@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Droplet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { apiCall } from '@/services/api'; // Import apiCall
+import { apiCall } from "@/services/api"; // Import apiCall
 
 interface WaterIntakeProps {
   selectedDate: string;
@@ -26,18 +25,17 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
       loadWaterData();
     };
 
-    window.addEventListener('measurementsRefresh', handleRefresh);
-    window.addEventListener('foodDiaryRefresh', handleRefresh); // Also listen for food diary refresh as it impacts overall progress
+    window.addEventListener("measurementsRefresh", handleRefresh);
+    window.addEventListener("foodDiaryRefresh", handleRefresh); // Also listen for food diary refresh as it impacts overall progress
 
     return () => {
-      window.removeEventListener('measurementsRefresh', handleRefresh);
-      window.removeEventListener('foodDiaryRefresh', handleRefresh);
+      window.removeEventListener("measurementsRefresh", handleRefresh);
+      window.removeEventListener("foodDiaryRefresh", handleRefresh);
     };
   }, [user, selectedDate]);
 
   const loadWaterData = async () => {
     try {
-      
       // Load water goal for selected date
       const goalData = await apiCall(`/goals/for-date?date=${selectedDate}`);
       if (goalData && goalData.water_goal) {
@@ -47,20 +45,24 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
       }
 
       // Load water intake for selected date - get all records and sum them
-      const waterData = await apiCall(`/measurements/water-intake/${selectedDate}`);
+      const waterData = await apiCall(
+        `/measurements/water-intake/${selectedDate}`,
+      );
       if (Array.isArray(waterData) && waterData.length > 0) {
         // Sum all glasses consumed for the day
-        const totalGlasses = waterData.reduce((sum, record) => sum + record.glasses_consumed, 0);
+        const totalGlasses = waterData.reduce(
+          (sum, record) => sum + record.glasses_consumed,
+          0,
+        );
         setWaterGlasses(totalGlasses);
       } else if (waterData && waterData.glasses_consumed !== undefined) {
         // If the API returns a single object with glasses_consumed
         setWaterGlasses(waterData.glasses_consumed);
-      }
-      else {
+      } else {
         setWaterGlasses(0);
       }
     } catch (error) {
-      console.error('Error loading water data:', error);
+      console.error("Error loading water data:", error);
       setWaterGlasses(0);
     }
   };
@@ -72,8 +74,8 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
       setLoading(true);
 
       // Use upsert for atomic update/insert
-      await apiCall('/measurements/water-intake', {
-        method: 'POST',
+      await apiCall("/measurements/water-intake", {
+        method: "POST",
         body: {
           user_id: user.id,
           entry_date: selectedDate,
@@ -81,14 +83,13 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
         },
       });
 
-
       toast({
         title: "Success",
         description: "Water intake updated",
       });
-      window.dispatchEvent(new Event('measurementsRefresh'));
+      window.dispatchEvent(new Event("measurementsRefresh"));
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to save water intake",
@@ -127,18 +128,18 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
           </div>
           <div className="text-gray-500 text-xs">glasses of water</div>
         </div>
-        
+
         {/* Water Bottle Visualization - takes up most space */}
-        <div className="flex-1 flex items-center justify-center mb-3">
+        <div className="flex-1 flex items-center  justify-center mb-3">
           <div className="relative flex flex-col items-center">
             {/* Bottle Cap */}
             <div className="w-5 h-1.5 bg-blue-400 rounded-t-sm mb-0.5"></div>
-            
+
             {/* Bottle Neck */}
             <div className="w-7 h-5 bg-gray-100 border-2 border-blue-400 rounded-sm mb-0.5"></div>
-            
+
             {/* Main Bottle Body */}
-            <div className="relative w-16 h-32 border-3 border-blue-400 rounded-xl bg-gray-50 overflow-hidden">
+            <div className="relative w-16 h-32 border-3 border-blue-400 rounded-xl bg-gray-50 dark:bg-slate-300 overflow-hidden">
               {/* Water Fill */}
               <div
                 className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 via-blue-400 to-blue-300 transition-all duration-700 ease-out rounded-b-xl"
@@ -149,25 +150,28 @@ const WaterIntake = ({ selectedDate }: WaterIntakeProps) => {
                   <div className="absolute top-0 w-full h-0.5 bg-blue-200 opacity-60 animate-pulse"></div>
                 )}
               </div>
-              
+
               {/* Bottle Highlight */}
               <div className="absolute top-3 left-2 w-2.5 h-10 bg-white opacity-30 rounded-full"></div>
-              
+
               {/* Water Level Lines */}
               <div className="absolute inset-0 flex flex-col justify-between p-0.5">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="w-full h-px bg-blue-200 opacity-40"></div>
+                  <div
+                    key={i}
+                    className="w-full h-px bg-blue-200 opacity-40"
+                  ></div>
                 ))}
               </div>
             </div>
-            
+
             {/* Progress Percentage */}
             <div className="text-xs text-gray-600 mt-1.5 font-medium">
               {Math.round(fillPercentage)}%
             </div>
           </div>
         </div>
-        
+
         {/* Water Control Buttons */}
         <div className="flex justify-center space-x-2">
           <Button
