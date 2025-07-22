@@ -15,6 +15,9 @@ export default defineNuxtConfig({
   ],
 
   content: {
+    locales: ['en'],
+    defaultLocale: 'en',
+    base: '/SparkyFitness/',
     sources: {
       content: {
         driver: 'fs',
