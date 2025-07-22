@@ -70,16 +70,8 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
       let newExercise: Exercise | undefined;
       if (selectedProviderType === 'wger') {
         newExercise = await addExternalExerciseToUserExercises(exercise.id);
-        toast({
-          title: "Success",
-          description: `${newExercise.name} added to your exercises.`,
-        });
       } else if (selectedProviderType === 'nutritionix') {
         newExercise = await addNutritionixExercise(exercise); // Call new function to add Nutritionix exercise
-        toast({
-          title: "Success",
-          description: `${newExercise.name} added to your exercises.`,
-        });
       } else {
         warn(loggingLevel, "ExerciseSearch: Unknown provider for adding external exercise:", selectedProviderType);
         return undefined;
@@ -87,6 +79,10 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
       
       if (newExercise) {
         onExerciseSelect(newExercise);
+        toast({
+          title: "Success",
+          description: `${exercise.name} added to your exercises.`,
+        });
       }
       return newExercise;
     } catch (error) {

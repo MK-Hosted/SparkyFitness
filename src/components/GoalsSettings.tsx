@@ -9,6 +9,8 @@ import { apiCall } from '@/services/api';
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/contexts/PreferencesContext"; // Added import
+import { useIsMobile } from "@/hooks/use-mobile";
+import { saveGoals as saveGoalsService } from '@/services/goalsService';
 import { GoalPreset, createGoalPreset, getGoalPresets, updateGoalPreset, deleteGoalPreset } from '@/services/goalPresetService';
 import { WeeklyGoalPlan, createWeeklyGoalPlan, getWeeklyGoalPlans, updateWeeklyGoalPlan, deleteWeeklyGoalPlan } from '@/services/weeklyGoalPlanService';
 import { PlusCircle, Edit, Trash2, CalendarDays } from "lucide-react";
@@ -19,43 +21,48 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import MealPercentageManager from './MealPercentageManager';
+import { Separator } from "@/components/ui/separator";
 
-interface ExpandedGoals {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  water_goal: number;
-  saturated_fat: number;
-  polyunsaturated_fat: number;
-  monounsaturated_fat: number;
-  trans_fat: number;
-  cholesterol: number;
-  sodium: number;
-  potassium: number;
-  dietary_fiber: number;
-  sugars: number;
-  vitamin_a: number;
-  vitamin_c: number;
-  calcium: number;
-  iron: number;
-  target_exercise_calories_burned: number;
-  target_exercise_duration_minutes: number;
-  protein_percentage: number | null;
-  carbs_percentage: number | null;
-  fat_percentage: number | null;
-}
+import { ExpandedGoals } from '@/types/goals';
 
 const GoalsSettings = () => {
   const { user } = useAuth();
-  const { dateFormat, formatDateInUserTimezone, parseDateInUserTimezone } = usePreferences(); // Corrected destructuring
+  const { dateFormat, formatDateInUserTimezone, parseDateInUserTimezone, nutrientDisplayPreferences, water_display_unit, setWaterDisplayUnit } = usePreferences(); // Corrected destructuring
+  
+  // Helper functions for unit conversion
+  const convertMlToSelectedUnit = (ml: number, unit: 'ml' | 'oz' | 'liter'): number => {
+    switch (unit) {
+      case 'oz':
+        return ml / 29.5735;
+      case 'liter':
+        return ml / 1000;
+      case 'ml':
+      default:
+        return ml;
+    }
+  };
+
+  const convertSelectedUnitToMl = (value: number, unit: 'ml' | 'oz' | 'liter'): number => {
+    switch (unit) {
+      case 'oz':
+        return value * 29.5735;
+      case 'liter':
+        return value * 1000;
+      case 'ml':
+      default:
+        return value;
+    }
+  };
+
   const [goals, setGoals] = useState<ExpandedGoals>({
-    calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal: 8,
+    calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal_ml: 1920, // Default to 8 glasses * 240ml
     saturated_fat: 20, polyunsaturated_fat: 10, monounsaturated_fat: 25, trans_fat: 0,
     cholesterol: 300, sodium: 2300, potassium: 3500, dietary_fiber: 25, sugars: 50,
     vitamin_a: 900, vitamin_c: 90, calcium: 1000, iron: 18,
     target_exercise_calories_burned: 0, target_exercise_duration_minutes: 0,
-    protein_percentage: null, carbs_percentage: null, fat_percentage: null
+    protein_percentage: null, carbs_percentage: null, fat_percentage: null,
+    breakfast_percentage: 25, lunch_percentage: 25, dinner_percentage: 25, snacks_percentage: 25
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,7 +105,7 @@ const GoalsSettings = () => {
           protein: goalData.protein || 150,
           carbs: goalData.carbs || 250,
           fat: goalData.fat || 67,
-          water_goal: goalData.water_goal || 8,
+          water_goal_ml: goalData.water_goal_ml || 1920, // Default to 8 glasses * 240ml
           saturated_fat: goalData.saturated_fat || 20,
           polyunsaturated_fat: goalData.polyunsaturated_fat || 10,
           monounsaturated_fat: goalData.monounsaturated_fat || 25,
@@ -116,7 +123,11 @@ const GoalsSettings = () => {
           target_exercise_duration_minutes: goalData.target_exercise_duration_minutes || 0,
           protein_percentage: goalData.protein_percentage || null,
           carbs_percentage: goalData.carbs_percentage || null,
-          fat_percentage: goalData.fat_percentage || null
+          fat_percentage: goalData.fat_percentage || null,
+          breakfast_percentage: goalData.breakfast_percentage || 25,
+          lunch_percentage: goalData.lunch_percentage || 25,
+          dinner_percentage: goalData.dinner_percentage || 25,
+          snacks_percentage: goalData.snacks_percentage || 25
         });
       }
     } catch (error) {
@@ -143,12 +154,13 @@ const GoalsSettings = () => {
   const handleCreatePresetClick = () => {
     setCurrentPreset({
       preset_name: '',
-      calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal: 8,
+      calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal_ml: 1920, // Default to 8 glasses * 240ml
       saturated_fat: 20, polyunsaturated_fat: 10, monounsaturated_fat: 25, trans_fat: 0,
       cholesterol: 300, sodium: 2300, potassium: 3500, dietary_fiber: 25, sugars: 50,
       vitamin_a: 900, vitamin_c: 90, calcium: 1000, iron: 18,
       target_exercise_calories_burned: 0, target_exercise_duration_minutes: 0,
-      protein_percentage: null, carbs_percentage: null, fat_percentage: null
+      protein_percentage: null, carbs_percentage: null, fat_percentage: null,
+      breakfast_percentage: 25, lunch_percentage: 25, dinner_percentage: 25, snacks_percentage: 25
     });
     setPresetMacroInputType('grams'); // Default to grams for new preset
     setIsPresetDialogOpen(true);
@@ -320,7 +332,7 @@ const GoalsSettings = () => {
     }
   };
 
-  const saveGoals = async () => {
+  const handleSaveGoals = async () => {
     if (!user) return;
 
     try {
@@ -328,41 +340,8 @@ const GoalsSettings = () => {
       
       const today = new Date().toISOString().split('T')[0];
       
-      await apiCall(`/goals/manage-timeline`, {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: user.id,
-          p_start_date: today,
-          p_calories: goals.calories,
-          p_protein: goals.protein,
-          p_carbs: goals.carbs,
-          p_fat: goals.fat,
-          p_water_goal: goals.water_goal,
-          p_saturated_fat: goals.saturated_fat,
-          p_polyunsaturated_fat: goals.polyunsaturated_fat,
-          p_monounsaturated_fat: goals.monounsaturated_fat,
-          p_trans_fat: goals.trans_fat,
-          p_cholesterol: goals.cholesterol,
-          p_sodium: goals.sodium,
-          p_potassium: goals.potassium,
-          p_dietary_fiber: goals.dietary_fiber,
-          p_sugars: goals.sugars,
-          p_vitamin_a: goals.vitamin_a,
-          p_vitamin_c: goals.vitamin_c,
-          p_calcium: goals.calcium,
-          p_iron: goals.iron,
-          p_target_exercise_calories_burned: goals.target_exercise_calories_burned,
-          p_target_exercise_duration_minutes: goals.target_exercise_duration_minutes,
-          p_protein_percentage: goals.protein_percentage,
-          p_carbs_percentage: goals.carbs_percentage,
-          p_fat_percentage: goals.fat_percentage
-        }),
-      });
-
-      toast({
-        title: "Success",
-        description: "Goals updated and will apply for the next 6 months (or until your next future goal)",
-      });
+      console.log("GoalsSettings: Saving goals with payload:", goals); // Re-enable logging
+      await saveGoalsService(today, goals, true);
 
       toast({
         title: "Success",
@@ -381,6 +360,11 @@ const GoalsSettings = () => {
       setSaving(false);
     }
   };
+
+  const isMobile = useIsMobile();
+  const platform = isMobile ? 'mobile' : 'desktop';
+  const goalPreferences = nutrientDisplayPreferences.find(p => p.view_group === 'goal' && p.platform === platform);
+  const visibleNutrients = goalPreferences ? goalPreferences.visible_nutrients : Object.keys(goals);
 
   if (!user) {
     return <div>Please sign in to manage your goals.</div>;
@@ -412,7 +396,7 @@ const GoalsSettings = () => {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Primary Macros */}
-            <div>
+            {visibleNutrients.includes('calories') && <div>
               <Label htmlFor="calories">Calories</Label>
               <Input
                 id="calories"
@@ -420,9 +404,9 @@ const GoalsSettings = () => {
                 value={goals.calories}
                 onChange={(e) => setGoals({ ...goals, calories: Number(e.target.value) })}
               />
-            </div>
+            </div>}
             
-            <div>
+            {visibleNutrients.includes('protein') && <div>
               <Label htmlFor="protein">Protein (g)</Label>
               <Input
                 id="protein"
@@ -430,9 +414,9 @@ const GoalsSettings = () => {
                 value={goals.protein}
                 onChange={(e) => setGoals({ ...goals, protein: Number(e.target.value) })}
               />
-            </div>
+            </div>}
             
-            <div>
+            {visibleNutrients.includes('carbs') && <div>
               <Label htmlFor="carbs">Carbohydrates (g)</Label>
               <Input
                 id="carbs"
@@ -440,9 +424,9 @@ const GoalsSettings = () => {
                 value={goals.carbs}
                 onChange={(e) => setGoals({ ...goals, carbs: Number(e.target.value) })}
               />
-            </div>
+            </div>}
             
-            <div>
+            {visibleNutrients.includes('fat') && <div>
               <Label htmlFor="fat">Fat (g)</Label>
               <Input
                 id="fat"
@@ -450,10 +434,10 @@ const GoalsSettings = () => {
                 value={goals.fat}
                 onChange={(e) => setGoals({ ...goals, fat: Number(e.target.value) })}
               />
-            </div>
+            </div>}
 
             {/* Fat Types */}
-            <div>
+            {visibleNutrients.includes('saturated_fat') && <div>
               <Label htmlFor="saturated_fat">Saturated Fat (g)</Label>
               <Input
                 id="saturated_fat"
@@ -461,9 +445,9 @@ const GoalsSettings = () => {
                 value={goals.saturated_fat}
                 onChange={(e) => setGoals({ ...goals, saturated_fat: Number(e.target.value) })}
               />
-            </div>
+            </div>}
 
-            <div>
+            {visibleNutrients.includes('polyunsaturated_fat') && <div>
               <Label htmlFor="polyunsaturated_fat">Polyunsaturated Fat (g)</Label>
               <Input
                 id="polyunsaturated_fat"
@@ -471,9 +455,9 @@ const GoalsSettings = () => {
                 value={goals.polyunsaturated_fat}
                 onChange={(e) => setGoals({ ...goals, polyunsaturated_fat: Number(e.target.value) })}
               />
-            </div>
+            </div>}
 
-            <div>
+            {visibleNutrients.includes('monounsaturated_fat') && <div>
               <Label htmlFor="monounsaturated_fat">Monounsaturated Fat (g)</Label>
               <Input
                 id="monounsaturated_fat"
@@ -481,9 +465,9 @@ const GoalsSettings = () => {
                 value={goals.monounsaturated_fat}
                 onChange={(e) => setGoals({ ...goals, monounsaturated_fat: Number(e.target.value) })}
               />
-            </div>
+            </div>}
 
-            <div>
+            {visibleNutrients.includes('trans_fat') && <div>
               <Label htmlFor="trans_fat">Trans Fat (g)</Label>
               <Input
                 id="trans_fat"
@@ -491,10 +475,10 @@ const GoalsSettings = () => {
                 value={goals.trans_fat}
                 onChange={(e) => setGoals({ ...goals, trans_fat: Number(e.target.value) })}
               />
-            </div>
+            </div>}
 
             {/* Other Nutrients */}
-            <div>
+            {visibleNutrients.includes('cholesterol') && <div>
               <Label htmlFor="cholesterol">Cholesterol (mg)</Label>
               <Input
                 id="cholesterol"
@@ -502,8 +486,8 @@ const GoalsSettings = () => {
                 value={goals.cholesterol}
                 onChange={(e) => setGoals({ ...goals, cholesterol: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('sodium') && <div>
               <Label htmlFor="sodium">Sodium (mg)</Label>
               <Input
                 id="sodium"
@@ -511,8 +495,8 @@ const GoalsSettings = () => {
                 value={goals.sodium}
                 onChange={(e) => setGoals({ ...goals, sodium: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('potassium') && <div>
               <Label htmlFor="potassium">Potassium (mg)</Label>
               <Input
                 id="potassium"
@@ -520,8 +504,8 @@ const GoalsSettings = () => {
                 value={goals.potassium}
                 onChange={(e) => setGoals({ ...goals, potassium: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('dietary_fiber') && <div>
               <Label htmlFor="dietary_fiber">Dietary Fiber (g)</Label>
               <Input
                 id="dietary_fiber"
@@ -529,8 +513,8 @@ const GoalsSettings = () => {
                 value={goals.dietary_fiber}
                 onChange={(e) => setGoals({ ...goals, dietary_fiber: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('sugars') && <div>
               <Label htmlFor="sugars">Sugars (g)</Label>
               <Input
                 id="sugars"
@@ -538,9 +522,9 @@ const GoalsSettings = () => {
                 value={goals.sugars}
                 onChange={(e) => setGoals({ ...goals, sugars: Number(e.target.value) })}
               />
-            </div>
+            </div>}
             {/* Vitamins and Minerals */}
-            <div>
+            {visibleNutrients.includes('vitamin_a') && <div>
               <Label htmlFor="vitamin_a">Vitamin A (mcg)</Label>
               <Input
                 id="vitamin_a"
@@ -548,8 +532,8 @@ const GoalsSettings = () => {
                 value={goals.vitamin_a}
                 onChange={(e) => setGoals({ ...goals, vitamin_a: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('vitamin_c') && <div>
               <Label htmlFor="vitamin_c">Vitamin C (mg)</Label>
               <Input
                 id="vitamin_c"
@@ -557,8 +541,8 @@ const GoalsSettings = () => {
                 value={goals.vitamin_c}
                 onChange={(e) => setGoals({ ...goals, vitamin_c: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('calcium') && <div>
               <Label htmlFor="calcium">Calcium (mg)</Label>
               <Input
                 id="calcium"
@@ -566,8 +550,8 @@ const GoalsSettings = () => {
                 value={goals.calcium}
                 onChange={(e) => setGoals({ ...goals, calcium: Number(e.target.value) })}
               />
-            </div>
-            <div>
+            </div>}
+            {visibleNutrients.includes('iron') && <div>
               <Label htmlFor="iron">Iron (mg)</Label>
               <Input
                 id="iron"
@@ -575,16 +559,29 @@ const GoalsSettings = () => {
                 value={goals.iron}
                 onChange={(e) => setGoals({ ...goals, iron: Number(e.target.value) })}
               />
-            </div>
+            </div>}
             
             <div>
-              <Label htmlFor="water">Water Goal (glasses)</Label>
+              <Label htmlFor="water">Water Goal ({water_display_unit})</Label>
               <Input
                 id="water"
                 type="number"
-                value={goals.water_goal}
-                onChange={(e) => setGoals({ ...goals, water_goal: Number(e.target.value) })}
+                value={convertMlToSelectedUnit(goals.water_goal_ml, water_display_unit)}
+                onChange={(e) => setGoals({ ...goals, water_goal_ml: convertSelectedUnitToMl(Number(e.target.value), water_display_unit) })}
               />
+              <Select
+                value={water_display_unit}
+                onValueChange={(value: 'ml' | 'oz' | 'liter') => setWaterDisplayUnit(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ml">ml</SelectItem>
+                  <SelectItem value="oz">oz</SelectItem>
+                  <SelectItem value="liter">liter</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* Exercise Goals */}
             <div>
@@ -607,11 +604,32 @@ const GoalsSettings = () => {
             </div>
           </div>
 
+          <Separator className="my-6" />
+
+          <h3 className="text-lg font-semibold mb-4">Meal Calorie Distribution</h3>
+          <MealPercentageManager
+            initialPercentages={{
+              breakfast: goals.breakfast_percentage,
+              lunch: goals.lunch_percentage,
+              dinner: goals.dinner_percentage,
+              snacks: goals.snacks_percentage,
+            }}
+            onPercentagesChange={(newPercentages) => {
+              setGoals(prevGoals => ({
+                ...prevGoals,
+                breakfast_percentage: newPercentages.breakfast,
+                lunch_percentage: newPercentages.lunch,
+                dinner_percentage: newPercentages.dinner,
+                snacks_percentage: newPercentages.snacks,
+              }));
+            }}
+          />
+
           <div className="mt-6">
-            <Button 
-              onClick={saveGoals} 
-              className="w-full" 
-              disabled={saving}
+            <Button
+              onClick={handleSaveGoals}
+              className="w-full"
+              disabled={saving || (goals.breakfast_percentage + goals.lunch_percentage + goals.dinner_percentage + goals.snacks_percentage) !== 100}
             >
               {saving ? 'Saving...' : 'Save Goals'}
             </Button>
@@ -839,8 +857,26 @@ const GoalsSettings = () => {
                   <Input id="iron" type="number" value={currentPreset.iron} onChange={(e) => setCurrentPreset({ ...currentPreset, iron: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <Label htmlFor="water_goal">Water (gl)</Label>
-                  <Input id="water_goal" type="number" value={currentPreset.water_goal} onChange={(e) => setCurrentPreset({ ...currentPreset, water_goal: Number(e.target.value) })} />
+                  <Label htmlFor="water_goal_ml">Water ({water_display_unit})</Label>
+                  <Input
+                    id="water_goal_ml"
+                    type="number"
+                    value={convertMlToSelectedUnit(currentPreset.water_goal_ml, water_display_unit)}
+                    onChange={(e) => setCurrentPreset({ ...currentPreset, water_goal_ml: convertSelectedUnitToMl(Number(e.target.value), water_display_unit) })}
+                  />
+                  <Select
+                    value={water_display_unit}
+                    onValueChange={(value: 'ml' | 'oz' | 'liter') => setWaterDisplayUnit(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ml">ml</SelectItem>
+                      <SelectItem value="oz">oz</SelectItem>
+                      <SelectItem value="liter">liter</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -858,11 +894,34 @@ const GoalsSettings = () => {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button onClick={handleSavePreset} disabled={presetSaving}>
-              {presetSaving ? 'Saving...' : 'Save Preset'}
-            </Button>
-          </DialogFooter>
+          {currentPreset && (
+            <>
+              <Separator className="my-6" />
+              <h3 className="text-lg font-semibold col-span-full mt-4">Meal Calorie Distribution</h3>
+              <MealPercentageManager
+                initialPercentages={{
+                  breakfast: currentPreset.breakfast_percentage,
+                  lunch: currentPreset.lunch_percentage,
+                  dinner: currentPreset.dinner_percentage,
+                  snacks: currentPreset.snacks_percentage,
+                }}
+                onPercentagesChange={(newPercentages) => {
+                  setCurrentPreset(prevPreset => prevPreset ? ({
+                    ...prevPreset,
+                    breakfast_percentage: newPercentages.breakfast,
+                    lunch_percentage: newPercentages.lunch,
+                    dinner_percentage: newPercentages.dinner,
+                    snacks_percentage: newPercentages.snacks,
+                  }) : null);
+                }}
+              />
+              <DialogFooter>
+                <Button onClick={handleSavePreset} disabled={presetSaving || (currentPreset.breakfast_percentage + currentPreset.lunch_percentage + currentPreset.dinner_percentage + currentPreset.snacks_percentage) !== 100}>
+                  {presetSaving ? 'Saving...' : 'Save Preset'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

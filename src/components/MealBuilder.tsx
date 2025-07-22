@@ -9,11 +9,12 @@ import { useActiveUser } from '@/contexts/ActiveUserContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { toast } from '@/hooks/use-toast';
 import { debug, info, warn, error } from '@/utils/logging';
-import { Food, FoodVariant } from '@/types/food';
+import { Food, FoodVariant, FoodSearchResult } from '@/types/food'; // Import FoodSearchResult
 import { Meal, MealFood, MealPayload } from '@/types/meal'; // Assuming you'll create this type
 import { createMeal, updateMeal, getMealById } from '@/services/mealService'; // Assuming you'll create this service
 import { searchFoods } from '@/services/foodService'; // Existing food service
-import FoodUnitSelector from '@/components/FoodUnitSelector'; // Import FoodUnitSelector
+import FoodUnitSelector from '@/components/FoodUnitSelector';
+import FoodSearchDialog from './FoodSearchDialog';
 
 interface MealBuilderProps {
   mealId?: string; // Optional: if editing an existing meal
@@ -21,16 +22,16 @@ interface MealBuilderProps {
   onCancel?: () => void;
 }
 
+
 const MealBuilder: React.FC<MealBuilderProps> = ({ mealId, onSave, onCancel }) => {
   const { activeUserId } = useActiveUser();
-  const { loggingLevel } = usePreferences();
+  const { loggingLevel, foodDisplayLimit } = usePreferences(); // Get foodDisplayLimit
   const [mealName, setMealName] = useState('');
   const [mealDescription, setMealDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [mealFoods, setMealFoods] = useState<MealFood[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<Food[]>([]);
   const [isFoodUnitSelectorOpen, setIsFoodUnitSelectorOpen] = useState(false);
+  const [showFoodSearchDialog, setShowFoodSearchDialog] = useState(false);
   const [selectedFoodForUnitSelection, setSelectedFoodForUnitSelection] = useState<Food | null>(null);
 
   useEffect(() => {
@@ -57,23 +58,6 @@ const MealBuilder: React.FC<MealBuilderProps> = ({ mealId, onSave, onCancel }) =
     }
   }, [mealId, activeUserId, loggingLevel]);
 
-  const handleSearchFoods = useCallback(async () => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const foods = await searchFoods(activeUserId!, searchTerm, activeUserId!, false, true, true);
-      setSearchResults(foods);
-    } catch (err) {
-      error(loggingLevel, 'Error searching foods:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to search foods.',
-        variant: 'destructive',
-      });
-    }
-  }, [searchTerm, activeUserId, loggingLevel]);
 
   const handleAddFoodToMeal = useCallback((food: Food) => {
     setSelectedFoodForUnitSelection(food);
@@ -97,8 +81,6 @@ const MealBuilder: React.FC<MealBuilderProps> = ({ mealId, onSave, onCancel }) =
     setMealFoods(prev => [...prev, newMealFood]);
     setIsFoodUnitSelectorOpen(false);
     setSelectedFoodForUnitSelection(null);
-    setSearchTerm('');
-    setSearchResults([]);
     toast({
       title: 'Success',
       description: `${food.name} added to meal.`,
@@ -137,9 +119,16 @@ const MealBuilder: React.FC<MealBuilderProps> = ({ mealId, onSave, onCancel }) =
       is_public: isPublic,
       foods: mealFoods.map(mf => ({
         food_id: mf.food_id,
+        food_name: mf.food_name,
         variant_id: mf.variant_id,
         quantity: mf.quantity,
         unit: mf.unit,
+        calories: mf.calories,
+        protein: mf.protein,
+        carbs: mf.carbs,
+        fat: mf.fat,
+        serving_size: mf.serving_size,
+        serving_unit: mf.serving_unit,
       })),
     };
 
@@ -242,45 +231,30 @@ const MealBuilder: React.FC<MealBuilderProps> = ({ mealId, onSave, onCancel }) =
 
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Add Food to Meal</h3>
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Search for food..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearchFoods();
-                }
-              }}
-              className="flex-1"
-            />
-            <Button onClick={handleSearchFoods}>
-              <Search className="h-4 w-4 mr-2" /> Search
-            </Button>
-          </div>
-
-          {searchResults.length > 0 && (
-            <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
-              {searchResults.map(food => (
-                <div key={food.id} className="flex items-center justify-between p-1 hover:bg-accent rounded-sm">
-                  <span>{food.name} {food.brand ? `(${food.brand})` : ''}</span>
-                  <Button variant="outline" size="sm" onClick={() => handleAddFoodToMeal(food)}>
-                    Add
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedFoodForUnitSelection && (
-            <FoodUnitSelector
-              food={selectedFoodForUnitSelection}
-              open={isFoodUnitSelectorOpen}
-              onOpenChange={setIsFoodUnitSelectorOpen}
-              onSelect={handleFoodUnitSelected}
-            />
-          )}
+          <Button onClick={() => setShowFoodSearchDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Food
+          </Button>
         </div>
+
+        {selectedFoodForUnitSelection && (
+          <FoodUnitSelector
+            food={selectedFoodForUnitSelection}
+            open={isFoodUnitSelectorOpen}
+            onOpenChange={setIsFoodUnitSelectorOpen}
+            onSelect={handleFoodUnitSelected}
+          />
+        )}
+
+        <FoodSearchDialog
+          open={showFoodSearchDialog}
+          onOpenChange={setShowFoodSearchDialog}
+          onFoodSelect={(food) => {
+            setShowFoodSearchDialog(false);
+            handleAddFoodToMeal(food);
+          }}
+          title="Add Food to Meal"
+          description="Search for a food to add to this meal."
+        />
 
         <div className="flex justify-end space-x-2">
           <Button variant="outline" onClick={onCancel}>Cancel</Button>

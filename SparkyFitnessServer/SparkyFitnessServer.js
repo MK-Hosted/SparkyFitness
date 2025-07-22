@@ -11,6 +11,7 @@ const foodRoutes = require('./routes/foodRoutes');
 const mealRoutes = require('./routes/mealRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const preferenceRoutes = require('./routes/preferenceRoutes');
+const nutrientDisplayPreferenceRoutes = require('./routes/nutrientDisplayPreferenceRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const measurementRoutes = require('./routes/measurementRoutes');
 const goalRoutes = require('./routes/goalRoutes');
@@ -27,6 +28,7 @@ const { router: openidRoutes, initializeOidcClient } = require('./openidRoutes')
 const oidcSettingsRoutes = require('./routes/oidcSettingsRoutes');
 const versionRoutes = require('./routes/versionRoutes');
 const { applyMigrations } = require('./utils/dbMigrations');
+const waterContainerRoutes = require('./routes/waterContainerRoutes');
 const errorHandler = require('./middleware/errorHandler'); // Import the new error handler
 
 const app = express();
@@ -89,6 +91,7 @@ app.use((req, res, next) => {
   const publicRoutes = [
     '/auth/login',
     '/auth/register',
+    '/auth/settings',
     '/health-data',
     '/health',
     '/openid', // All OIDC routes are handled by session, not JWT token
@@ -112,6 +115,7 @@ app.use('/foods', foodRoutes);
 app.use('/meals', mealRoutes);
 app.use('/reports', reportRoutes);
 app.use('/user-preferences', preferenceRoutes);
+app.use('/preferences/nutrient-display', nutrientDisplayPreferenceRoutes);
 app.use('/measurements', measurementRoutes);
 app.use('/goals', goalRoutes);
 app.use('/user-goals', goalRoutes);
@@ -129,6 +133,7 @@ app.use('/admin/oidc-settings', oidcSettingsRoutes); // Admin OIDC settings rout
 app.use('/version', versionRoutes); // Version routes
 log('debug', 'Registering /openid routes');
 app.use('/openid', openidRoutes); // Import OpenID routes
+app.use('/water-containers', waterContainerRoutes);
 
 console.log('DEBUG: Attempting to start server...');
 applyMigrations().then(async () => {

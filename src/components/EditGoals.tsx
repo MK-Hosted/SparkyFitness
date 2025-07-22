@@ -12,7 +12,11 @@ import { GoalPreset } from '@/services/goalPresetService';
 import { getGoalPresets } from '@/services/goalPresetService';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExpandedGoals } from '@/types/goals'; // Import from new types file
+import { ExpandedGoals } from '@/types/goals';
+import MealPercentageManager from './MealPercentageManager';
+import { Separator } from "@/components/ui/separator";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 interface EditGoalsProps {
@@ -23,12 +27,41 @@ interface EditGoalsProps {
 
 const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
   const { user } = useAuth();
+  const { formatDate, nutrientDisplayPreferences, water_display_unit, setWaterDisplayUnit } = usePreferences();
+  const isMobile = useIsMobile();
+
+  // Helper functions for unit conversion
+  const convertMlToSelectedUnit = (ml: number, unit: 'ml' | 'oz' | 'liter'): number => {
+    switch (unit) {
+      case 'oz':
+        return ml / 29.5735;
+      case 'liter':
+        return ml / 1000;
+      case 'ml':
+      default:
+        return ml;
+    }
+  };
+
+  const convertSelectedUnitToMl = (value: number, unit: 'ml' | 'oz' | 'liter'): number => {
+    switch (unit) {
+      case 'oz':
+        return value * 29.5735;
+      case 'liter':
+        return value * 1000;
+      case 'ml':
+      default:
+        return value;
+    }
+  };
+  const platform = isMobile ? 'mobile' : 'desktop';
+
   const [goals, setGoals] = useState<ExpandedGoals>({
     calories: 2000,
     protein: 150,
     carbs: 250,
     fat: 67,
-    water_goal: 8,
+    water_goal_ml: 1920, // Default to 8 glasses * 240ml
     saturated_fat: 20,
     polyunsaturated_fat: 10,
     monounsaturated_fat: 25,
@@ -46,9 +79,15 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
     target_exercise_duration_minutes: 0,
     protein_percentage: null,
     carbs_percentage: null,
-    fat_percentage: null
+    fat_percentage: null,
+    breakfast_percentage: 25,
+    lunch_percentage: 25,
+    dinner_percentage: 25,
+    snacks_percentage: 25
   });
   const [loading, setLoading] = useState(false);
+  const goalPreferences = nutrientDisplayPreferences.find(p => p.view_group === 'goal' && p.platform === platform);
+  const visibleNutrients = goalPreferences ? goalPreferences.visible_nutrients : Object.keys(goals);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [goalPresets, setGoalPresets] = useState<GoalPreset[]>([]);
@@ -68,15 +107,20 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
       setLoading(true);
       
       const goalData = await loadGoals(selectedDate);
-      const cleanGoalValue = (value: number | null | undefined, defaultValue: number) =>
-        isNaN(value as number) || value === null || value === undefined ? defaultValue : value;
+      const cleanGoalValue = (value: any, defaultValue: number | null): number | null => {
+        if (value === null || value === undefined || value === '') {
+            return defaultValue;
+        }
+        const num = Number(value);
+        return isNaN(num) ? defaultValue : num;
+      };
 
       setGoals({
         calories: cleanGoalValue(goalData.calories, 2000),
         protein: cleanGoalValue(goalData.protein, 150),
         carbs: cleanGoalValue(goalData.carbs, 250),
         fat: cleanGoalValue(goalData.fat, 67),
-        water_goal: cleanGoalValue(goalData.water_goal, 8),
+        water_goal_ml: cleanGoalValue(goalData.water_goal_ml, 1920), // Default to 8 glasses * 240ml
         saturated_fat: cleanGoalValue(goalData.saturated_fat, 20),
         polyunsaturated_fat: cleanGoalValue(goalData.polyunsaturated_fat, 10),
         monounsaturated_fat: cleanGoalValue(goalData.monounsaturated_fat, 25),
@@ -94,7 +138,11 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
         target_exercise_duration_minutes: cleanGoalValue(goalData.target_exercise_duration_minutes, 0),
         protein_percentage: cleanGoalValue(goalData.protein_percentage, null),
         carbs_percentage: cleanGoalValue(goalData.carbs_percentage, null),
-        fat_percentage: cleanGoalValue(goalData.fat_percentage, null)
+        fat_percentage: cleanGoalValue(goalData.fat_percentage, null),
+        breakfast_percentage: cleanGoalValue(goalData.breakfast_percentage, 25),
+        lunch_percentage: cleanGoalValue(goalData.lunch_percentage, 25),
+        dinner_percentage: cleanGoalValue(goalData.dinner_percentage, 25),
+        snacks_percentage: cleanGoalValue(goalData.snacks_percentage, 25)
       });
 
       // Determine macro input type based on loaded data
@@ -153,13 +201,13 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
       }
 
       console.log("Goals to save:", goalsToSave); // Add this line for debugging
-      await saveGoals(selectedDate, goalsToSave);
+      // Convert water_goal_ml to the correct backend field name if necessary
+      // The backend expects water_goal_ml, so no conversion needed here.
+      await saveGoals(selectedDate, goalsToSave, false);
 
       toast({
         title: "Success",
-        description: selectedDate >= new Date().toISOString().split('T')[0]
-          ? "Goals updated and will apply for the next 6 months (or until your next future goal)"
-          : "Goal updated for this specific date",
+        description: "Goal updated for this specific date",
       });
       
       setOpen(false);
@@ -185,7 +233,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
         protein: preset.protein,
         carbs: preset.carbs,
         fat: preset.fat,
-        water_goal: preset.water_goal,
+        water_goal_ml: preset.water_goal_ml,
         saturated_fat: preset.saturated_fat,
         polyunsaturated_fat: preset.polyunsaturated_fat,
         monounsaturated_fat: preset.monounsaturated_fat,
@@ -204,6 +252,10 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
         protein_percentage: preset.protein_percentage,
         carbs_percentage: preset.carbs_percentage,
         fat_percentage: preset.fat_percentage,
+        breakfast_percentage: preset.breakfast_percentage,
+        lunch_percentage: preset.lunch_percentage,
+        dinner_percentage: preset.dinner_percentage,
+        snacks_percentage: preset.snacks_percentage,
       });
       // Set macro input type based on the applied preset
       if (preset.protein_percentage !== null && preset.carbs_percentage !== null && preset.fat_percentage !== null) {
@@ -224,13 +276,14 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
       // A more robust solution might involve a backend endpoint to explicitly delete date-specific goals
       // and let the cascading logic take over.
       await saveGoals(selectedDate, {
-        calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal: 8,
+        calories: 2000, protein: 150, carbs: 250, fat: 67, water_goal_ml: 1920, // Default to 8 glasses * 240ml
         saturated_fat: 20, polyunsaturated_fat: 10, monounsaturated_fat: 25, trans_fat: 0,
         cholesterol: 300, sodium: 2300, potassium: 3500, dietary_fiber: 25, sugars: 50,
         vitamin_a: 900, vitamin_c: 90, calcium: 1000, iron: 18,
         target_exercise_calories_burned: 0, target_exercise_duration_minutes: 0,
-        protein_percentage: null, carbs_percentage: null, fat_percentage: null
-      });
+        protein_percentage: null, carbs_percentage: null, fat_percentage: null,
+        breakfast_percentage: 25, lunch_percentage: 25, dinner_percentage: 25, snacks_percentage: 25
+      }, false);
       toast({
         title: "Success",
         description: "Date-specific goal cleared. Default or weekly plan will now apply.",
@@ -263,11 +316,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Goals for {selectedDate}</DialogTitle>
+          <DialogTitle>Edit Goals for {formatDate(selectedDate)}</DialogTitle>
           <DialogDescription>
-            {selectedDate >= new Date().toISOString().split('T')[0] 
-              ? "Changes will cascade for 6 months or until your next future goal"
-              : "Changes will only apply to this specific date"}
+            Changes will only apply to this specific date.
           </DialogDescription>
         </DialogHeader>
         {loading ? (
@@ -303,7 +354,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
 
             <div className="grid grid-cols-2 gap-4">
               {/* Primary Macros */}
-              <div>
+              {visibleNutrients.includes('calories') && <div>
                 <Label htmlFor="calories">Calories</Label>
                 <Input
                   id="calories"
@@ -311,7 +362,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                   value={goals.calories}
                   onChange={(e) => setGoals({ ...goals, calories: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                 />
-              </div>
+              </div>}
             </div>
 
             {/* Macro Input Type Toggle */}
@@ -335,7 +386,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
 
             {macroInputType === 'grams' ? (
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                {visibleNutrients.includes('protein') && <div>
                   <Label htmlFor="protein">Protein (g)</Label>
                   <Input
                     id="protein"
@@ -343,9 +394,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.protein}
                     onChange={(e) => setGoals({ ...goals, protein: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
                 
-                <div>
+                {visibleNutrients.includes('carbs') && <div>
                   <Label htmlFor="carbs">Carbs (g)</Label>
                   <Input
                     id="carbs"
@@ -353,9 +404,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.carbs}
                     onChange={(e) => setGoals({ ...goals, carbs: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
                 
-                <div>
+                {visibleNutrients.includes('fat') && <div>
                   <Label htmlFor="fat">Fat (g)</Label>
                   <Input
                     id="fat"
@@ -363,11 +414,11 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.fat}
                     onChange={(e) => setGoals({ ...goals, fat: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                {visibleNutrients.includes('protein') && <div>
                   <Label htmlFor="protein_percentage">Protein (%)</Label>
                   <Input
                     id="protein_percentage"
@@ -375,8 +426,8 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.protein_percentage ?? ''}
                     onChange={(e) => setGoals({ ...goals, protein_percentage: e.target.value === '' ? null : (isNaN(Number(e.target.value)) ? null : Number(e.target.value)) })}
                   />
-                </div>
-                <div>
+                </div>}
+                {visibleNutrients.includes('carbs') && <div>
                   <Label htmlFor="carbs_percentage">Carbs (%)</Label>
                   <Input
                     id="carbs_percentage"
@@ -384,8 +435,8 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.carbs_percentage ?? ''}
                     onChange={(e) => setGoals({ ...goals, carbs_percentage: e.target.value === '' ? null : (isNaN(Number(e.target.value)) ? null : Number(e.target.value)) })}
                   />
-                </div>
-                <div>
+                </div>}
+                {visibleNutrients.includes('fat') && <div>
                   <Label htmlFor="fat_percentage">Fat (%)</Label>
                   <Input
                     id="fat_percentage"
@@ -393,7 +444,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.fat_percentage ?? ''}
                     onChange={(e) => setGoals({ ...goals, fat_percentage: e.target.value === '' ? null : (isNaN(Number(e.target.value)) ? null : Number(e.target.value)) })}
                   />
-                </div>
+                </div>}
                 <p className="col-span-2 text-center text-sm text-gray-500">
                   Calculated Grams: Protein {((goals.calories * (goals.protein_percentage || 0) / 100) / 4).toFixed(1)}g, Carbs {((goals.calories * (goals.carbs_percentage || 0) / 100) / 4).toFixed(1)}g, Fat {((goals.calories * (goals.fat_percentage || 0) / 100) / 9).toFixed(1)}g
                 </p>
@@ -402,7 +453,7 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
 
               {/* Fat Types */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                {visibleNutrients.includes('saturated_fat') && <div>
                   <Label htmlFor="saturated_fat">Sat Fat (g)</Label>
                   <Input
                     id="saturated_fat"
@@ -410,9 +461,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.saturated_fat}
                     onChange={(e) => setGoals({ ...goals, saturated_fat: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('polyunsaturated_fat') && <div>
                   <Label htmlFor="polyunsaturated_fat">Poly Fat (g)</Label>
                   <Input
                     id="polyunsaturated_fat"
@@ -420,9 +471,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.polyunsaturated_fat}
                     onChange={(e) => setGoals({ ...goals, polyunsaturated_fat: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('monounsaturated_fat') && <div>
                   <Label htmlFor="monounsaturated_fat">Mono Fat (g)</Label>
                   <Input
                     id="monounsaturated_fat"
@@ -430,9 +481,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.monounsaturated_fat}
                     onChange={(e) => setGoals({ ...goals, monounsaturated_fat: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('trans_fat') && <div>
                   <Label htmlFor="trans_fat">Trans Fat (g)</Label>
                   <Input
                     id="trans_fat"
@@ -440,10 +491,10 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.trans_fat}
                     onChange={(e) => setGoals({ ...goals, trans_fat: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
                 {/* Other Nutrients */}
-                <div>
+                {visibleNutrients.includes('cholesterol') && <div>
                   <Label htmlFor="cholesterol">Cholesterol (mg)</Label>
                   <Input
                     id="cholesterol"
@@ -451,9 +502,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.cholesterol}
                     onChange={(e) => setGoals({ ...goals, cholesterol: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('sodium') && <div>
                   <Label htmlFor="sodium">Sodium (mg)</Label>
                   <Input
                     id="sodium"
@@ -461,9 +512,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.sodium}
                     onChange={(e) => setGoals({ ...goals, sodium: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('potassium') && <div>
                   <Label htmlFor="potassium">Potassium (mg)</Label>
                   <Input
                     id="potassium"
@@ -471,9 +522,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.potassium}
                     onChange={(e) => setGoals({ ...goals, potassium: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('dietary_fiber') && <div>
                   <Label htmlFor="dietary_fiber">Fiber (g)</Label>
                   <Input
                     id="dietary_fiber"
@@ -481,9 +532,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.dietary_fiber}
                     onChange={(e) => setGoals({ ...goals, dietary_fiber: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('sugars') && <div>
                   <Label htmlFor="sugars">Sugars (g)</Label>
                   <Input
                     id="sugars"
@@ -491,9 +542,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.sugars}
                     onChange={(e) => setGoals({ ...goals, sugars: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('vitamin_a') && <div>
                   <Label htmlFor="vitamin_a">Vitamin A (mcg)</Label>
                   <Input
                     id="vitamin_a"
@@ -501,9 +552,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.vitamin_a}
                     onChange={(e) => setGoals({ ...goals, vitamin_a: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('vitamin_c') && <div>
                   <Label htmlFor="vitamin_c">Vitamin C (mg)</Label>
                   <Input
                     id="vitamin_c"
@@ -511,9 +562,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.vitamin_c}
                     onChange={(e) => setGoals({ ...goals, vitamin_c: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('calcium') && <div>
                   <Label htmlFor="calcium">Calcium (mg)</Label>
                   <Input
                     id="calcium"
@@ -521,9 +572,9 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.calcium}
                     onChange={(e) => setGoals({ ...goals, calcium: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
 
-                <div>
+                {visibleNutrients.includes('iron') && <div>
                   <Label htmlFor="iron">Iron (mg)</Label>
                   <Input
                     id="iron"
@@ -531,16 +582,29 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                     value={goals.iron}
                     onChange={(e) => setGoals({ ...goals, iron: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
                   />
-                </div>
+                </div>}
                 
                 <div>
-                  <Label htmlFor="water">Water Goal (glasses)</Label>
+                  <Label htmlFor="water">Water Goal ({water_display_unit})</Label>
                   <Input
                     id="water"
                     type="number"
-                    value={goals.water_goal}
-                    onChange={(e) => setGoals({ ...goals, water_goal: isNaN(Number(e.target.value)) ? 0 : Number(e.target.value) })}
+                    value={convertMlToSelectedUnit(goals.water_goal_ml, water_display_unit)}
+                    onChange={(e) => setGoals({ ...goals, water_goal_ml: convertSelectedUnitToMl(Number(e.target.value), water_display_unit) })}
                   />
+                  <Select
+                    value={water_display_unit}
+                    onValueChange={(value: 'ml' | 'oz' | 'liter') => setWaterDisplayUnit(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ml">ml</SelectItem>
+                      <SelectItem value="oz">oz</SelectItem>
+                      <SelectItem value="liter">liter</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 {/* Exercise Goals */}
                 <div>
@@ -563,10 +627,31 @@ const EditGoals = ({ selectedDate, onGoalsUpdated }: EditGoalsProps) => {
                 </div>
               </div>
 
+            <Separator className="my-6" />
+
+            <h3 className="text-lg font-semibold mb-4">Meal Calorie Distribution</h3>
+            <MealPercentageManager
+              initialPercentages={{
+                breakfast: goals.breakfast_percentage,
+                lunch: goals.lunch_percentage,
+                dinner: goals.dinner_percentage,
+                snacks: goals.snacks_percentage,
+              }}
+              onPercentagesChange={(newPercentages) => {
+                setGoals(prevGoals => ({
+                  ...prevGoals,
+                  breakfast_percentage: newPercentages.breakfast,
+                  lunch_percentage: newPercentages.lunch,
+                  dinner_percentage: newPercentages.dinner,
+                  snacks_percentage: newPercentages.snacks,
+                }));
+              }}
+            />
+
             <Button
               onClick={handleSaveGoals}
               className="w-full"
-              disabled={saving}
+              disabled={saving || (goals.breakfast_percentage + goals.lunch_percentage + goals.dinner_percentage + goals.snacks_percentage) !== 100}
             >
               {saving ? 'Saving...' : 'Save Goals'}
             </Button>
