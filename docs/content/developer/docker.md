@@ -312,9 +312,3 @@ sparkyfitness-frontend:
 - Use strong passwords even in development
 - Rotate API keys regularly
 - Never commit real credentials to version control
-
-## Next Steps
-
-- [Development Workflow](./workflow) - Learn the development process
-- [API Documentation](./api) - Backend API reference  
-- [Troubleshooting](./troubleshooting) - Common issues and solutions
