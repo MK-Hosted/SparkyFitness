@@ -1,0 +1,5 @@
+title: Install
+navigation:
+  - docker-compose.md
+  - portainer.md
+  - synology.md

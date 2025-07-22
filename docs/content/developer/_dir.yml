@@ -1,2 +1,20 @@
-title: Developer Guide
-icon: ph:code-bold
+title: Contributors
+navigation:
+  - contributing.md
+  - ai-command-patterns.md
+  - app-overview.md
+  - architecture.md
+  - chatbot-workflow.md
+  - database-migrations.md
+  - database-schema.md
+  - directories.md
+  - docker.md
+  - getting-started.md
+  - openapi.md
+  - pr-checklist.md
+  - rate-limiting.md
+  - setup.md
+  - translations.md
+  - troubleshooting.md
+  - wger-integration-plan.md
+  - development-workflow.md
