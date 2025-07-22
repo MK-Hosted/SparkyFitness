@@ -374,8 +374,8 @@ node --prof SparkyFitnessServer.js
 ### Key Files for Understanding
 
 - **Server entry**: `SparkyFitnessServer/SparkyFitnessServer.js`
-- **Database schema**: [Database Schema](../database-schema)
-- **App overview**: [App Overview](../app-overview)
+- **Database schema**: [Database Schema](./database-schema)
+- **App overview**: [App Overview](./app-overview)
 - **Frontend entry**: `src/App.tsx`
 
 ### External Documentation

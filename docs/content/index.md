@@ -1,3 +1,4 @@
+
 # SparkyFitness Documentation
 
 Welcome to the comprehensive documentation for **SparkyFitness**, a self-hosted alternative to MyFitnessPal with AI-powered nutrition assistance.
@@ -29,12 +30,12 @@ SparkyFitness is built with:
 ## Documentation Sections
 
 - **[Getting Started](./developer/getting-started)** - Complete setup guide for development and production
-- **[Development Workflow](./developer/workflow)** - Developer guide and coding standards  
+- **[Development Workflow](./developer/workflow)** - Developer guide and coding standards
 - **[Docker Guide](./developer/docker)** - Container deployment and configuration
 - **[Features Overview](./features/)** - Complete feature documentation
-- **[Contributing Guide](./contributing)** - How to contribute to the project
-- **[Database Schema](./database-schema)** - Database structure and design
-- **[App Overview](./app-overview)** - High-level architecture
+- **[Contributing Guide](./developer/contributing)** - How to contribute to the project
+- **[Database Schema](./developer/database-schema)** - Database structure and design
+- **[App Overview](./developer/app-overview)** - High-level architecture
 
 ## Getting Help
 

@@ -10,7 +10,7 @@ We welcome contributions of all kinds! Whether you're fixing bugs, adding featur
 
 ```bash
 # Fork and clone the repository
-git clone https://github.com/YOUR_USERNAME/SparkyFitness.git
+git clone https://github.com/CodeWithCJ/SparkyFitness.git
 cd SparkyFitness
 
 # Copy environment template
@@ -41,9 +41,9 @@ cp docker/.env.example .env
 
 For detailed technical information, see our comprehensive developer guides:
 
-- **[Development Workflow](./developer/workflow)** - Architecture, patterns, coding standards, and testing
-- **[Getting Started](./developer/getting-started)** - Complete setup guide with all installation options
-- **[Docker Guide](./developer/docker)** - Container deployment, troubleshooting, and configuration
+- **[Development Workflow](./workflow)** - Architecture, patterns, coding standards, and testing
+- **[Getting Started](./getting-started)** - Complete setup guide with all installation options
+- **[Docker Guide](./docker)** - Container deployment, troubleshooting, and configuration
 
 ## Pull Request Process
 

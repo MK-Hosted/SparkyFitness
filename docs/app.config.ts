@@ -20,6 +20,56 @@ export default defineAppConfig({
       showLinkIcon: true,
       exclude: [],
       fluid: true
+    },
+    // Add a home property to explicitly define the home page
+    home: {
+      title: 'Welcome to SparkyFitness',
+      description: 'Your comprehensive fitness tracking solution.'
+    },
+    navigation: {
+      enabled: true,
+      items: [
+        {
+          title: 'Overview',
+          to: '/'
+        },
+        {
+          title: 'Install',
+          to: '/install'
+        },
+        {
+          title: 'Features',
+          to: '/features'
+        },
+        {
+          title: 'Guides',
+          to: '/guides'
+        },
+        {
+          title: 'Developer',
+          to: '/developer'
+        },
+        {
+          title: 'Administration',
+          to: '/administration'
+        },
+        {
+          title: 'FAQ',
+          to: '/faq'
+        },
+        {
+          title: 'Help Me!',
+          to: '/help-me'
+        },
+        {
+          title: 'Community Guides',
+          to: '/community-guides'
+        },
+        {
+          title: 'Support The Project',
+          to: '/support-the-project'
+        }
+      ]
     }
   }
 })

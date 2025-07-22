@@ -1,1 +1,29 @@
-icon: material-symbols:lightbulb-2-rounded
+title: Features
+navigation:
+  - index.md
+  - diary/
+  - check-in.md
+  - reports.md
+  - food/
+  - exercises/
+  - goals.md
+  - settings/
+  - admin/
+  - automatic-backup.md
+  - chromecast-support.md
+  - immich-cli.md
+  - facial-recognition.md
+  - folder-view.md
+  - hardware-transcoding.md
+  - external-libraries.md
+  - hardware-accelerated-machine-learning.md
+  - mobile-app.md
+  - monitoring.md
+  - partner-sharing.md
+  - reverse-geocoding.md
+  - searching.md
+  - sharing.md
+  - supported-media-formats.md
+  - tags.md
+  - user-settings.md
+  - xmp-sidecars.md
