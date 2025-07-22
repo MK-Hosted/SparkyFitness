@@ -30,7 +30,7 @@ SparkyFitness is built with:
 ## Documentation Sections
 
 - **[Getting Started](./developer/getting-started)** - Complete setup guide for development and production
-- **[Development Workflow](./developer/workflow)** - Developer guide and coding standards
+- **[Development Workflow](./developer/development-workflow)** - Developer guide and coding standards
 - **[Docker Guide](./developer/docker)** - Container deployment and configuration
 - **[Features Overview](./features/)** - Complete feature documentation
 - **[Contributing Guide](./developer/contributing)** - How to contribute to the project

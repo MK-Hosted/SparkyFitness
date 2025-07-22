@@ -42,10 +42,6 @@ export default defineAppConfig({
           to: '/features'
         },
         {
-          title: 'Guides',
-          to: '/guides'
-        },
-        {
           title: 'Developer',
           to: '/developer'
         },

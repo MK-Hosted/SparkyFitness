@@ -200,7 +200,7 @@ lsof -i :3010
 - **Documentation:** Comprehensive guides in this docs site
 ## Next Steps
 
-- [Development Workflow](./workflow) - Learn the development process
+- [Development Workflow](./development-workflow) - Learn the development process
 - [Docker Guide](./docker) - Detailed Docker configuration
 - [Architecture Overview](./app-overview) - Understanding the codebase
 - [API Documentation](./openapi) - Backend API reference

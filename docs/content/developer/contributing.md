@@ -41,7 +41,7 @@ cp docker/.env.example .env
 
 For detailed technical information, see our comprehensive developer guides:
 
-- **[Development Workflow](./workflow)** - Architecture, patterns, coding standards, and testing
+- **[Development Workflow](./development-workflow)** - Architecture, patterns, coding standards, and testing
 - **[Getting Started](./getting-started)** - Complete setup guide with all installation options
 - **[Docker Guide](./docker)** - Container deployment, troubleshooting, and configuration
 

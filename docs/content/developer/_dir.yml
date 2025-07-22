@@ -1,14 +1,12 @@
 title: Contributors
 navigation:
   - contributing.md
-  - index.md
   - ai-command-patterns.md
   - app-overview.md
   - architecture.md
   - chatbot-workflow.md
   - database-migrations.md
   - database-schema.md
-  - devcontainers.md
   - directories.md
   - docker.md
   - getting-started.md
@@ -16,8 +14,7 @@ navigation:
   - pr-checklist.md
   - rate-limiting.md
   - setup.md
-  - testing.md
   - translations.md
   - troubleshooting.md
   - wger-integration-plan.md
-  - workflow.md
+  - development-workflow.md

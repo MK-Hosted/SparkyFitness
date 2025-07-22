@@ -12,7 +12,6 @@ This checklist outlines the essential steps and considerations for submitting a 
     ```
 2.  **Make your changes** following existing patterns: Adhere to the project's coding standards and architectural patterns.
 3.  **Test thoroughly** using the development environment: Ensure your changes work as expected and do not introduce regressions. Run relevant tests (unit, integration, end-to-end).
-    *   Refer to the [Testing](./testing) guide for more details.
 4.  **Submit a PR** with clear description of changes:
     *   Provide a concise and informative title.
     *   Describe the problem your PR solves and how it solves it.
@@ -23,7 +22,7 @@ This checklist outlines the essential steps and considerations for submitting a 
 ## Before Submitting Your PR
 
 *   **Code Quality**: Ensure your code adheres to the project's code standards. Run linters and formatters.
-    *   Refer to the [Development Workflow](./workflow) for code quality tools.
+    *   Refer to the [Development Workflow](./development-workflow) for code quality tools.
 *   **Documentation**: Update relevant documentation (this docs site, inline comments, `README.md`s) for any new features, changes, or bug fixes.
 *   **Dependencies**: If you've added new dependencies, ensure they are necessary and properly documented.
 *   **Security**: Consider any security implications of your changes.
