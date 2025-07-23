@@ -1,4 +1,3 @@
-// https://github.com/nuxt-themes/docus/blob/main/nuxt.schema.ts
 export default defineAppConfig({
   docus: {
     title: 'SparkyFitness Docs',
@@ -26,46 +25,5 @@ export default defineAppConfig({
       title: 'Welcome to SparkyFitness',
       description: 'Your comprehensive fitness tracking solution.'
     },
-    navigation: {
-      enabled: true,
-      items: [
-        {
-          title: 'Overview',
-          to: '/'
-        },
-        {
-          title: 'Install',
-          to: '/install'
-        },
-        {
-          title: 'Features',
-          to: '/features'
-        },
-        {
-          title: 'Developer',
-          to: '/developer'
-        },
-        {
-          title: 'Administration',
-          to: '/administration'
-        },
-        {
-          title: 'FAQ',
-          to: '/faq'
-        },
-        {
-          title: 'Help Me!',
-          to: '/help-me'
-        },
-        {
-          title: 'Community Guides',
-          to: '/community-guides'
-        },
-        {
-          title: 'Support The Project',
-          to: '/support-the-project'
-        }
-      ]
-    }
   }
 })
