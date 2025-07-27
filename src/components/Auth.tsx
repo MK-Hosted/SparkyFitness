@@ -24,6 +24,8 @@ import {
 } from "@/services/authService";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthResponse } from "../types"; // Import AuthResponse type
+import useToggle from "@/hooks/use-toggle";
+import PasswordToggle from "./PasswordToggle";
 
 const Auth = () => {
   const navigate = useNavigate(); // Initialize useNavigate
@@ -37,6 +39,7 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [loginSettings, setLoginSettings] = useState({ oidc: { enabled: false }, email: { enabled: true } });
+  const { isToggled: showPassword, toggleHandler: passwordToggleHandler } = useToggle();
 
   useEffect(() => {
     const fetchLoginSettings = async () => {
@@ -210,11 +213,11 @@ const Auth = () => {
                     autoComplete="username"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <Label htmlFor="signin-password">Password</Label>
                   <Input
                     id="signin-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => {
@@ -227,6 +230,7 @@ const Auth = () => {
                     required
                     autoComplete="current-password"
                   />
+                    <PasswordToggle showPassword = {showPassword} passwordToggleHandler = {passwordToggleHandler} />
                 </div>
                 <div className="text-right text-sm">
                   <a
@@ -239,7 +243,7 @@ const Auth = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full dark:hover:bg-slate-200"
+                  className="w-full"
                   disabled={loading}
                 >
                   {loading ? "Signing in..." : "Sign In"}
@@ -302,11 +306,11 @@ const Auth = () => {
                     autoComplete="username"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="signup-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
                     value={password}
                     onChange={(e) => {
@@ -320,6 +324,7 @@ const Auth = () => {
                     required
                     autoComplete="new-password"
                   />
+                    <PasswordToggle showPassword = {showPassword} passwordToggleHandler = {passwordToggleHandler} />
                   {passwordError && (
                     <p className="text-red-500 text-sm">{passwordError}</p>
                   )}
