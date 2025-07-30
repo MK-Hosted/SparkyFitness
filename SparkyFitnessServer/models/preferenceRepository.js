@@ -14,13 +14,14 @@ async function updateUserPreferences(userId, preferenceData) {
         timezone = COALESCE($7, timezone),
         default_food_data_provider_id = COALESCE($8, default_food_data_provider_id),
         item_display_limit = COALESCE($9, item_display_limit),
+        water_display_unit = COALESCE($10, water_display_unit),
         updated_at = now()
-      WHERE user_id = $10
+      WHERE user_id = $11
       RETURNING *`,
       [
         preferenceData.date_format, preferenceData.default_weight_unit, preferenceData.default_measurement_unit,
         preferenceData.system_prompt, preferenceData.auto_clear_history, preferenceData.logging_level, preferenceData.timezone,
-        preferenceData.default_food_data_provider_id, preferenceData.item_display_limit, userId
+        preferenceData.default_food_data_provider_id, preferenceData.item_display_limit, preferenceData.water_display_unit, userId
       ]
     );
     return result.rows[0];
@@ -62,8 +63,8 @@ async function upsertUserPreferences(preferenceData) {
       `INSERT INTO user_preferences (
         user_id, date_format, default_weight_unit, default_measurement_unit,
         system_prompt, auto_clear_history, logging_level, timezone,
-        default_food_data_provider_id, item_display_limit, created_at, updated_at
-      ) VALUES ($1, COALESCE($2, 'yyyy-MM-dd'), COALESCE($3, 'lbs'), COALESCE($4, 'in'), COALESCE($5, ''), COALESCE($6, 'never'), COALESCE($7, 'INFO'), COALESCE($8, 'UTC'), $9, COALESCE($10, 10), now(), now())
+        default_food_data_provider_id, item_display_limit, water_display_unit, created_at, updated_at
+      ) VALUES ($1, COALESCE($2, 'yyyy-MM-dd'), COALESCE($3, 'lbs'), COALESCE($4, 'in'), COALESCE($5, ''), COALESCE($6, 'never'), COALESCE($7, 'INFO'), COALESCE($8, 'UTC'), $9, COALESCE($10, 10), COALESCE($11, 'ml'), now(), now())
       ON CONFLICT (user_id) DO UPDATE SET
         date_format = COALESCE(EXCLUDED.date_format, user_preferences.date_format),
         default_weight_unit = COALESCE(EXCLUDED.default_weight_unit, user_preferences.default_weight_unit),
@@ -74,12 +75,13 @@ async function upsertUserPreferences(preferenceData) {
         timezone = COALESCE(EXCLUDED.timezone, user_preferences.timezone),
         default_food_data_provider_id = COALESCE(EXCLUDED.default_food_data_provider_id, user_preferences.default_food_data_provider_id),
         item_display_limit = COALESCE(EXCLUDED.item_display_limit, user_preferences.item_display_limit),
+        water_display_unit = COALESCE(EXCLUDED.water_display_unit, user_preferences.water_display_unit),
         updated_at = now()
       RETURNING *`,
       [
         preferenceData.user_id, preferenceData.date_format, preferenceData.default_weight_unit, preferenceData.default_measurement_unit,
         preferenceData.system_prompt, preferenceData.auto_clear_history, preferenceData.logging_level, preferenceData.timezone,
-        preferenceData.default_food_data_provider_id, preferenceData.item_display_limit
+        preferenceData.default_food_data_provider_id, preferenceData.item_display_limit, preferenceData.water_display_unit
       ]
     );
     return result.rows[0];

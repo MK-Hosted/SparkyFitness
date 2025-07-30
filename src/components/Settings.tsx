@@ -667,7 +667,13 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
                  <SelectItem value="cup">Cups</SelectItem>
                </SelectContent>
              </Select>
+
            </div>
+           <Button onClick={handlePreferencesUpdate} disabled={loading}>
+               <Save className="h-4 w-4 mr-2" />
+               {loading ? 'Saving...' : 'Save Water Display Unit'}
+             </Button>
+        
            <Separator />
            <WaterContainerManager />
         </CardContent>

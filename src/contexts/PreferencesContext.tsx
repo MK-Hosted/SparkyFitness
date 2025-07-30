@@ -147,7 +147,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     try {
       const data = await fetchUserPreferences(user.id);
-
       if (data) {
         debug(loggingLevel, 'PreferencesContext: Preferences data loaded:', data);
         setWeightUnitState(data.default_weight_unit as 'kg' | 'lbs');
@@ -201,7 +200,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         default_food_data_provider_id: null, // Default to no specific food data provider
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Add default timezone
         item_display_limit: 10,
-        water_display_unit: 'ml', // Set default water display unit
+        water_display_unit: waterDisplayUnit // Set default water display unit
       };
 
 
