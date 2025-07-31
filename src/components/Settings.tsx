@@ -656,10 +656,7 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
              <Label htmlFor="water_display_unit">Water Display Unit</Label>
              <Select
                value={water_display_unit}
-               onValueChange={async (value) => {
-                setWaterDisplayUnit(value as "ml" | "oz" | "liter")
-                await handlePreferencesUpdate();
-               }}
+               onValueChange={setWaterDisplayUnit}
              >
                <SelectTrigger>
                  <SelectValue />
@@ -672,6 +669,10 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
              </Select>
 
            </div>
+           <Button onClick={handlePreferencesUpdate} disabled={loading}>
+            <Save className="h-4 w-4 mr-2" />
+            {loading ? 'Saving...' : 'Save Water Display Unit'}
+            </Button>
            <Separator />
            <WaterContainerManager />
         </CardContent>
