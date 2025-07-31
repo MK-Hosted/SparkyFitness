@@ -52,7 +52,7 @@ export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   useEffect(() => {
     fetchAndSetActiveContainer();
-  }, []);
+  }, [water_display_unit]);
 
   const refreshContainers = () => {
     fetchAndSetActiveContainer();
