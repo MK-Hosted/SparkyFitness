@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getWaterContainers, setPrimaryWaterContainer, WaterContainer } from '../services/waterContainerService';
 import { useToast } from '../hooks/use-toast';
+import { usePreferences } from './PreferencesContext';
 
 interface WaterContainerContextType {
   activeContainer: WaterContainer | null;
@@ -12,6 +13,7 @@ const WaterContainerContext = createContext<WaterContainerContextType | undefine
 export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [activeContainer, setActiveContainer] = useState<WaterContainer | null>(null);
   const { toast } = useToast();
+  const { water_display_unit } = usePreferences();
 
   const fetchAndSetActiveContainer = async () => {
     try {
@@ -37,7 +39,7 @@ export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ chil
           user_id: '', // Placeholder, not used for non-persisted default
           name: 'Default Container',
           volume: 2000, // Default to 2000ml
-          unit: 'ml',
+          unit: water_display_unit,
           is_primary: true,
           servings_per_container: 8,
         });
@@ -50,7 +52,7 @@ export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ chil
 
   useEffect(() => {
     fetchAndSetActiveContainer();
-  }, []);
+  }, [water_display_unit]);
 
   const refreshContainers = () => {
     fetchAndSetActiveContainer();
