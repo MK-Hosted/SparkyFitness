@@ -94,7 +94,19 @@ async function getMiniNutritionTrends(userId, startDate, endDate) {
          SUM(fv.protein * fe.quantity / fv.serving_size) AS total_protein,
          SUM(fv.carbs * fe.quantity / fv.serving_size) AS total_carbs,
          SUM(fv.fat * fe.quantity / fv.serving_size) AS total_fat,
-         SUM(COALESCE(fv.dietary_fiber, 0) * fe.quantity / fv.serving_size) AS total_dietary_fiber
+         SUM(COALESCE(fv.saturated_fat, 0) * fe.quantity / fv.serving_size) AS total_saturated_fat,
+         SUM(COALESCE(fv.polyunsaturated_fat, 0) * fe.quantity / fv.serving_size) AS total_polyunsaturated_fat,
+         SUM(COALESCE(fv.monounsaturated_fat, 0) * fe.quantity / fv.serving_size) AS total_monounsaturated_fat,
+         SUM(COALESCE(fv.trans_fat, 0) * fe.quantity / fv.serving_size) AS total_trans_fat,
+         SUM(COALESCE(fv.cholesterol, 0) * fe.quantity / fv.serving_size) AS total_cholesterol,
+         SUM(COALESCE(fv.sodium, 0) * fe.quantity / fv.serving_size) AS total_sodium,
+         SUM(COALESCE(fv.potassium, 0) * fe.quantity / fv.serving_size) AS total_potassium,
+         SUM(COALESCE(fv.dietary_fiber, 0) * fe.quantity / fv.serving_size) AS total_dietary_fiber,
+         SUM(COALESCE(fv.sugars, 0) * fe.quantity / fv.serving_size) AS total_sugars,
+         SUM(COALESCE(fv.vitamin_a, 0) * fe.quantity / fv.serving_size) AS total_vitamin_a,
+         SUM(COALESCE(fv.vitamin_c, 0) * fe.quantity / fv.serving_size) AS total_vitamin_c,
+         SUM(COALESCE(fv.calcium, 0) * fe.quantity / fv.serving_size) AS total_calcium,
+         SUM(COALESCE(fv.iron, 0) * fe.quantity / fv.serving_size) AS total_iron
        FROM food_entries fe
        JOIN food_variants fv ON fe.variant_id = fv.id
        WHERE fe.user_id = $1 AND fe.entry_date BETWEEN $2 AND $3

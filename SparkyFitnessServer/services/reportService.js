@@ -100,7 +100,19 @@ async function getMiniNutritionTrends(authenticatedUserId, targetUserId, startDa
       protein: parseFloat(row.total_protein || 0),
       carbs: parseFloat(row.total_carbs || 0),
       fat: parseFloat(row.total_fat || 0),
-      dietary_fiber: parseFloat(row.total_dietary_fiber || 0),
+      saturated_fat: parseFloat(row.total_saturated_fat) || 0,
+      polyunsaturated_fat: parseFloat(row.total_polyunsaturated_fat) || 0,
+      monounsaturated_fat: parseFloat(row.total_monounsaturated_fat) || 0,
+      trans_fat: parseFloat(row.total_trans_fat) || 0,
+      cholesterol: parseFloat(row.total_cholesterol) || 0,
+      sodium: parseFloat(row.total_sodium) || 0,
+      potassium: parseFloat(row.total_potassium) || 0,
+      dietary_fiber: parseFloat(row.total_dietary_fiber) || 0,
+      sugars: parseFloat(row.total_sugars) || 0,
+      vitamin_a: parseFloat(row.total_vitamin_a) || 0,
+      vitamin_c: parseFloat(row.total_vitamin_c) || 0,
+      calcium: parseFloat(row.total_calcium) || 0,
+      iron: parseFloat(row.total_iron) || 0,
     }));
 
     return formattedResults;
