@@ -550,7 +550,17 @@ const FoodDatabaseManager: React.FC = () => {
                 </PaginationItem>
 
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNumber = i + 1;
+                  let pageNumber;
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i;
+                  } else {
+                    pageNumber = currentPage - 2 + i;
+                  }
+
                   return (
                     <PaginationItem key={pageNumber}>
                       <PaginationLink
