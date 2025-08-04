@@ -312,7 +312,7 @@ async function getFoodsWithPagination(searchTerm, foodFilter, authenticatedUserI
 async function countFoods(searchTerm, foodFilter, authenticatedUserId) {
   const client = await pool.connect();
   try {
-    let whereClauses = ['1=1'];
+    let whereClauses = ["is_quick_food = FALSE"];
     const countQueryParams = [];
     let paramIndex = 1;
 
