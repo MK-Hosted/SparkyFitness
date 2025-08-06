@@ -18,7 +18,7 @@ async function registerUser(email, password, full_name) {
 
     await nutrientDisplayPreferenceService.createDefaultNutrientPreferencesForUser(userId);
 
-    const token = jwt.sign({ userId: userId }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: userId }, JWT_SECRET, { expiresIn: '30d' });
     return { userId, token };
   } catch (error) {
     log('error', 'Error during user registration in authService:', error);
@@ -39,7 +39,7 @@ async function loginUser(email, password) {
       throw new Error('Invalid credentials.');
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
     return { userId: user.id, token, role: user.role };
   } catch (error) {
     log('error', 'Error during user login in authService:', error);
