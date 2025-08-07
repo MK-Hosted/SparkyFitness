@@ -110,6 +110,10 @@ const FoodDatabaseManager: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, itemsPerPage, foodFilter]);
+
   const fetchFoodsData = async () => {
     try {
       setLoading(true);
@@ -130,11 +134,6 @@ const FoodDatabaseManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFilterChange = (value: FoodFilter) => {
-    setFoodFilter(value);
-    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const togglePublicSharing = async (foodId: string, currentState: boolean) => {
@@ -260,11 +259,6 @@ const FoodDatabaseManager: React.FC = () => {
     setCurrentPage(page);
   };
 
-  const handleItemsPerPageChange = (value: string) => {
-    setItemsPerPage(parseInt(value));
-    setCurrentPage(1); // Reset to first page
-  };
-
   const canEdit = (food: Food) => {
     // Only allow editing if the user owns the food
     return food.user_id === user?.id;
@@ -376,7 +370,7 @@ const FoodDatabaseManager: React.FC = () => {
               {/* Filter dropdown */}
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <Filter className="h-4 w-4 text-gray-500" />
-                <Select value={foodFilter} onValueChange={handleFilterChange}>
+                <Select value={foodFilter} onValueChange={(value) => setFoodFilter(value)}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -416,7 +410,7 @@ const FoodDatabaseManager: React.FC = () => {
                 <span className="text-sm">Items per page:</span>
                 <Select
                   value={itemsPerPage.toString()}
-                  onValueChange={handleItemsPerPageChange}
+                  onValueChange={(value) => setItemsPerPage(Number(value))}
                 >
                   <SelectTrigger className="w-20">
                     <SelectValue />
@@ -550,7 +544,17 @@ const FoodDatabaseManager: React.FC = () => {
                 </PaginationItem>
 
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNumber = i + 1;
+                  let pageNumber;
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i;
+                  } else {
+                    pageNumber = currentPage - 2 + i;
+                  }
+
                   return (
                     <PaginationItem key={pageNumber}>
                       <PaginationLink
