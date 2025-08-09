@@ -47,3 +47,12 @@ Thumbs.db
 /build
 
 WIP
+
+# SparkyFitnessMobile specific ignores
+SparkyFitnessMobile/node_modules/
+SparkyFitnessMobile/.expo/
+SparkyFitnessMobile/web-build/
+SparkyFitnessMobile/android/build/
+SparkyFitnessMobile/ios/build/
+SparkyFitnessMobile/.env
+SparkyFitnessMobile/.env.*
