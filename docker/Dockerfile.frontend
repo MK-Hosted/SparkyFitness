@@ -22,7 +22,7 @@ RUN apk add --no-cache bash gettext
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy the nginx configuration template
-COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copy and set up the entrypoint script
 COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
