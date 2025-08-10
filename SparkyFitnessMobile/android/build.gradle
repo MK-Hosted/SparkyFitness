@@ -12,6 +12,7 @@ buildscript {
   }
 }
 
+
 def reactNativeAndroidDir = new File(
   providers.exec {
     workingDir(rootDir)

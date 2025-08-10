@@ -87,13 +87,16 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.sparkyfitnessmobile"
+    namespace "com.codewithcj.SparkyFitnessMobile"
     defaultConfig {
         applicationId 'com.codewithcj.SparkyFitnessMobile'
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+    }
+    buildFeatures {
+        buildConfig = true
     }
     signingConfigs {
         debug {
