@@ -46,6 +46,31 @@ export const requestStepsPermission = async () => {
 };
 
 /**
+ * Requests permission to read active calories burned data.
+ * @returns {Promise<boolean>} True if permission is granted, false otherwise.
+ */
+export const requestActiveCaloriesPermission = async () => {
+  try {
+    console.log('[HealthConnectService] Inside requestActiveCaloriesPermission function.');
+    const permissions = await requestPermission([{ accessType: 'read', recordType: 'ActiveCaloriesBurned' }]);
+    if (permissions.length > 0) {
+      addLog(`[HealthConnectService] Active Calories permission granted.`);
+      console.log('[HealthConnectService] Active Calories permission granted.');
+    } else {
+      addLog(`[HealthConnectService] Active Calories permission NOT granted.`);
+      console.log('[HealthConnectService] Active Calories permission NOT granted.');
+    }
+    addLog(`[HealthConnectService] requestActiveCaloriesPermission returning: ${permissions.length > 0}`);
+    console.log(`[HealthConnectService] requestActiveCaloriesPermission returning: ${permissions.length > 0}`);
+    return permissions.length > 0;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to request active calories permission: ${error.message}.`);
+    console.error('Failed to request active calories permission', error);
+    return false;
+  }
+};
+
+/**
  * Reads step records for a given date range.
  * @param {Date} startDate - The start date of the range.
  * @param {Date} endDate - The end date of the range.
@@ -69,6 +94,34 @@ export const readStepRecords = async (startDate, endDate) => {
   } catch (error) {
     addLog(`[HealthConnectService] Failed to read step records: ${error.message}. Full error: ${JSON.stringify(error)}`);
     console.error('Failed to read step records', error);
+    return [];
+  }
+};
+
+/**
+ * Reads active calories burned records for a given date range.
+ * @param {Date} startDate - The start date of the range.
+ * @param {Date} endDate - The end date of the range.
+ * @returns {Promise<Array>} An array of active calories burned records.
+ */
+export const readActiveCaloriesRecords = async (startDate, endDate) => {
+  try {
+    const startTime = startDate.toISOString();
+    const endTime = endDate.toISOString();
+    addLog(`[HealthConnectService] Reading active calories records for timerange: ${startTime} to ${endTime}`);
+    const result = await readRecords('ActiveCaloriesBurned', {
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: startTime,
+        endTime: endTime,
+      },
+    });
+    addLog(`[HealthConnectService] Raw result from readActiveCaloriesRecords: ${JSON.stringify(result)}`);
+    addLog(`[HealthConnectService] Raw active calories records from Health Connect: ${JSON.stringify(result.records)}`);
+    return result.records;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to read active calories records: ${error.message}. Full error: ${JSON.stringify(error)}`);
+    console.error('Failed to read active calories records', error);
     return [];
   }
 };
@@ -103,5 +156,38 @@ export const aggregateStepsByDate = (records) => {
     date,
     value: aggregatedData[date],
     type: 'step',
+  }));
+};
+
+/**
+ * Aggregates active calories burned records by date.
+ * @param {Array} records - An array of active calories burned records from Health Connect.
+ * @returns {Array} An array of objects, where each object has a date and the total active calories for that date.
+ */
+export const aggregateActiveCaloriesByDate = (records) => {
+  if (!Array.isArray(records)) {
+    addLog(`[HealthConnectService] aggregateActiveCaloriesByDate received non-array records: ${JSON.stringify(records)}`);
+    console.warn('aggregateActiveCaloriesByDate received non-array records:', records);
+    return [];
+  }
+  addLog(`[HealthConnectService] Input records for active calories aggregation: ${JSON.stringify(records)}`);
+
+  const aggregatedData = records.reduce((acc, record) => {
+    const date = record.startTime.split('T')[0];
+    const calories = record.energy.inCalories; // Assuming energy is in calories
+
+    if (!acc[date]) {
+      acc[date] = 0;
+    }
+    acc[date] += calories;
+
+    return acc;
+  }, {});
+  addLog(`[HealthConnectService] Aggregated active calories data: ${JSON.stringify(aggregatedData)}`);
+
+  return Object.keys(aggregatedData).map(date => ({
+    date,
+    value: aggregatedData[date],
+    type: 'active_calories',
   }));
 };

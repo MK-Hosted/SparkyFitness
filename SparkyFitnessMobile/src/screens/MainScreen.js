@@ -6,12 +6,16 @@ import {
   requestStepsPermission,
   readStepRecords,
   aggregateStepsByDate,
+  requestActiveCaloriesPermission,
+  readActiveCaloriesRecords,
+  aggregateActiveCaloriesByDate,
 } from '../services/healthConnectService';
 import { syncHealthData } from '../services/api';
 import { addLog } from '../services/LogService';
 
 const MainScreen = ({ navigation }) => {
   const [isStepsEnabled, setIsStepsEnabled] = useState(true);
+  const [isActiveCaloriesEnabled, setIsActiveCaloriesEnabled] = useState(false);
   const [syncDuration, setSyncDuration] = useState(1);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHealthConnectInitialized, setIsHealthConnectInitialized] = useState(false);
@@ -31,6 +35,7 @@ const MainScreen = ({ navigation }) => {
   }, []);
 
   const toggleSteps = () => setIsStepsEnabled(previousState => !previousState);
+  const toggleActiveCalories = () => setIsActiveCaloriesEnabled(previousState => !previousState);
 
   const handleSync = async () => {
     if (isSyncing) return;
@@ -38,39 +43,70 @@ const MainScreen = ({ navigation }) => {
     addLog('Sync button pressed.');
 
     try {
-      addLog('Requesting steps permission...');
-      const permissionGranted = await requestStepsPermission();
-      addLog(`Permission granted: ${permissionGranted}`);
-      if (!permissionGranted) {
-        addLog('Permission denied by user.');
-        Alert.alert('Permission Denied', 'Cannot sync without permission to read steps data.');
-        setIsSyncing(false);
-        return;
-      }
-
       const endDate = new Date();
-      // Set endDate to the end of the current day in local time
       endDate.setHours(23, 59, 59, 999);
 
-      const startDate = new Date(endDate); // Start with the same date as endDate
-      // Set startDate to the beginning of the day 'syncDuration - 1' days ago
+      const startDate = new Date(endDate);
       startDate.setDate(endDate.getDate() - syncDuration + 1);
       startDate.setHours(0, 0, 0, 0);
 
-      addLog('Reading step records...');
-      const stepRecords = await readStepRecords(startDate, endDate);
-      addLog(`Found ${stepRecords.length} step records.`);
-      const aggregatedData = aggregateStepsByDate(stepRecords);
+      let allAggregatedData = [];
 
-      if (aggregatedData.length === 0) {
-        addLog('No step data found for the selected period.');
-        Alert.alert('No Data', 'No step data found for the selected period.');
+      if (isStepsEnabled) {
+        addLog('Requesting steps permission...');
+        const permissionGranted = await requestStepsPermission();
+        addLog(`Permission granted for steps: ${permissionGranted}`);
+        if (!permissionGranted) {
+          addLog('Permission denied by user for steps.');
+          Alert.alert('Permission Denied', 'Cannot sync steps without permission to read steps data.');
+          setIsSyncing(false);
+          return;
+        }
+
+        addLog('Reading step records...');
+        const stepRecords = await readStepRecords(startDate, endDate);
+        addLog(`Found ${stepRecords.length} step records.`);
+        const aggregatedStepsData = aggregateStepsByDate(stepRecords);
+        allAggregatedData = allAggregatedData.concat(aggregatedStepsData);
+
+        if (aggregatedStepsData.length === 0) {
+          addLog('No step data found for the selected period.');
+          Alert.alert('No Data', 'No step data found for the selected period.');
+        }
+      }
+
+      if (isActiveCaloriesEnabled) {
+        addLog('Requesting active calories permission...');
+        const permissionGranted = await requestActiveCaloriesPermission();
+        addLog(`Permission granted for active calories: ${permissionGranted}`);
+        if (!permissionGranted) {
+          addLog('Permission denied by user for active calories.');
+          Alert.alert('Permission Denied', 'Cannot sync active calories without permission to read active calories data.');
+          setIsSyncing(false);
+          return;
+        }
+
+        addLog('Reading active calories records...');
+        const activeCaloriesRecords = await readActiveCaloriesRecords(startDate, endDate);
+        addLog(`Found ${activeCaloriesRecords.length} active calories records.`);
+        const aggregatedActiveCaloriesData = aggregateActiveCaloriesByDate(activeCaloriesRecords);
+        allAggregatedData = allAggregatedData.concat(aggregatedActiveCaloriesData);
+
+        if (aggregatedActiveCaloriesData.length === 0) {
+          addLog('No active calories data found for the selected period.');
+          Alert.alert('No Data', 'No active calories data found for the selected period.');
+        }
+      }
+
+      if (allAggregatedData.length === 0) {
+        addLog('No data selected or found for the selected period.');
+        Alert.alert('No Data', 'No data selected or found for the selected period.');
         setIsSyncing(false);
         return;
       }
 
       addLog('Syncing health data to server...');
-      await syncHealthData(aggregatedData);
+      await syncHealthData(allAggregatedData);
       addLog('Health data synced successfully.');
       Alert.alert('Success', 'Health data synced successfully.');
     } catch (error) {
@@ -92,6 +128,16 @@ const MainScreen = ({ navigation }) => {
           thumbColor={isStepsEnabled ? "#f5dd4b" : "#f4f3f4"}
           onValueChange={toggleSteps}
           value={isStepsEnabled}
+        />
+      </View>
+
+      <View style={styles.optionContainer}>
+        <Text>Track Active Calories Burned</Text>
+        <Switch
+          trackColor={{ false: "#767577", true: "#81b0ff" }}
+          thumbColor={isActiveCaloriesEnabled ? "#f5dd4b" : "#f4f3f4"}
+          onValueChange={toggleActiveCalories}
+          value={isActiveCaloriesEnabled}
         />
       </View>
 
