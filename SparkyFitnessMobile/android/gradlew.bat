@@ -1,3 +1,8 @@
+@REM Copyright (c) Meta Platforms, Inc. and affiliates.
+@REM
+@REM This source code is licensed under the MIT license found in the
+@REM LICENSE file in the root directory of this source tree.
+
 @rem
 @rem Copyright 2015 the original author or authors.
 @rem
@@ -16,7 +21,6 @@
 @rem SPDX-License-Identifier: Apache-2.0
 @rem
 
-set "JAVA_HOME=C:\Program Files\Java\jdk-17"
 @if "%DEBUG%"=="" @echo off
 @rem ##########################################################################
 @rem
@@ -71,11 +75,11 @@ goto fail
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+set CLASSPATH=
 
 
 @rem Execute Gradle
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
 
 :end
 @rem End local scope for the variables with windows NT shell

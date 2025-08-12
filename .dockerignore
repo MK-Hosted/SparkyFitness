@@ -30,3 +30,10 @@ Dockerfile
 docker-compose.yml
 README.md
 WIP
+
+# Mobile App Exclusions
+SparkyFitnessMobile/node_modules
+SparkyFitnessMobile/android/build
+SparkyFitnessMobile/ios/build
+SparkyFitnessMobile/web-build
+SparkyFitnessMobile/.expo
