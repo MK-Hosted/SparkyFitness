@@ -3,6 +3,7 @@ import {
   requestPermission,
   readRecords,
 } from 'react-native-health-connect';
+import { addLog } from './LogService';
 
 /**
  * Initializes the Health Connect client.
@@ -13,6 +14,7 @@ export const initHealthConnect = async () => {
     const isInitialized = await initialize();
     return isInitialized;
   } catch (error) {
+    addLog(`[HealthConnectService] Failed to initialize Health Connect: ${error.message}`);
     console.error('Failed to initialize Health Connect', error);
     return false;
   }
@@ -24,9 +26,20 @@ export const initHealthConnect = async () => {
  */
 export const requestStepsPermission = async () => {
   try {
+    console.log('[HealthConnectService] Inside requestStepsPermission function.');
     const permissions = await requestPermission([{ accessType: 'read', recordType: 'Steps' }]);
+    if (permissions.length > 0) {
+      addLog(`[HealthConnectService] Steps permission granted.`);
+      console.log('[HealthConnectService] Steps permission granted.');
+    } else {
+      addLog(`[HealthConnectService] Steps permission NOT granted.`);
+      console.log('[HealthConnectService] Steps permission NOT granted.');
+    }
+    addLog(`[HealthConnectService] requestStepsPermission returning: ${permissions.length > 0}`);
+    console.log(`[HealthConnectService] requestStepsPermission returning: ${permissions.length > 0}`);
     return permissions.length > 0;
   } catch (error) {
+    addLog(`[HealthConnectService] Failed to request steps permission: ${error.message}.`);
     console.error('Failed to request steps permission', error);
     return false;
   }
@@ -40,15 +53,21 @@ export const requestStepsPermission = async () => {
  */
 export const readStepRecords = async (startDate, endDate) => {
   try {
+    const startTime = startDate.toISOString();
+    const endTime = endDate.toISOString();
+    addLog(`[HealthConnectService] Reading step records for timerange: ${startTime} to ${endTime}`);
     const result = await readRecords('Steps', {
       timeRangeFilter: {
         operator: 'between',
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
+        startTime: startTime,
+        endTime: endTime,
       },
     });
+    addLog(`[HealthConnectService] Raw result from readRecords: ${JSON.stringify(result)}`);
+    addLog(`[HealthConnectService] Raw step records from Health Connect: ${JSON.stringify(result.records)}`);
     return result.records;
   } catch (error) {
+    addLog(`[HealthConnectService] Failed to read step records: ${error.message}. Full error: ${JSON.stringify(error)}`);
     console.error('Failed to read step records', error);
     return [];
   }
@@ -61,9 +80,11 @@ export const readStepRecords = async (startDate, endDate) => {
  */
 export const aggregateStepsByDate = (records) => {
   if (!Array.isArray(records)) {
+    addLog(`[HealthConnectService] aggregateStepsByDate received non-array records: ${JSON.stringify(records)}`);
     console.warn('aggregateStepsByDate received non-array records:', records);
     return [];
   }
+  addLog(`[HealthConnectService] Input records for aggregation: ${JSON.stringify(records)}`);
 
   const aggregatedData = records.reduce((acc, record) => {
     const date = record.startTime.split('T')[0];
@@ -76,6 +97,7 @@ export const aggregateStepsByDate = (records) => {
 
     return acc;
   }, {});
+  addLog(`[HealthConnectService] Aggregated data: ${JSON.stringify(aggregatedData)}`);
 
   return Object.keys(aggregatedData).map(date => ({
     date,

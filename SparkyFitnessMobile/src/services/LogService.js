@@ -8,6 +8,7 @@ const LOG_KEY = 'app_logs';
  */
 export const addLog = async (message) => {
   try {
+    console.log(`[LogService] Attempting to add log: ${message}`);
     const existingLogs = await AsyncStorage.getItem(LOG_KEY);
     const logs = existingLogs ? JSON.parse(existingLogs) : [];
     const newLog = {
@@ -16,8 +17,9 @@ export const addLog = async (message) => {
     };
     logs.unshift(newLog); // Add to the beginning for descending order
     await AsyncStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    console.log(`[LogService] Successfully added log: ${message}`);
   } catch (error) {
-    console.error('Failed to add log', error);
+    console.error(`[LogService] Failed to add log: ${error.message}`, error);
   }
 };
 
