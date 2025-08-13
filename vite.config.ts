@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/health-data': {
+        target: 'http://localhost:3010',
+        changeOrigin: true,
+        rewrite: (path) => `/api${path}`, // Add /api/ prefix
+      },
       '/openid': {
         target: 'http://localhost:3010',
         changeOrigin: true,

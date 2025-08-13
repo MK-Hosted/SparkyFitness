@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, Switch, Text } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Alert, Switch, Text, Picker } from 'react-native';
 import { getServerConfig, saveServerConfig, deleteServerConfig } from '../services/storage';
-import { initHealthConnect, requestHealthPermissions, saveHealthPreference, loadHealthPreference, readStepRecords, readActiveCaloriesRecords } from '../services/healthConnectService';
+import { initHealthConnect, requestHealthPermissions, saveHealthPreference, loadHealthPreference, readStepRecords, readActiveCaloriesRecords, saveSyncDuration, loadSyncDuration, getSyncStartDate } from '../services/healthConnectService';
 
 const SettingsScreen = ({ navigation }) => {
   const [url, setUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isStepsSyncEnabled, setIsStepsSyncEnabled] = useState(false);
   const [isCaloriesSyncEnabled, setIsCaloriesSyncEnabled] = useState(false);
+  const [syncDuration, setSyncDuration] = useState('24h'); // Default to 24 hours
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -23,6 +24,10 @@ const SettingsScreen = ({ navigation }) => {
 
       const caloriesEnabled = await loadHealthPreference('syncCaloriesEnabled');
       setIsCaloriesSyncEnabled(caloriesEnabled !== null ? caloriesEnabled : false);
+
+      // Load sync duration preference
+      const duration = await loadSyncDuration();
+      setSyncDuration(duration !== null ? duration : '24h');
 
       // Initialize Health Connect
       await initHealthConnect();
@@ -85,6 +90,11 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
+  const handleSyncDurationChange = async (itemValue) => {
+    setSyncDuration(itemValue);
+    await saveSyncDuration(itemValue);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Server Configuration</Text>
@@ -122,6 +132,18 @@ const SettingsScreen = ({ navigation }) => {
           onValueChange={handleToggleCaloriesSync}
           value={isCaloriesSyncEnabled}
         />
+      </View>
+
+      <Text style={styles.sectionTitle}>Sync Duration</Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={syncDuration}
+          style={styles.picker}
+          onValueChange={handleSyncDurationChange}>
+          <Picker.Item label="Last 24 Hours" value="24h" />
+          <Picker.Item label="Last 3 Days" value="3d" />
+          <Picker.Item label="Last 7 Days" value="7d" />
+        </Picker>
       </View>
     </View>
   );
@@ -161,6 +183,16 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 16,
+  },
+  pickerContainer: {
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginBottom: 15,
+    borderRadius: 5,
+  },
+  picker: {
+    height: 40,
+    width: '100%',
   },
 });
 

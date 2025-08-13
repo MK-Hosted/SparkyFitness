@@ -92,7 +92,7 @@ app.use((req, res, next) => {
     '/auth/login',
     '/auth/register',
     '/auth/settings',
-    '/health-data',
+    '/api/health-data',
     '/health',
     '/openid', // All OIDC routes are handled by session, not JWT token
     '/openid/api/me', // Explicitly allow /openid/api/me as a public route for session check
@@ -124,7 +124,7 @@ app.use('/weekly-goal-plans', weeklyGoalPlanRoutes);
 app.use('/meal-plan-templates', mealPlanTemplateRoutes);
 app.use('/exercises', exerciseRoutes);
 app.use('/exercise-entries', exerciseEntryRoutes);
-app.use('/health-data', healthDataRoutes);
+app.use('/api/health-data', healthDataRoutes);
 app.use('/auth', authRoutes);
 app.use('/user', authRoutes);
 app.use('/health', healthRoutes);

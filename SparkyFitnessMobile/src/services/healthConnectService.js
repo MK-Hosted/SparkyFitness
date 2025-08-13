@@ -6,6 +6,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addLog } from './LogService';
 
+const SYNC_DURATION_KEY = '@HealthConnect:syncDuration';
+
 /**
  * Initializes the Health Connect client.
  * @returns {Promise<boolean>} True if initialization is successful, false otherwise.
@@ -80,6 +82,32 @@ export const readStepRecords = async (startDate, endDate) => {
     console.error('Failed to read step records', error);
     return [];
   }
+};
+
+/**
+ * Calculates the start date for data synchronization based on the selected duration.
+ * @param {string} duration - The sync duration ('24h', '3d', '7d').
+ * @returns {Date} The calculated start date.
+ */
+export const getSyncStartDate = (duration) => {
+  const now = new Date();
+  let startDate = new Date(now);
+
+  switch (duration) {
+    case '24h':
+      startDate.setHours(now.getHours() - 24);
+      break;
+    case '3d':
+      startDate.setDate(now.getDate() - 3);
+      break;
+    case '7d':
+      startDate.setDate(now.getDate() - 7);
+      break;
+    default:
+      startDate.setHours(now.getHours() - 24); // Default to 24 hours
+      break;
+  }
+  return startDate;
 };
 
 /**
@@ -209,5 +237,39 @@ export const loadHealthPreference = async (key) => {
     addLog(`[HealthConnectService] Failed to load preference ${key}: ${error.message}`);
     console.error(`Failed to load preference ${key}`, error);
     return null;
+  }
+};
+
+/**
+ * Saves the sync duration preference to AsyncStorage.
+ * @param {string} value - The sync duration value (e.g., '24h', '3d', '7d').
+ */
+export const saveSyncDuration = async (value) => {
+  try {
+    await AsyncStorage.setItem(SYNC_DURATION_KEY, value);
+    addLog(`[HealthConnectService] Saved sync duration: ${value}`);
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to save sync duration: ${error.message}`);
+    console.error(`Failed to save sync duration`, error);
+  }
+};
+
+/**
+ * Loads the sync duration preference from AsyncStorage.
+ * @returns {Promise<string|null>} The sync duration value, or null if not found.
+ */
+export const loadSyncDuration = async () => {
+  try {
+    const value = await AsyncStorage.getItem(SYNC_DURATION_KEY);
+    if (value !== null) {
+      addLog(`[HealthConnectService] Loaded sync duration: ${value}`);
+      return value;
+    }
+    addLog(`[HealthConnectService] Sync duration not found, returning default '24h'.`);
+    return '24h'; // Default to 24 hours if not found
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to load sync duration: ${error.message}`);
+    console.error(`Failed to load sync duration`, error);
+    return '24h'; // Default to 24 hours on error
   }
 };
