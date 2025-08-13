@@ -3,19 +3,18 @@ import { View, Text, Button, StyleSheet, Switch, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import {
   initHealthConnect,
-  requestStepsPermission,
   readStepRecords,
   aggregateStepsByDate,
-  requestActiveCaloriesPermission,
   readActiveCaloriesRecords,
   aggregateActiveCaloriesByDate,
+  loadHealthPreference, // Add loadHealthPreference
 } from '../services/healthConnectService';
 import { syncHealthData } from '../services/api';
 import { addLog } from '../services/LogService';
 
 const MainScreen = ({ navigation }) => {
-  const [isStepsEnabled, setIsStepsEnabled] = useState(true);
-  const [isActiveCaloriesEnabled, setIsActiveCaloriesEnabled] = useState(false);
+  const [isStepsEnabled, setIsStepsEnabled] = useState(false); // Initialize to false, will load from storage
+  const [isActiveCaloriesEnabled, setIsActiveCaloriesEnabled] = useState(false); // Initialize to false, will load from storage
   const [syncDuration, setSyncDuration] = useState(1);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHealthConnectInitialized, setIsHealthConnectInitialized] = useState(false);
@@ -30,12 +29,18 @@ const MainScreen = ({ navigation }) => {
         addLog('Health Connect initialization failed.');
       }
       setIsHealthConnectInitialized(initialized);
+
+      // Load preferences from AsyncStorage
+      const stepsEnabled = await loadHealthPreference('syncStepsEnabled');
+      setIsStepsEnabled(stepsEnabled !== null ? stepsEnabled : false);
+
+      const caloriesEnabled = await loadHealthPreference('syncCaloriesEnabled');
+      setIsActiveCaloriesEnabled(caloriesEnabled !== null ? caloriesEnabled : false);
     };
     initialize();
   }, []);
 
-  const toggleSteps = () => setIsStepsEnabled(previousState => !previousState);
-  const toggleActiveCalories = () => setIsActiveCaloriesEnabled(previousState => !previousState);
+  // Remove toggle functions as they are now handled in SettingsScreen
 
   const handleSync = async () => {
     if (isSyncing) return;
@@ -50,19 +55,11 @@ const MainScreen = ({ navigation }) => {
       startDate.setDate(endDate.getDate() - syncDuration + 1);
       startDate.setHours(0, 0, 0, 0);
 
+      addLog(`[MainScreen] Syncing data from ${startDate.toISOString()} to ${endDate.toISOString()} for duration ${syncDuration} days.`);
+
       let allAggregatedData = [];
 
       if (isStepsEnabled) {
-        addLog('Requesting steps permission...');
-        const permissionGranted = await requestStepsPermission();
-        addLog(`Permission granted for steps: ${permissionGranted}`);
-        if (!permissionGranted) {
-          addLog('Permission denied by user for steps.');
-          Alert.alert('Permission Denied', 'Cannot sync steps without permission to read steps data.');
-          setIsSyncing(false);
-          return;
-        }
-
         addLog('Reading step records...');
         const stepRecords = await readStepRecords(startDate, endDate);
         addLog(`Found ${stepRecords.length} step records.`);
@@ -71,21 +68,11 @@ const MainScreen = ({ navigation }) => {
 
         if (aggregatedStepsData.length === 0) {
           addLog('No step data found for the selected period.');
-          Alert.alert('No Data', 'No step data found for the selected period.');
+          // Alert.alert('No Data', 'No step data found for the selected period.'); // Removed to avoid multiple alerts
         }
       }
 
       if (isActiveCaloriesEnabled) {
-        addLog('Requesting active calories permission...');
-        const permissionGranted = await requestActiveCaloriesPermission();
-        addLog(`Permission granted for active calories: ${permissionGranted}`);
-        if (!permissionGranted) {
-          addLog('Permission denied by user for active calories.');
-          Alert.alert('Permission Denied', 'Cannot sync active calories without permission to read active calories data.');
-          setIsSyncing(false);
-          return;
-        }
-
         addLog('Reading active calories records...');
         const activeCaloriesRecords = await readActiveCaloriesRecords(startDate, endDate);
         addLog(`Found ${activeCaloriesRecords.length} active calories records.`);
@@ -94,7 +81,7 @@ const MainScreen = ({ navigation }) => {
 
         if (aggregatedActiveCaloriesData.length === 0) {
           addLog('No active calories data found for the selected period.');
-          Alert.alert('No Data', 'No active calories data found for the selected period.');
+          // Alert.alert('No Data', 'No active calories data found for the selected period.'); // Removed to avoid multiple alerts
         }
       }
 
@@ -104,8 +91,10 @@ const MainScreen = ({ navigation }) => {
         setIsSyncing(false);
         return;
       }
-
-      addLog('Syncing health data to server...');
+ 
+      const dataToSend = JSON.stringify(allAggregatedData, null, 2);
+      console.log(`[MainScreen] Data to be synced: ${dataToSend}`); // Use console.log
+      console.log('Syncing health data to server...'); // Use console.log
       await syncHealthData(allAggregatedData);
       addLog('Health data synced successfully.');
       Alert.alert('Success', 'Health data synced successfully.');
@@ -121,25 +110,6 @@ const MainScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>SparkyFitness</Text>
 
-      <View style={styles.optionContainer}>
-        <Text>Track Steps</Text>
-        <Switch
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={isStepsEnabled ? "#f5dd4b" : "#f4f3f4"}
-          onValueChange={toggleSteps}
-          value={isStepsEnabled}
-        />
-      </View>
-
-      <View style={styles.optionContainer}>
-        <Text>Track Active Calories Burned</Text>
-        <Switch
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={isActiveCaloriesEnabled ? "#f5dd4b" : "#f4f3f4"}
-          onValueChange={toggleActiveCalories}
-          value={isActiveCaloriesEnabled}
-        />
-      </View>
 
       <Picker
         selectedValue={syncDuration}

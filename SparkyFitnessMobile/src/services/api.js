@@ -13,6 +13,9 @@ export const syncHealthData = async (data) => {
 
   const { url, apiKey } = config;
 
+  console.log(`[API Service] Attempting to sync to URL: ${url}/health-data`);
+  console.log(`[API Service] Using API Key (first 5 chars): ${apiKey ? apiKey.substring(0, 5) + '...' : 'N/A'}`);
+
   try {
     const response = await fetch(`${url}/health-data`, {
       method: 'POST',
@@ -24,8 +27,9 @@ export const syncHealthData = async (data) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to sync data.');
+      const errorText = await response.text(); // Read raw response text
+      console.log('Server responded with non-OK status:', response.status, errorText); // Use console.log
+      throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 200)}...`); // Log first 200 chars
     }
 
     return await response.json();

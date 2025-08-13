@@ -98,3 +98,61 @@ SparkyFitnessMobile/
 │   └── technical-design-document.md
 ├── package.json
 └── ... (other react-native files)
+
+---
+
+## 7. Health Connect Integration - Revision 1
+
+### 7.1. Problem Analysis
+
+The initial implementation of Health Connect integration was failing to retrieve health data. A thorough analysis revealed the following key issues:
+
+*   **Incorrect Permission Requests:** The application was requesting permissions for different data types in separate, sequential function calls. The Health Connect API is designed to handle all permission requests in a single, consolidated user-facing dialog. This incorrect implementation was causing the permission requests to fail silently.
+*   **Lack of State Persistence:** User preferences, such as enabling or disabling data syncing, were not being saved to the device's local storage. This required users to reconfigure their settings every time they launched the app.
+
+### 7.2. Revised Solution
+
+To address these issues and align with best practices for professional app design, the following changes will be implemented:
+
+#### 7.2.1. Consolidated Permission Service
+
+The existing `healthConnectService.js` will be refactored to handle permission requests correctly.
+
+*   A new, flexible function, `requestHealthPermissions(permissions)`, will be created. This function will accept an array of permission strings (e.g., `['Steps', 'ActiveCaloriesBurned']`) and request them in a single API call.
+*   The old, separate permission functions (`requestStepsPermission`, `requestActiveCaloriesPermission`) will be deprecated and removed to avoid confusion.
+
+#### 7.2.2. In-Context Permission Requests
+
+Permissions will be requested "in-context," meaning the app will only ask for permission when the user actively tries to use a feature that requires it.
+
+*   The UI will feature distinct controls (e.g., checkboxes) for each type of health data (e.g., "Sync Steps," "Sync Calories").
+*   When a user enables one of these controls for the first time, the `requestHealthPermissions` function will be called with the corresponding permission.
+
+#### 7.2.3. State Management with AsyncStorage
+
+User preferences will be persisted to the device's local storage using `@react-native-async-storage/async-storage`.
+
+*   The state of UI controls (e.g., the enabled/disabled status of checkboxes, selected date ranges) will be saved to `AsyncStorage`.
+*   When the app launches, it will read these preferences from `AsyncStorage` to restore the user's previous settings.
+
+### 7.3. Revised Data Flow Diagram
+
+The following diagram illustrates the new, improved workflow:
+
+```mermaid
+graph TD
+    subgraph "User Interaction"
+        A[User enables 'Sync Steps' checkbox] --> B{Call requestHealthPermissions(['Steps'])};
+        B --> C[System shows permission dialog for Steps];
+        C --> D{Save 'Sync Steps' preference to storage};
+
+        E[User enables 'Sync Calories' checkbox] --> F{Call requestHealthPermissions(['ActiveCaloriesBurned'])};
+        F --> G[System shows permission dialog for Calories];
+        G --> H{Save 'Sync Calories' preference to storage};
+    end
+
+    subgraph "App Launch"
+        I[App Starts] --> J{Read preferences from AsyncStorage};
+        J --> K[Restore UI state e.g., checkboxes];
+    end
+```

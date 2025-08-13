@@ -116,6 +116,7 @@ SparkyFitnessMobile/docs/react-native-docs
 SparkyFitnessMobile/node_modules
 SparkyFitnessMobile/android/.gradle/
 SparkyFitnessMobile/android/app/build/*
+SparkyFitnessMobile/docs/SampleApp/*
 
 # Keystore
 *.keystore

@@ -3,6 +3,7 @@ import {
   requestPermission,
   readRecords,
 } from 'react-native-health-connect';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addLog } from './LogService';
 
 /**
@@ -24,48 +25,31 @@ export const initHealthConnect = async () => {
  * Requests permission to read step data.
  * @returns {Promise<boolean>} True if permission is granted, false otherwise.
  */
-export const requestStepsPermission = async () => {
+export const requestHealthPermissions = async (permissionsToRequest) => {
   try {
-    console.log('[HealthConnectService] Inside requestStepsPermission function.');
-    const permissions = await requestPermission([{ accessType: 'read', recordType: 'Steps' }]);
-    if (permissions.length > 0) {
-      addLog(`[HealthConnectService] Steps permission granted.`);
-      console.log('[HealthConnectService] Steps permission granted.');
-    } else {
-      addLog(`[HealthConnectService] Steps permission NOT granted.`);
-      console.log('[HealthConnectService] Steps permission NOT granted.');
-    }
-    addLog(`[HealthConnectService] requestStepsPermission returning: ${permissions.length > 0}`);
-    console.log(`[HealthConnectService] requestStepsPermission returning: ${permissions.length > 0}`);
-    return permissions.length > 0;
-  } catch (error) {
-    addLog(`[HealthConnectService] Failed to request steps permission: ${error.message}.`);
-    console.error('Failed to request steps permission', error);
-    return false;
-  }
-};
+    addLog(`[HealthConnectService] Requesting permissions: ${JSON.stringify(permissionsToRequest)}`);
+    const grantedPermissions = await requestPermission(permissionsToRequest);
 
-/**
- * Requests permission to read active calories burned data.
- * @returns {Promise<boolean>} True if permission is granted, false otherwise.
- */
-export const requestActiveCaloriesPermission = async () => {
-  try {
-    console.log('[HealthConnectService] Inside requestActiveCaloriesPermission function.');
-    const permissions = await requestPermission([{ accessType: 'read', recordType: 'ActiveCaloriesBurned' }]);
-    if (permissions.length > 0) {
-      addLog(`[HealthConnectService] Active Calories permission granted.`);
-      console.log('[HealthConnectService] Active Calories permission granted.');
+    // Check if all requested permissions are present in the grantedPermissions array
+    const allGranted = permissionsToRequest.every(requestedPerm =>
+      grantedPermissions.some(grantedPerm =>
+        grantedPerm.recordType === requestedPerm.recordType &&
+        grantedPerm.accessType === requestedPerm.accessType
+      )
+    );
+
+    if (allGranted) {
+      addLog(`[HealthConnectService] All requested permissions granted.`);
+      console.log('[HealthConnectService] All requested permissions granted.');
+      return true;
     } else {
-      addLog(`[HealthConnectService] Active Calories permission NOT granted.`);
-      console.log('[HealthConnectService] Active Calories permission NOT granted.');
+      addLog(`[HealthConnectService] Not all requested permissions granted. Requested: ${JSON.stringify(permissionsToRequest)}. Granted: ${JSON.stringify(grantedPermissions)}`);
+      console.log('[HealthConnectService] Not all requested permissions granted.', { requested: permissionsToRequest, granted: grantedPermissions });
+      return false;
     }
-    addLog(`[HealthConnectService] requestActiveCaloriesPermission returning: ${permissions.length > 0}`);
-    console.log(`[HealthConnectService] requestActiveCaloriesPermission returning: ${permissions.length > 0}`);
-    return permissions.length > 0;
   } catch (error) {
-    addLog(`[HealthConnectService] Failed to request active calories permission: ${error.message}.`);
-    console.error('Failed to request active calories permission', error);
+    addLog(`[HealthConnectService] Failed to request health permissions: ${error.message}. Full error: ${JSON.stringify(error)}`);
+    console.error('Failed to request health permissions', error);
     return false;
   }
 };
@@ -190,4 +174,40 @@ export const aggregateActiveCaloriesByDate = (records) => {
     value: aggregatedData[date],
     type: 'active_calories',
   }));
+};
+
+/**
+ * Saves a Health Connect preference to AsyncStorage.
+ * @param {string} key - The key for the preference (e.g., 'syncStepsEnabled').
+ * @param {boolean} value - The boolean value of the preference.
+ */
+export const saveHealthPreference = async (key, value) => {
+  try {
+    await AsyncStorage.setItem(`@HealthConnect:${key}`, JSON.stringify(value));
+    addLog(`[HealthConnectService] Saved preference ${key}: ${value}`);
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to save preference ${key}: ${error.message}`);
+    console.error(`Failed to save preference ${key}`, error);
+  }
+};
+
+/**
+ * Loads a Health Connect preference from AsyncStorage.
+ * @param {string} key - The key for the preference.
+ * @returns {Promise<boolean|null>} The boolean value of the preference, or null if not found.
+ */
+export const loadHealthPreference = async (key) => {
+  try {
+    const value = await AsyncStorage.getItem(`@HealthConnect:${key}`);
+    if (value !== null) {
+      addLog(`[HealthConnectService] Loaded preference ${key}: ${value}`);
+      return JSON.parse(value);
+    }
+    addLog(`[HealthConnectService] Preference ${key} not found.`);
+    return null;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to load preference ${key}: ${error.message}`);
+    console.error(`Failed to load preference ${key}`, error);
+    return null;
+  }
 };
