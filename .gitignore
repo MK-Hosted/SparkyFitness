@@ -116,6 +116,7 @@ SparkyFitnessMobile/docs/react-native-docs
 SparkyFitnessMobile/node_modules
 SparkyFitnessMobile/android/.gradle/
 SparkyFitnessMobile/android/app/build/*
+SparkyFitnessMobile/android/app/src/main/res/mipmap-anydpi-v26/
 SparkyFitnessMobile/docs/SampleApp/*
 
 # Keystore

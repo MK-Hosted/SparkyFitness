@@ -95,16 +95,34 @@ const MainScreen = ({ navigation }) => {
     let currentHeartRate = 0;
     let currentActiveMinutes = 0;
 
+    console.log(`[MainScreen] Fetching health data for display from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
     if (isStepsEnabled) {
       const stepRecords = await readStepRecords(startDate, endDate);
       const aggregatedStepsData = aggregateStepsByDate(stepRecords);
-      currentSteps = aggregatedStepsData.reduce((sum, record) => sum + record.totalSteps, 0);
+      currentSteps = aggregatedStepsData.reduce((sum, record) => sum + record.value, 0); // Use record.value
+      console.log(`[MainScreen] Fetched steps: ${currentSteps}`);
     }
 
     if (isActiveCaloriesEnabled) {
       const activeCaloriesRecords = await readActiveCaloriesRecords(startDate, endDate);
       const aggregatedActiveCaloriesData = aggregateActiveCaloriesByDate(activeCaloriesRecords);
-      currentCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.totalActiveCalories, 0);
+      currentCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.value, 0); // Use record.value
+      console.log(`[MainScreen] Fetched calories: ${currentCalories}`);
+    }
+
+    if (isHeartRateEnabled) {
+      const heartRateRecords = await readHeartRateRecords(startDate, endDate);
+      const aggregatedHeartRateData = aggregateHeartRateByDate(heartRateRecords);
+      currentHeartRate = aggregatedHeartRateData.reduce((sum, record) => sum + record.value, 0);
+      console.log(`[MainScreen] Fetched heart rate: ${currentHeartRate}`);
+    }
+
+    if (isActiveMinutesEnabled) {
+      const activeMinutesRecords = await readActiveMinutesRecords(startDate, endDate);
+      const aggregatedActiveMinutesData = aggregateActiveMinutesByDate(activeMinutesRecords);
+      currentActiveMinutes = aggregatedActiveMinutesData.reduce((sum, record) => sum + record.value, 0);
+      console.log(`[MainScreen] Fetched active minutes: ${currentActiveMinutes}`);
     }
 
 
@@ -113,6 +131,7 @@ const MainScreen = ({ navigation }) => {
     setHeartRateData(currentHeartRate > 0 ? `${Math.round(currentHeartRate)} bpm` : '0 bpm');
     setActiveMinutesData(currentActiveMinutes > 0 ? `${Math.round(currentActiveMinutes)} min` : '0 min');
     setIsConnected(true);
+    console.log(`[MainScreen] Displaying steps: ${currentSteps}, calories: ${currentCalories}, heart rate: ${currentHeartRate}, active minutes: ${currentActiveMinutes}`);
   };
 
   // Remove toggle functions as they are now handled in SettingsScreen
@@ -149,6 +168,7 @@ const MainScreen = ({ navigation }) => {
         allAggregatedData = allAggregatedData.concat(aggregatedHeartRateData);
         const totalHeartRate = aggregatedHeartRateData.reduce((sum, record) => sum + record.value, 0);
         setHeartRateData(totalHeartRate > 0 ? `${Math.round(totalHeartRate)} bpm` : '0 bpm');
+        console.log(`[MainScreen] Synced heart rate: ${totalHeartRate}`);
 
         if (aggregatedHeartRateData.length === 0) {
           addLog('No heart rate data found for the selected period.');
@@ -163,6 +183,7 @@ const MainScreen = ({ navigation }) => {
         allAggregatedData = allAggregatedData.concat(aggregatedActiveMinutesData);
         const totalActiveMinutes = aggregatedActiveMinutesData.reduce((sum, record) => sum + record.value, 0);
         setActiveMinutesData(totalActiveMinutes > 0 ? `${Math.round(totalActiveMinutes)} min` : '0 min');
+        console.log(`[MainScreen] Synced active minutes: ${totalActiveMinutes}`);
 
         if (aggregatedActiveMinutesData.length === 0) {
           addLog('No active minutes data found for the selected period.');
@@ -175,8 +196,9 @@ const MainScreen = ({ navigation }) => {
         addLog(`Found ${stepRecords.length} step records.`);
         const aggregatedStepsData = aggregateStepsByDate(stepRecords);
         allAggregatedData = allAggregatedData.concat(aggregatedStepsData);
-        const totalSteps = aggregatedStepsData.reduce((sum, record) => sum + record.totalSteps, 0);
+        const totalSteps = aggregatedStepsData.reduce((sum, record) => sum + record.value, 0); // Use record.value
         setStepsData(totalSteps.toLocaleString());
+        console.log(`[MainScreen] Synced steps: ${totalSteps}`);
 
         if (aggregatedStepsData.length === 0) {
           addLog('No step data found for the selected period.');
@@ -189,8 +211,9 @@ const MainScreen = ({ navigation }) => {
         addLog(`Found ${activeCaloriesRecords.length} active calories records.`);
         const aggregatedActiveCaloriesData = aggregateActiveCaloriesByDate(activeCaloriesRecords);
         allAggregatedData = allAggregatedData.concat(aggregatedActiveCaloriesData);
-        const totalCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.totalActiveCalories, 0);
+        const totalCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.value, 0); // Use record.value
         setCaloriesData(totalCalories.toLocaleString());
+        console.log(`[MainScreen] Synced calories: ${totalCalories}`);
 
         if (aggregatedActiveCaloriesData.length === 0) {
           addLog('No active calories data found for the selected period.');
