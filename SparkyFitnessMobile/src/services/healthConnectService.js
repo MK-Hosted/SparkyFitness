@@ -2,6 +2,9 @@ import {
   initialize,
   requestPermission,
   readRecords,
+  // Add new record types as needed
+  HeartRateRecord,
+  ActiveMinutesRecord,
 } from 'react-native-health-connect';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addLog } from './LogService';
@@ -103,6 +106,9 @@ export const getSyncStartDate = (duration) => {
     case '7d':
       startDate.setDate(now.getDate() - 7);
       break;
+    case '30d': // Add case for 30 days
+      startDate.setDate(now.getDate() - 30);
+      break;
     default:
       startDate.setHours(now.getHours() - 24); // Default to 24 hours
       break;
@@ -139,6 +145,127 @@ export const readActiveCaloriesRecords = async (startDate, endDate) => {
 };
 
 /**
+ * Reads heart rate records for a given date range.
+ * @param {Date} startDate - The start date of the range.
+ * @param {Date} endDate - The end date of the range.
+ * @returns {Promise<Array>} An array of heart rate records.
+ */
+export const readHeartRateRecords = async (startDate, endDate) => {
+  try {
+    const startTime = startDate.toISOString();
+    const endTime = endDate.toISOString();
+    addLog(`[HealthConnectService] Reading heart rate records for timerange: ${startTime} to ${endTime}`);
+    const result = await readRecords('HeartRate', {
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: startTime,
+        endTime: endTime,
+      },
+    });
+    addLog(`[HealthConnectService] Raw heart rate records from Health Connect: ${JSON.stringify(result.records)}`);
+    return result.records;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to read heart rate records: ${error.message}. Full error: ${JSON.stringify(error)}`);
+    console.error('Failed to read heart rate records', error);
+    return [];
+  }
+};
+
+/**
+ * Aggregates heart rate records by date and calculates average heart rate.
+ * @param {Array} records - An array of heart rate records from Health Connect.
+ * @returns {Array} An array of objects, where each object has a date and the average heart rate for that date.
+ */
+export const aggregateHeartRateByDate = (records) => {
+  if (!Array.isArray(records)) {
+    addLog(`[HealthConnectService] aggregateHeartRateByDate received non-array records: ${JSON.stringify(records)}`);
+    console.warn('aggregateHeartRateByDate received non-array records:', records);
+    return [];
+  }
+  addLog(`[HealthConnectService] Input records for heart rate aggregation: ${JSON.stringify(records)}`);
+
+  const aggregatedData = records.reduce((acc, record) => {
+    const date = record.startTime.split('T')[0];
+    const heartRate = (record.samples && record.samples.length > 0) ? record.samples.reduce((sum, sample) => sum + sample.beatsPerMinute, 0) / record.samples.length : 0;
+
+    if (!acc[date]) {
+      acc[date] = { total: 0, count: 0 };
+    }
+    acc[date].total += heartRate;
+    acc[date].count++;
+
+    return acc;
+  }, {});
+  addLog(`[HealthConnectService] Aggregated heart rate data: ${JSON.stringify(aggregatedData)}`);
+
+  return Object.keys(aggregatedData).map(date => ({
+    date,
+    value: aggregatedData[date].count > 0 ? Math.round(aggregatedData[date].total / aggregatedData[date].count) : 0,
+    type: 'heart_rate',
+  }));
+};
+
+/**
+ * Reads active minutes records for a given date range.
+ * @param {Date} startDate - The start date of the range.
+ * @param {Date} endDate - The end date of the range.
+ * @returns {Promise<Array>} An array of active minutes records.
+ */
+export const readActiveMinutesRecords = async (startDate, endDate) => {
+  try {
+    const startTime = startDate.toISOString();
+    const endTime = endDate.toISOString();
+    addLog(`[HealthConnectService] Reading active minutes records for timerange: ${startTime} to ${endTime}`);
+    const result = await readRecords(ActiveMinutesRecord.name, {
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: startTime,
+        endTime: endTime,
+      },
+    });
+    addLog(`[HealthConnectService] Raw active minutes records from Health Connect: ${JSON.stringify(result.records)}`);
+    return result.records;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to read active minutes records: ${error.message}. Full error: ${JSON.stringify(error)}`);
+    console.error('Failed to read active minutes records', error);
+    return [];
+  }
+};
+
+/**
+ * Aggregates active minutes records by date.
+ * @param {Array} records - An array of active minutes records from Health Connect.
+ * @returns {Array} An array of objects, where each object has a date and the total active minutes for that date.
+ */
+export const aggregateActiveMinutesByDate = (records) => {
+  if (!Array.isArray(records)) {
+    addLog(`[HealthConnectService] aggregateActiveMinutesByDate received non-array records: ${JSON.stringify(records)}`);
+    console.warn('aggregateActiveMinutesByDate received non-array records:', records);
+    return [];
+  }
+  addLog(`[HealthConnectService] Input records for active minutes aggregation: ${JSON.stringify(records)}`);
+
+  const aggregatedData = records.reduce((acc, record) => {
+    const date = record.startTime.split('T')[0];
+    const activeMinutes = typeof record.activeTime === 'number' ? record.activeTime / 60000 : 0; // Convert milliseconds to minutes
+
+    if (!acc[date]) {
+      acc[date] = 0;
+    }
+    acc[date] += activeMinutes;
+
+    return acc;
+  }, {});
+  addLog(`[HealthConnectService] Aggregated active minutes data: ${JSON.stringify(aggregatedData)}`);
+
+  return Object.keys(aggregatedData).map(date => ({
+    date,
+    value: Math.round(aggregatedData[date]),
+    type: 'active_minutes',
+  }));
+};
+
+/**
  * Aggregates step records by date.
  * @param {Array} records - An array of step records from Health Connect.
  * @returns {Array} An array of objects, where each object has a date and the total steps for that date.
@@ -153,7 +280,7 @@ export const aggregateStepsByDate = (records) => {
 
   const aggregatedData = records.reduce((acc, record) => {
     const date = record.startTime.split('T')[0];
-    const steps = record.count;
+    const steps = typeof record.count === 'number' ? record.count : 0; // Ensure steps is a number
 
     if (!acc[date]) {
       acc[date] = 0;
@@ -186,7 +313,7 @@ export const aggregateActiveCaloriesByDate = (records) => {
 
   const aggregatedData = records.reduce((acc, record) => {
     const date = record.startTime.split('T')[0];
-    const calories = record.energy.inCalories; // Assuming energy is in calories
+    const calories = (record.energy && typeof record.energy.inCalories === 'number') ? record.energy.inCalories : 0; // Ensure calories is a number
 
     if (!acc[date]) {
       acc[date] = 0;
@@ -206,13 +333,14 @@ export const aggregateActiveCaloriesByDate = (records) => {
 
 /**
  * Saves a Health Connect preference to AsyncStorage.
+ * This function is intended for boolean or object values that need JSON stringification.
  * @param {string} key - The key for the preference (e.g., 'syncStepsEnabled').
- * @param {boolean} value - The boolean value of the preference.
+ * @param {any} value - The value of the preference.
  */
 export const saveHealthPreference = async (key, value) => {
   try {
     await AsyncStorage.setItem(`@HealthConnect:${key}`, JSON.stringify(value));
-    addLog(`[HealthConnectService] Saved preference ${key}: ${value}`);
+    addLog(`[HealthConnectService] Saved preference ${key}: ${JSON.stringify(value)}`);
   } catch (error) {
     addLog(`[HealthConnectService] Failed to save preference ${key}: ${error.message}`);
     console.error(`Failed to save preference ${key}`, error);
@@ -221,8 +349,9 @@ export const saveHealthPreference = async (key, value) => {
 
 /**
  * Loads a Health Connect preference from AsyncStorage.
+ * This function is intended for boolean or object values that need JSON parsing.
  * @param {string} key - The key for the preference.
- * @returns {Promise<boolean|null>} The boolean value of the preference, or null if not found.
+ * @returns {Promise<any|null>} The parsed value of the preference, or null if not found.
  */
 export const loadHealthPreference = async (key) => {
   try {
@@ -236,6 +365,42 @@ export const loadHealthPreference = async (key) => {
   } catch (error) {
     addLog(`[HealthConnectService] Failed to load preference ${key}: ${error.message}`);
     console.error(`Failed to load preference ${key}`, error);
+    return null;
+  }
+};
+
+/**
+ * Saves a string preference to AsyncStorage.
+ * @param {string} key - The key for the preference.
+ * @param {string} value - The string value of the preference.
+ */
+export const saveStringPreference = async (key, value) => {
+  try {
+    await AsyncStorage.setItem(`@HealthConnect:${key}`, value);
+    addLog(`[HealthConnectService] Saved string preference ${key}: ${value}`);
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to save string preference ${key}: ${error.message}`);
+    console.error(`Failed to save string preference ${key}`, error);
+  }
+};
+
+/**
+ * Loads a string preference from AsyncStorage.
+ * @param {string} key - The key for the preference.
+ * @returns {Promise<string|null>} The string value of the preference, or null if not found.
+ */
+export const loadStringPreference = async (key) => {
+  try {
+    const value = await AsyncStorage.getItem(`@HealthConnect:${key}`);
+    if (value !== null) {
+      addLog(`[HealthConnectService] Loaded string preference ${key}: ${value}`);
+      return value;
+    }
+    addLog(`[HealthConnectService] String preference ${key} not found.`);
+    return null;
+  } catch (error) {
+    addLog(`[HealthConnectService] Failed to load string preference ${key}: ${error.message}`);
+    console.error(`Failed to load string preference ${key}`, error);
     return null;
   }
 };

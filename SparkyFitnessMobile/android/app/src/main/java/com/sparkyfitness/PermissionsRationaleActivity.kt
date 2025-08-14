@@ -1,4 +1,4 @@
-package com.sparkyfitnessmobile
+package com.sparkyfitness
 
 import android.os.Bundle
 import android.webkit.WebResourceRequest

@@ -25,4 +25,28 @@ adb logcat -s "ReactNative" "HealthConnect" "SparkyFitnessMobile" *:E
 
 
 
+Clean b# Navigate to the React Native project directory
+cd SparkyFitnessMobile
+
+# Remove node_modules and package lock files
+rm -rf node_modules
+rm -f yarn.lock package-lock.json
+
+# Clean Android build caches
+cd android
+./gradlew clean
+rm -rf .gradle app/build build
+cd .. # Go back to SparkyFitnessMobile directory
+uild:
+
+
+
+npm start -- --reset-cache
+
+npm install
+
+npm run android
+
+
+
 

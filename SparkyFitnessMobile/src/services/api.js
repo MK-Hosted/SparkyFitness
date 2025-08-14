@@ -1,4 +1,4 @@
-import { getServerConfig } from './storage';
+import { getActiveServerConfig } from './storage';
 
 /**
  * Sends health data to the server.
@@ -6,7 +6,7 @@ import { getServerConfig } from './storage';
  * @returns {Promise<object>} The server's response.
  */
 export const syncHealthData = async (data) => {
-  const config = await getServerConfig();
+  const config = await getActiveServerConfig();
   if (!config) {
     throw new Error('Server configuration not found.');
   }
@@ -36,5 +36,29 @@ export const syncHealthData = async (data) => {
   } catch (error) {
     console.error('Failed to sync health data', error);
     throw error;
+  }
+};
+
+/**
+ * Checks the server connection status.
+ * @returns {Promise<boolean>} True if connection is successful, false otherwise.
+ */
+export const checkServerConnection = async () => {
+  const config = await getActiveServerConfig();
+  if (!config || !config.url) {
+    return false; // No configuration, so no connection
+  }
+
+  try {
+    const response = await fetch(`${config.url}/health-data/status`, { // Assuming a status endpoint
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to check server connection', error);
+    return false;
   }
 };

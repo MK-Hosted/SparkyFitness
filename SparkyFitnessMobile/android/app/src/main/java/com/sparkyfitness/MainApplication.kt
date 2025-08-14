@@ -1,4 +1,4 @@
-package com.sparkyfitnessmobile
+package com.sparkyfitness
 
 import android.app.Application
 import com.facebook.react.PackageList
