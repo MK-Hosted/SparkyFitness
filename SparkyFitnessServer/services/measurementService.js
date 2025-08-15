@@ -9,28 +9,44 @@ async function processHealthData(healthDataArray, userId) {
   const errors = [];
 
   for (const dataEntry of healthDataArray) {
-    const { value, type, unit, date } = dataEntry;
+    const { value, type, date, timestamp } = dataEntry; // Added timestamp
 
-    if (!value || !type || !date) {
+    if (value === undefined || value === null || !type || !date) { // Check for undefined/null value
       errors.push({ error: "Missing required fields: value, type, date in one of the entries", entry: dataEntry });
       continue;
     }
 
     let parsedDate;
+    let entryTimestamp = null;
+    let entryHour = null;
+
     try {
       const dateObj = new Date(date);
       if (isNaN(dateObj.getTime())) {
         throw new Error(`Invalid date received from shortcut: '${date}'.`);
       }
       parsedDate = dateObj.toISOString().split('T')[0];
+
+      if (timestamp) {
+        const timestampObj = new Date(timestamp);
+        if (isNaN(timestampObj.getTime())) {
+          log('warn', `Invalid timestamp received for entry: ${JSON.stringify(dataEntry)}. Using date only.`);
+        } else {
+          entryTimestamp = timestampObj.toISOString();
+          entryHour = timestampObj.getHours();
+        }
+      }
     } catch (e) {
-      log('error', "Date parsing error:", e);
-      errors.push({ error: `Invalid date format for entry: ${JSON.stringify(dataEntry)}. Error: ${e.message}`, entry: dataEntry });
+      log('error', "Date/Timestamp parsing error:", e);
+      errors.push({ error: `Invalid date/timestamp format for entry: ${JSON.stringify(dataEntry)}. Error: ${e.message}`, entry: dataEntry });
       continue;
     }
 
     try {
       let result;
+      let categoryId;
+
+      // Handle specific types first, then fall back to custom measurements
       switch (type) {
         case 'step':
           const stepValue = parseInt(value, 10);
@@ -61,7 +77,29 @@ async function processHealthData(healthDataArray, userId) {
           processedResults.push({ type, status: 'success', data: result });
           break;
         default:
-          errors.push({ error: `Unsupported health data type: ${type}`, entry: dataEntry });
+          // Handle as custom measurement
+          const numericValue = parseFloat(value);
+          if (isNaN(numericValue)) {
+            errors.push({ error: `Invalid numeric value for custom measurement type: ${type}. Value: ${value}`, entry: dataEntry });
+            break;
+          }
+
+          // Get or create custom category
+          categoryId = await getOrCreateCustomCategory(userId, type);
+          if (!categoryId) {
+            errors.push({ error: `Failed to get or create custom category for type: ${type}`, entry: dataEntry });
+            break;
+          }
+
+          result = await measurementRepository.upsertCustomMeasurement(
+            userId,
+            categoryId,
+            numericValue,
+            parsedDate,
+            entryHour,
+            entryTimestamp
+          );
+          processedResults.push({ type, status: 'success', data: result });
           break;
       }
     } catch (error) {
@@ -81,6 +119,27 @@ async function processHealthData(healthDataArray, userId) {
       message: "All health data successfully processed.",
       processed: processedResults
     };
+  }
+}
+
+// Helper function to get or create a custom category
+async function getOrCreateCustomCategory(userId, categoryName) {
+  // Try to get existing category
+  const existingCategories = await measurementRepository.getCustomCategories(userId);
+  let category = existingCategories.find(cat => cat.name === categoryName);
+
+  if (category) {
+    return category.id;
+  } else {
+    // Create new category if it doesn't exist
+    const newCategoryData = {
+      user_id: userId,
+      name: categoryName,
+      measurement_type: 'numeric', // Default to numeric for Health Connect data
+      frequency: 'Daily' // Default frequency, can be refined later if needed
+    };
+    const newCategory = await measurementRepository.createCustomCategory(newCategoryData);
+    return newCategory.id;
   }
 }
 

@@ -5,9 +5,40 @@ import {
   // Add new record types as needed
   HeartRateRecord,
   ActiveMinutesRecord,
+  WeightRecord,
+  BloodPressureRecord,
+  NutritionRecord,
+  SleepSessionRecord,
+  StepsRecord,
+  ActiveCaloriesBurnedRecord,
+  BasalBodyTemperatureRecord,
+  BasalMetabolicRateRecord,
+  BloodGlucoseRecord,
+  BodyFatRecord,
+  BodyTemperatureRecord,
+  BoneMassRecord,
+  CervicalMucusRecord,
+  DistanceRecord,
+  ElevationGainedRecord,
+  ExerciseSessionRecord,
+  FloorsClimbedRecord,
+  HeightRecord,
+  HydrationRecord,
+  LeanBodyMassRecord,
+  MenstruationFlowRecord,
+  OvulationTestRecord,
+  OxygenSaturationRecord,
+  PowerRecord,
+  RespiratoryRateRecord,
+  RestingHeartRateRecord,
+  SexualActivityRecord,
+  SpeedRecord,
+  Vo2MaxRecord,
+  WheelchairPushesRecord,
 } from 'react-native-health-connect';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addLog } from './LogService';
+import * as api from './api'; // Import the api service
 
 const SYNC_DURATION_KEY = '@HealthConnect:syncDuration';
 
@@ -65,27 +96,36 @@ export const requestHealthPermissions = async (permissionsToRequest) => {
  * @param {Date} endDate - The end date of the range.
  * @returns {Promise<Array>} An array of step records.
  */
-export const readStepRecords = async (startDate, endDate) => {
+/**
+ * Reads health records for a given record type and date range.
+ * @param {string} recordType - The type of record to read (e.g., 'Steps', 'HeartRate').
+ * @param {Date} startDate - The start date of the range.
+ * @param {Date} endDate - The end date of the range.
+ * @returns {Promise<Array>} An array of health records.
+ */
+export const readHealthRecords = async (recordType, startDate, endDate) => {
   try {
     const startTime = startDate.toISOString();
     const endTime = endDate.toISOString();
-    addLog(`[HealthConnectService] Reading step records for timerange: ${startTime} to ${endTime}`);
-    const result = await readRecords('Steps', {
+    addLog(`[HealthConnectService] Reading ${recordType} records for timerange: ${startTime} to ${endTime}`);
+    const result = await readRecords(recordType, {
       timeRangeFilter: {
         operator: 'between',
         startTime: startTime,
         endTime: endTime,
       },
     });
-    addLog(`[HealthConnectService] Raw result from readRecords: ${JSON.stringify(result)}`);
-    addLog(`[HealthConnectService] Raw step records from Health Connect: ${JSON.stringify(result.records)}`);
+    addLog(`[HealthConnectService] Raw ${recordType} records from Health Connect: ${JSON.stringify(result.records)}`);
     return result.records;
   } catch (error) {
-    addLog(`[HealthConnectService] Failed to read step records: ${error.message}. Full error: ${JSON.stringify(error)}`);
-    console.error('Failed to read step records', error);
+    addLog(`[HealthConnectService] Failed to read ${recordType} records: ${error.message}. Full error: ${JSON.stringify(error)}`);
+    console.error(`Failed to read ${recordType} records`, error);
     return [];
   }
 };
+
+// Existing specific read functions can now call the generic one
+export const readStepRecords = async (startDate, endDate) => readHealthRecords('Steps', startDate, endDate);
 
 /**
  * Calculates the start date for data synchronization based on the selected duration.
@@ -122,27 +162,7 @@ export const getSyncStartDate = (duration) => {
  * @param {Date} endDate - The end date of the range.
  * @returns {Promise<Array>} An array of active calories burned records.
  */
-export const readActiveCaloriesRecords = async (startDate, endDate) => {
-  try {
-    const startTime = startDate.toISOString();
-    const endTime = endDate.toISOString();
-    addLog(`[HealthConnectService] Reading active calories records for timerange: ${startTime} to ${endTime}`);
-    const result = await readRecords('ActiveCaloriesBurned', {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startTime,
-        endTime: endTime,
-      },
-    });
-    addLog(`[HealthConnectService] Raw result from readActiveCaloriesRecords: ${JSON.stringify(result)}`);
-    addLog(`[HealthConnectService] Raw active calories records from Health Connect: ${JSON.stringify(result.records)}`);
-    return result.records;
-  } catch (error) {
-    addLog(`[HealthConnectService] Failed to read active calories records: ${error.message}. Full error: ${JSON.stringify(error)}`);
-    console.error('Failed to read active calories records', error);
-    return [];
-  }
-};
+export const readActiveCaloriesRecords = async (startDate, endDate) => readHealthRecords('ActiveCaloriesBurned', startDate, endDate);
 
 /**
  * Reads heart rate records for a given date range.
@@ -150,26 +170,7 @@ export const readActiveCaloriesRecords = async (startDate, endDate) => {
  * @param {Date} endDate - The end date of the range.
  * @returns {Promise<Array>} An array of heart rate records.
  */
-export const readHeartRateRecords = async (startDate, endDate) => {
-  try {
-    const startTime = startDate.toISOString();
-    const endTime = endDate.toISOString();
-    addLog(`[HealthConnectService] Reading heart rate records for timerange: ${startTime} to ${endTime}`);
-    const result = await readRecords('HeartRate', {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startTime,
-        endTime: endTime,
-      },
-    });
-    addLog(`[HealthConnectService] Raw heart rate records from Health Connect: ${JSON.stringify(result.records)}`);
-    return result.records;
-  } catch (error) {
-    addLog(`[HealthConnectService] Failed to read heart rate records: ${error.message}. Full error: ${JSON.stringify(error)}`);
-    console.error('Failed to read heart rate records', error);
-    return [];
-  }
-};
+export const readHeartRateRecords = async (startDate, endDate) => readHealthRecords('HeartRate', startDate, endDate);
 
 /**
  * Aggregates heart rate records by date and calculates average heart rate.
@@ -211,26 +212,7 @@ export const aggregateHeartRateByDate = (records) => {
  * @param {Date} endDate - The end date of the range.
  * @returns {Promise<Array>} An array of active minutes records.
  */
-export const readActiveMinutesRecords = async (startDate, endDate) => {
-  try {
-    const startTime = startDate.toISOString();
-    const endTime = endDate.toISOString();
-    addLog(`[HealthConnectService] Reading active minutes records for timerange: ${startTime} to ${endTime}`);
-    const result = await readRecords(ActiveMinutesRecord.name, {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startTime,
-        endTime: endTime,
-      },
-    });
-    addLog(`[HealthConnectService] Raw active minutes records from Health Connect: ${JSON.stringify(result.records)}`);
-    return result.records;
-  } catch (error) {
-    addLog(`[HealthConnectService] Failed to read active minutes records: ${error.message}. Full error: ${JSON.stringify(error)}`);
-    console.error('Failed to read active minutes records', error);
-    return [];
-  }
-};
+export const readActiveMinutesRecords = async (startDate, endDate) => readHealthRecords('ActiveMinutes', startDate, endDate);
 
 /**
  * Aggregates active minutes records by date.
@@ -329,6 +311,182 @@ export const aggregateActiveCaloriesByDate = (records) => {
     value: aggregatedData[date],
     type: 'active_calories',
   }));
+};
+
+/**
+ * Transforms raw Health Connect records into a standardized format for the server.
+ * This function handles various record types and extracts relevant numeric values.
+ * @param {Array} records - An array of raw Health Connect records.
+ * @param {string} recordType - The original Health Connect record type (e.g., 'Steps', 'BloodPressure').
+ * @returns {Array} An array of objects in the format { type, value, date, timestamp }.
+ */
+export const transformHealthRecords = (records, recordType) => {
+  if (!Array.isArray(records)) {
+    addLog(`[HealthConnectService] transformHealthRecords received non-array records for ${recordType}: ${JSON.stringify(records)}`);
+    console.warn(`transformHealthRecords received non-array records for ${recordType}:`, records);
+    return [];
+  }
+
+  const transformedData = [];
+
+  records.forEach(record => {
+    let value = null;
+    let typeSuffix = ''; // For multi-component types like BloodPressure
+
+    switch (recordType) {
+      case 'Steps':
+        value = record.count;
+        typeSuffix = 'step';
+        break;
+      case 'ActiveCaloriesBurned':
+        value = record.energy?.inCalories;
+        typeSuffix = 'active_calories_burned';
+        break;
+      case 'HeartRate':
+        if (record.samples && record.samples.length > 0) {
+          value = record.samples.reduce((sum, sample) => sum + sample.beatsPerMinute, 0) / record.samples.length;
+        }
+        typeSuffix = 'heart_rate';
+        break;
+      case 'Weight':
+        value = record.weight?.inKilograms;
+        typeSuffix = 'weight';
+        break;
+      case 'BloodPressure':
+        if (record.systolic?.inMillimetersOfMercury) {
+          transformedData.push({
+            type: 'blood_pressure_systolic',
+            value: record.systolic.inMillimetersOfMercury,
+            date: record.time.split('T')[0],
+            timestamp: record.time,
+          });
+        }
+        if (record.diastolic?.inMillimetersOfMercury) {
+          transformedData.push({
+            type: 'blood_pressure_diastolic',
+            value: record.diastolic.inMillimetersOfMercury,
+            date: record.time.split('T')[0],
+            timestamp: record.time,
+          });
+        }
+        return;
+      case 'Nutrition':
+        value = record.energy?.inCalories;
+        typeSuffix = 'nutrition_calories';
+        break;
+      case 'SleepSession':
+        value = (new Date(record.endTime).getTime() - new Date(record.startTime).getTime()) / (1000 * 60);
+        typeSuffix = 'sleep_duration_minutes';
+        break;
+      case 'BasalBodyTemperature':
+        value = record.temperature?.inCelsius;
+        typeSuffix = 'basal_body_temperature';
+        break;
+      case 'BasalMetabolicRate':
+        value = record.basalMetabolicRate?.inCalories;
+        typeSuffix = 'basal_metabolic_rate';
+        break;
+      case 'BloodGlucose':
+        value = record.bloodGlucose?.inMillimolesPerLiter;
+        typeSuffix = 'blood_glucose';
+        break;
+      case 'BodyFat':
+        value = record.percentage?.inPercent;
+        typeSuffix = 'body_fat';
+        break;
+      case 'BodyTemperature':
+        value = record.temperature?.inCelsius;
+        typeSuffix = 'body_temperature';
+        break;
+      case 'BoneMass':
+        value = record.mass?.inKilograms;
+        typeSuffix = 'bone_mass';
+        break;
+      case 'CervicalMucus':
+        addLog(`[HealthConnectService] Skipping CervicalMucus record as it's qualitative: ${JSON.stringify(record)}`);
+        return;
+      case 'Distance':
+        value = record.distance?.inMeters;
+        typeSuffix = 'distance';
+        break;
+      case 'ElevationGained':
+        value = record.elevation?.inMeters;
+        typeSuffix = 'elevation_gained';
+        break;
+      case 'ExerciseSession':
+        value = (new Date(record.endTime).getTime() - new Date(record.startTime).getTime()) / (1000 * 60);
+        typeSuffix = 'exercise_session_duration_minutes';
+        break;
+      case 'FloorsClimbed':
+        value = record.floors;
+        typeSuffix = 'floors_climbed';
+        break;
+      case 'Height':
+        value = record.height?.inMeters;
+        typeSuffix = 'height';
+        break;
+      case 'Hydration':
+        value = record.volume?.inLiters;
+        typeSuffix = 'hydration';
+        break;
+      case 'LeanBodyMass':
+        value = record.mass?.inKilograms;
+        typeSuffix = 'lean_body_mass';
+        break;
+      case 'MenstruationFlow':
+        addLog(`[HealthConnectService] Skipping MenstruationFlow record as it's qualitative: ${JSON.stringify(record)}`);
+        return;
+      case 'OvulationTest':
+        addLog(`[HealthConnectService] Skipping OvulationTest record as it's qualitative: ${JSON.stringify(record)}`);
+        return;
+      case 'OxygenSaturation':
+        value = record.percentage?.inPercent;
+        typeSuffix = 'oxygen_saturation';
+        break;
+      case 'Power':
+        value = record.power?.inWatts;
+        typeSuffix = 'power';
+        break;
+      case 'RespiratoryRate':
+        value = record.rate;
+        typeSuffix = 'respiratory_rate';
+        break;
+      case 'RestingHeartRate':
+        value = record.beatsPerMinute;
+        typeSuffix = 'resting_heart_rate';
+        break;
+      case 'SexualActivity':
+        addLog(`[HealthConnectService] Skipping SexualActivity record as it's qualitative: ${JSON.stringify(record)}`);
+        return;
+      case 'Speed':
+        value = record.speed?.inMetersPerSecond;
+        typeSuffix = 'speed';
+        break;
+      case 'Vo2Max':
+        value = record.vo2Max;
+        typeSuffix = 'vo2_max';
+        break;
+      case 'WheelchairPushes':
+        value = record.count;
+        typeSuffix = 'wheelchair_pushes';
+        break;
+      default:
+        addLog(`[HealthConnectService] Unhandled record type in transformation: ${recordType}. Record: ${JSON.stringify(record)}`);
+        return;
+    }
+
+    if (value !== null && value !== undefined) {
+      transformedData.push({
+        type: typeSuffix,
+        value: parseFloat(value.toFixed(2)),
+        date: record.startTime.split('T')[0],
+        timestamp: record.startTime,
+      });
+    }
+  });
+
+  addLog(`[HealthConnectService] Transformed ${recordType} data: ${JSON.stringify(transformedData)}`);
+  return transformedData;
 };
 
 /**
@@ -436,5 +594,84 @@ export const loadSyncDuration = async () => {
     addLog(`[HealthConnectService] Failed to load sync duration: ${error.message}`);
     console.error(`Failed to load sync duration`, error);
     return '24h'; // Default to 24 hours on error
+  }
+};
+
+/**
+ * Orchestrates reading health data from Health Connect, transforming it, and sending it to the server.
+ * @param {string} syncDuration - The duration for which to sync data (e.g., '24h', '3d', '7d').
+ * @returns {Promise<object>} An object containing processed and error results from the server.
+ */
+export const syncHealthData = async (syncDuration) => {
+  addLog(`[HealthConnectService] Starting health data sync for duration: ${syncDuration}`);
+  const startDate = getSyncStartDate(syncDuration);
+  const endDate = new Date(); // Current time
+
+  const healthDataTypesToSync = [
+    'Steps',
+    'HeartRate',
+    'ActiveCaloriesBurned',
+    'Weight',
+    'BloodPressure',
+    'Nutrition',
+    'SleepSession',
+    'BasalBodyTemperature',
+    'BasalMetabolicRate',
+    'BloodGlucose',
+    'BodyFat',
+    'BodyTemperature',
+    'BoneMass',
+    'Distance',
+    'ElevationGained',
+    'ExerciseSession',
+    'FloorsClimbed',
+    'Height',
+    'Hydration',
+    'LeanBodyMass',
+    'OxygenSaturation',
+    'Power',
+    'RespiratoryRate',
+    'RestingHeartRate',
+    'Speed',
+    'Vo2Max',
+    'WheelchairPushes',
+    // Add other relevant Health Connect record types here
+  ];
+
+  let allTransformedData = [];
+  const syncErrors = [];
+
+  for (const type of healthDataTypesToSync) {
+    try {
+      addLog(`[HealthConnectService] Attempting to read ${type} records...`);
+      const rawRecords = await readHealthRecords(type, startDate, endDate);
+      addLog(`[HealthConnectService] Found ${rawRecords.length} raw ${type} records.`);
+      if (rawRecords.length > 0) {
+        const transformed = transformHealthRecords(rawRecords, type);
+        addLog(`[HealthConnectService] Transformed ${transformed.length} ${type} records.`);
+        allTransformedData = allTransformedData.concat(transformed);
+      } else {
+        addLog(`[HealthConnectService] No raw ${type} records found for transformation.`);
+      }
+    } catch (error) {
+      addLog(`[HealthConnectService] Error reading or transforming ${type} records: ${error.message}. Stack: ${error.stack}`);
+      syncErrors.push({ type, error: error.message });
+    }
+  }
+
+  addLog(`[HealthConnectService] Total transformed data entries: ${allTransformedData.length}`);
+
+  if (allTransformedData.length > 0) {
+    try {
+      const apiResponse = await api.syncHealthData(allTransformedData);
+      addLog(`[HealthConnectService] Server sync response: ${JSON.stringify(apiResponse)}`);
+      return { success: true, apiResponse, syncErrors };
+    } catch (error) {
+      addLog(`[HealthConnectService] Error sending data to server: ${error.message}`);
+      return { success: false, error: error.message, syncErrors };
+    }
+  } else {
+    addLog(`[HealthConnectService] No health data to sync.`);
+    return { success: true, message: "No health data to sync.", syncErrors };
   }
 };
