@@ -131,6 +131,7 @@ For complete installation guides, development setup, and usage instructions, vis
 - **[🔧 Development Workflow](https://codewithcj.github.io/SparkyFitness/developer/workflow)** - Developer guide and contribution process  
 - **[📊 Features Overview](https://codewithcj.github.io/SparkyFitness/features/)** - Complete feature documentation
 - **[🏗️ Architecture](https://codewithcj.github.io/SparkyFitness/app-overview)** - Technical architecture and design
+- Refer WIiki for sample env setup and Mobile App configuration.
 
 ## 🐳 Docker Deployment
 
