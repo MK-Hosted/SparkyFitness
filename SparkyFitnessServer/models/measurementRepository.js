@@ -1,3 +1,4 @@
+console.log('DEBUG: Loading measurementRepository.js');
 const pool = require('../db/connection');
 const { log } = require('../config/logging');
 
@@ -168,21 +169,40 @@ async function getCheckInMeasurementsByDate(userId, date) {
   }
 }
 
-async function updateCheckInMeasurements(id, userId, entryDate, updateData) {
+async function updateCheckInMeasurements(userId, entryDate, updateData) {
+  log('info', `[measurementRepository] updateCheckInMeasurements called with: userId=${userId}, entryDate=${entryDate}, updateData=`, updateData);
   const client = await pool.connect();
   try {
-    const result = await client.query(
-      `UPDATE check_in_measurements SET
-        weight = COALESCE($1, weight),
-        neck = COALESCE($2, neck),
-        waist = COALESCE($3, waist),
-        hips = COALESCE($4, hips),
-        steps = COALESCE($5, steps),
-        updated_at = now()
-      WHERE id = $6 AND user_id = $7 AND entry_date = $8
-      RETURNING *`,
-      [updateData.weight, updateData.neck, updateData.waist, updateData.hips, updateData.steps, id, userId, entryDate]
-    );
+    const fieldsToUpdate = Object.keys(updateData)
+      .filter(key => ['weight', 'neck', 'waist', 'hips', 'steps'].includes(key))
+      .map((key, index) => `${key} = $${index + 1}`);
+
+    if (fieldsToUpdate.length === 0) {
+      log('warn', `[measurementRepository] No valid fields to update for check-in measurement userId: ${userId}, entryDate: ${entryDate}`);
+      return null;
+    }
+
+    const values = Object.values(updateData).filter((_value, index) => {
+      const key = Object.keys(updateData)[index];
+      return ['weight', 'neck', 'waist', 'hips', 'steps'].includes(key);
+    });
+
+    values.push(userId, entryDate);
+
+    const query = `
+      UPDATE check_in_measurements
+      SET ${fieldsToUpdate.join(', ')}, updated_at = now()
+      WHERE user_id = $${values.length - 1} AND entry_date = $${values.length}
+      RETURNING *`;
+
+    log('debug', `[measurementRepository] Executing query: ${query}`);
+    log('debug', `[measurementRepository] Query values: ${JSON.stringify(values)}`);
+    const result = await client.query(query, values);
+    if (result.rows[0]) {
+      log('info', `[measurementRepository] Successfully updated check-in measurement for userId: ${userId}, entryDate: ${entryDate}`);
+    } else {
+      log('warn', `[measurementRepository] No rows updated for check-in measurement userId: ${userId}, entryDate: ${entryDate}`);
+    }
     return result.rows[0];
   } finally {
     client.release();
@@ -256,6 +276,20 @@ async function deleteCustomCategory(id, userId) {
       [id, userId]
     );
     return result.rowCount > 0;
+  } finally {
+    client.release();
+  }
+}
+
+async function getCheckInMeasurementOwnerId(id) { // This function is problematic if 'id' is not the primary key
+  log('warn', `[measurementRepository] getCheckInMeasurementOwnerId called with id: ${id}. This function might be problematic if 'id' is not the primary key for check_in_measurements.`);
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT user_id FROM check_in_measurements WHERE id = $1',
+      [id]
+    );
+    return result.rows[0]?.user_id;
   } finally {
     client.release();
   }
@@ -347,12 +381,14 @@ async function getCustomMeasurementEntriesByDate(userId, date) {
 }
 
 async function getCheckInMeasurementsByDateRange(userId, startDate, endDate) {
+  log('info', `[measurementRepository] getCheckInMeasurementsByDateRange called for userId: ${userId}, startDate: ${startDate}, endDate: ${endDate}`);
   const client = await pool.connect();
   try {
     const result = await client.query(
       'SELECT * FROM check_in_measurements WHERE user_id = $1 AND entry_date BETWEEN $2 AND $3 ORDER BY entry_date',
       [userId, startDate, endDate]
     );
+    log('debug', `[measurementRepository] getCheckInMeasurementsByDateRange returning: ${JSON.stringify(result.rows)}`);
     return result.rows;
   } finally {
     client.release();

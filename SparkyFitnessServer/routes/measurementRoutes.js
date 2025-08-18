@@ -216,19 +216,31 @@ router.get('/check-in/:date', authenticateToken, authorizeAccess('checkin', (req
 });
 
 // Endpoint to update check-in measurements
-router.put('/check-in/:id', authenticateToken, authorizeAccess('checkin'), async (req, res, next) => {
-  const { id } = req.params;
+router.put('/check-in/:id', authenticateToken, async (req, res, next) => {
+  const { id } = req.params; // Keep 'id' for route matching, but it's not used for lookup in service
   const { entry_date, ...updateData } = req.body;
-  if (!id || !entry_date) {
-    return res.status(400).json({ error: 'ID and entry date are required.' });
+  if (!entry_date) {
+    return res.status(400).json({ error: 'Entry date is required.' });
   }
+
   try {
+    // Perform authorization check directly in the route handler
+    // Fetch the existing measurement to verify ownership
+    const existingMeasurement = await measurementService.getCheckInMeasurements(req.userId, req.userId, entry_date);
+
+    if (!existingMeasurement || existingMeasurement.id !== id) {
+      // If no existing measurement for the user and date, or ID mismatch
+      return res.status(404).json({ error: 'Check-in measurement not found or not authorized to update.' });
+    }
+
+    // If ownership is confirmed, proceed with the update
     const updatedMeasurement = await measurementService.updateCheckInMeasurements(req.userId, id, entry_date, updateData);
     res.status(200).json(updatedMeasurement);
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
       return res.status(403).json({ error: error.message });
     }
+    // Catch specific error from service layer if measurement not found
     if (error.message === 'Check-in measurement not found or not authorized to update.') {
       return res.status(404).json({ error: error.message });
     }

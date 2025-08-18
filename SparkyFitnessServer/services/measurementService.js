@@ -1,3 +1,4 @@
+console.log('DEBUG: Loading measurementService.js');
 const measurementRepository = require('../models/measurementRepository');
 const userRepository = require('../models/userRepository');
 const exerciseRepository = require('../models/exerciseRepository'); // For active calories
@@ -272,21 +273,29 @@ async function getCheckInMeasurements(authenticatedUserId, targetUserId, date) {
 }
 
 async function updateCheckInMeasurements(authenticatedUserId, id, entryDate, updateData) {
+  log('info', `[measurementService] updateCheckInMeasurements called with: id=${id}, authenticatedUserId=${authenticatedUserId}, entryDate=${entryDate}, updateData=`, updateData);
   try {
-    const entryOwnerId = await measurementRepository.getCheckInMeasurementOwnerId(id);
-    if (!entryOwnerId) {
+    // Verify ownership using entry_date and user_id, not 'id'
+    const existingMeasurement = await measurementRepository.getCheckInMeasurementsByDate(authenticatedUserId, entryDate);
+
+    if (!existingMeasurement) {
+      log('warn', `[measurementService] Check-in measurement not found for user ${authenticatedUserId} on date: ${entryDate}`);
       throw new Error('Check-in measurement not found.');
     }
-    if (entryOwnerId !== authenticatedUserId) {
-      throw new Error('Forbidden: You do not have permission to update this check-in measurement.');
-    }
-    const updatedMeasurement = await measurementRepository.updateCheckInMeasurements(id, authenticatedUserId, entryDate, updateData);
+
+    // The 'id' passed from the frontend is the row ID, but we're updating by user_id and entry_date
+    // We don't need to check entryOwnerId against 'id' here, as we're using the composite key for update.
+    // The authorization check is implicitly handled by getCheckInMeasurementsByDate.
+
+    const updatedMeasurement = await measurementRepository.updateCheckInMeasurements(authenticatedUserId, entryDate, updateData);
     if (!updatedMeasurement) {
+      log('warn', `[measurementService] Check-in measurement not found or not authorized to update after repository call for user ${authenticatedUserId} on date: ${entryDate}`);
       throw new Error('Check-in measurement not found or not authorized to update.');
     }
+    log('info', `[measurementService] Successfully updated check-in measurement for user ${authenticatedUserId} on date: ${entryDate}`);
     return updatedMeasurement;
   } catch (error) {
-    log('error', `Error updating check-in measurements ${id} by ${authenticatedUserId}:`, error);
+    log('error', `[measurementService] Error updating check-in measurements for user ${authenticatedUserId} on date ${entryDate}:`, error);
     throw error;
   }
 }

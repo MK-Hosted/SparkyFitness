@@ -3,7 +3,7 @@
   "version": "0.15.1",
   "main": "SparkyFitnessServer.js",
   "scripts": {
-    "start": "nodemon SparkyFitnessServer.js",
+    "start": "nodemon --watch . --watch routes --watch services --watch models SparkyFitnessServer.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

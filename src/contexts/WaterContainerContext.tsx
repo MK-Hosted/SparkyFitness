@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { getWaterContainers, setPrimaryWaterContainer, WaterContainer } from '../services/waterContainerService';
 import { useToast } from '../hooks/use-toast';
 import { usePreferences } from './PreferencesContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface WaterContainerContextType {
   activeContainer: WaterContainer | null;
@@ -14,6 +15,7 @@ export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ chil
   const [activeContainer, setActiveContainer] = useState<WaterContainer | null>(null);
   const { toast } = useToast();
   const { water_display_unit } = usePreferences();
+  const { user, loading } = useAuth();
 
   const fetchAndSetActiveContainer = async () => {
     try {
@@ -51,8 +53,13 @@ export const WaterContainerProvider: React.FC<{ children: ReactNode }> = ({ chil
   };
 
   useEffect(() => {
-    fetchAndSetActiveContainer();
-  }, [water_display_unit]);
+    if (!loading && user) {
+      fetchAndSetActiveContainer();
+    } else if (!loading && !user) {
+      // If user logs out, clear the active container
+      setActiveContainer(null);
+    }
+  }, [water_display_unit, user, loading]);
 
   const refreshContainers = () => {
     fetchAndSetActiveContainer();

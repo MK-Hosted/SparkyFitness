@@ -14,14 +14,18 @@ import { debug, info, warn, error } from '@/utils/logging'; // Import logging ut
 import { format } from 'date-fns'; // Import format from date-fns
 import {
   loadCustomCategories as loadCustomCategoriesService,
-  fetchRecentMeasurements as fetchRecentMeasurementsService,
-  handleDeleteMeasurement,
+  fetchRecentCustomMeasurements,
+  fetchRecentStandardMeasurements,
+  deleteCustomMeasurement,
+  updateCheckInMeasurementField,
   loadExistingCheckInMeasurements,
   loadExistingCustomMeasurements,
   saveCheckInMeasurements,
   saveCustomMeasurement,
   CustomCategory,
   CustomMeasurement,
+  CheckInMeasurement,
+  CombinedMeasurement,
 } from '@/services/checkInService';
 
 
@@ -52,7 +56,7 @@ const CheckIn = () => {
   const [customValues, setCustomValues] = useState<{[key: string]: string}>({});
 
   const [loading, setLoading] = useState(false);
-  const [recentMeasurements, setRecentMeasurements] = useState<CustomMeasurement[]>([]);
+  const [recentMeasurements, setRecentMeasurements] = useState<CombinedMeasurement[]>([]);
 
   const currentUserId = activeUserId || user?.id;
   debug(loggingLevel, "Current user ID:", currentUserId);
@@ -68,13 +72,13 @@ const CheckIn = () => {
       loadExistingData();
       loadPreferences(); // Load user's default preferences
       loadCustomCategories();
-      fetchRecentMeasurements();
+      fetchAllRecentMeasurements();
     }
 
     const handleRefresh = () => {
       info(loggingLevel, "CheckIn: Received measurementsRefresh event, triggering data reload.");
       loadExistingData();
-      fetchRecentMeasurements();
+      fetchAllRecentMeasurements();
     };
 
     window.addEventListener('measurementsRefresh', handleRefresh);
@@ -130,33 +134,96 @@ const CheckIn = () => {
     }
   };
 
-  const fetchRecentMeasurements = async () => {
+  const fetchAllRecentMeasurements = async () => {
     if (!currentUserId) {
-      warn(loggingLevel, "fetchRecentMeasurements called with no current user ID.");
+      warn(loggingLevel, "fetchAllRecentMeasurements called with no current user ID.");
       return;
     }
 
     try {
-      const data = await fetchRecentMeasurementsService();
-      info(loggingLevel, "Recent measurements fetched successfully:", data);
-      setRecentMeasurements(data || []);
+      const custom = await fetchRecentCustomMeasurements();
+      // For standard measurements, fetch for a range (e.g., last 30 days)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 30); // Fetch last 30 days
+      const standard = await fetchRecentStandardMeasurements(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
+
+      const combined: CombinedMeasurement[] = [];
+
+      // Add custom measurements
+      custom.forEach(m => {
+        combined.push({
+          id: m.id,
+          entry_date: m.entry_date,
+          entry_hour: m.entry_hour,
+          entry_timestamp: m.entry_timestamp,
+          value: m.value,
+          type: 'custom',
+          display_name: m.custom_categories.name,
+          display_unit: m.custom_categories.measurement_type,
+          custom_categories: m.custom_categories, // Keep original custom_categories for conversion logic
+        });
+      });
+
+      // Add standard measurements
+      standard.forEach(s => {
+        if (s.weight !== null) combined.push({ id: s.id, entry_date: s.entry_date, value: s.weight, type: 'standard', display_name: 'Weight', display_unit: defaultWeightUnit, entry_hour: null, entry_timestamp: s.entry_date });
+        if (s.neck !== null) combined.push({ id: s.id, entry_date: s.entry_date, value: s.neck, type: 'standard', display_name: 'Neck', display_unit: defaultMeasurementUnit, entry_hour: null, entry_timestamp: s.entry_date });
+        if (s.waist !== null) combined.push({ id: s.id, entry_date: s.entry_date, value: s.waist, type: 'standard', display_name: 'Waist', display_unit: defaultMeasurementUnit, entry_hour: null, entry_timestamp: s.entry_date });
+        if (s.hips !== null) combined.push({ id: s.id, entry_date: s.entry_date, value: s.hips, type: 'standard', display_name: 'Hips', display_unit: defaultMeasurementUnit, entry_hour: null, entry_timestamp: s.entry_date });
+        if (s.steps !== null) combined.push({ id: s.id, entry_date: s.entry_date, value: s.steps, type: 'standard', display_name: 'Steps', display_unit: 'steps', entry_hour: null, entry_timestamp: s.entry_date });
+      });
+
+      // Sort by entry_timestamp (or entry_date if timestamp is null) in descending order
+      combined.sort((a, b) => {
+        const dateA = new Date(a.entry_timestamp || a.entry_date).getTime();
+        const dateB = new Date(b.entry_timestamp || b.entry_date).getTime();
+        return dateB - dateA;
+      });
+
+      // Take top 20
+      setRecentMeasurements(combined.slice(0, 20));
+      info(loggingLevel, "All recent measurements fetched successfully:", combined.slice(0, 20));
     } catch (err) {
-      error(loggingLevel, 'Error fetching recent measurements:', err);
+      error(loggingLevel, 'Error fetching all recent measurements:', err);
       sonnerToast.error('Failed to load recent measurements');
     }
   };
 
-  const handleDeleteMeasurementClick = async (measurementId: string) => {
+  const handleDeleteMeasurementClick = async (measurement: CombinedMeasurement) => {
     if (!currentUserId) {
       warn(loggingLevel, "handleDeleteMeasurementClick called with no current user ID.");
       return;
     }
 
     try {
-      await handleDeleteMeasurement(measurementId);
-      info(loggingLevel, 'Measurement deleted successfully:', measurementId);
+      if (measurement.type === 'custom') {
+        await deleteCustomMeasurement(measurement.id);
+      } else if (measurement.type === 'standard') {
+        // For standard measurements, we set the specific field to null
+        // The 'id' of a standard measurement in the frontend is the ID of the check_in_measurements row
+        // The 'display_name' is used to determine which field to nullify
+        let fieldToNull: string;
+        switch (measurement.display_name) {
+          case 'Weight': fieldToNull = 'weight'; break;
+          case 'Neck': fieldToNull = 'neck'; break;
+          case 'Waist': fieldToNull = 'waist'; break;
+          case 'Hips': fieldToNull = 'hips'; break;
+          case 'Steps': fieldToNull = 'steps'; break;
+          default:
+            warn(loggingLevel, `Unknown standard measurement type for deletion: ${measurement.display_name}`);
+            return;
+        }
+        await updateCheckInMeasurementField({
+          id: measurement.id,
+          field: fieldToNull,
+          value: null,
+          entry_date: measurement.entry_date,
+        });
+      }
+      info(loggingLevel, 'Measurement deleted successfully:', measurement.id);
       sonnerToast.success('Measurement deleted successfully');
-      fetchRecentMeasurements();
+      fetchAllRecentMeasurements();
       loadExistingData(); // Reload today's values
     } catch (err) {
       error(loggingLevel, 'Error deleting measurement:', err);
@@ -288,7 +355,7 @@ const CheckIn = () => {
       });
 
       // Refresh recent measurements after saving
-      fetchRecentMeasurements();
+      fetchAllRecentMeasurements();
     } catch (err) {
       error(loggingLevel, 'Error saving check-in data:', err);
       toast({
@@ -439,21 +506,38 @@ const CheckIn = () => {
             {recentMeasurements.length === 0 ? (
               <p className="text-muted-foreground">No measurements recorded yet</p>
             ) : (
-              recentMeasurements.map((measurement) => {
-                const isConvertible = shouldConvertCustomMeasurement(measurement.custom_categories.measurement_type);
-                const displayValue = isConvertible
-                  ? convertMeasurement(measurement.value, 'cm', displayMeasurementUnit).toFixed(1)
-                  : measurement.value;
-                const displayUnit = isConvertible ? displayMeasurementUnit : measurement.custom_categories.measurement_type;
+              recentMeasurements.map((measurement: CombinedMeasurement) => { // Explicitly cast here
+                let displayValue = measurement.value;
+                let displayUnit = measurement.display_unit;
+                let measurementName = measurement.display_name;
+
+                if (measurement.type === 'custom' && measurement.custom_categories) {
+                  const isConvertible = shouldConvertCustomMeasurement(measurement.custom_categories.measurement_type);
+                  displayValue = isConvertible
+                    ? convertMeasurement(measurement.value, 'cm', displayMeasurementUnit)
+                    : measurement.value;
+                  displayUnit = isConvertible ? displayMeasurementUnit : measurement.custom_categories.measurement_type;
+                } else if (measurement.type === 'standard') {
+                  // Apply unit conversion for standard measurements if applicable
+                  if (measurement.display_name === 'Weight') {
+                    displayValue = convertWeight(measurement.value, measurement.display_unit as 'kg' | 'lbs', displayWeightUnit);
+                    displayUnit = displayWeightUnit;
+                  } else if (['Neck', 'Waist', 'Hips'].includes(measurement.display_name)) {
+                    displayValue = convertMeasurement(measurement.value, measurement.display_unit as 'cm' | 'inches', displayMeasurementUnit);
+                    displayUnit = displayMeasurementUnit;
+                  }
+                }
+                // Format displayValue to one decimal place if it's a number
+                const formattedDisplayValue = typeof displayValue === 'number' ? displayValue.toFixed(1) : displayValue;
 
                 return (
                   <div
-                    key={measurement.id}
+                    key={`${measurement.id}-${measurement.display_name}`}
                     className="flex items-center justify-between p-3 border rounded-lg"
                   >
                     <div>
                       <div className="font-medium">
-                        {measurement.custom_categories.name}: {displayValue} {displayUnit}
+                        {measurementName}: {formattedDisplayValue} {displayUnit}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateInUserTimezone(measurement.entry_date, 'PPP')}
@@ -466,7 +550,7 @@ const CheckIn = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        handleDeleteMeasurementClick(measurement.id);
+                        handleDeleteMeasurementClick(measurement);
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
