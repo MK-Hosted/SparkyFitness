@@ -11,7 +11,8 @@ export const syncHealthData = async (data) => {
     throw new Error('Server configuration not found.');
   }
 
-  const { url, apiKey } = config;
+  let { url, apiKey } = config;
+  url = url.endsWith('/') ? url.slice(0, -1) : url; // Remove trailing slash if present
 
   console.log(`[API Service] Attempting to sync to URL: ${url}/health-data`);
   console.log(`[API Service] Using API Key (first 5 chars): ${apiKey ? apiKey.substring(0, 5) + '...' : 'N/A'}`);
@@ -46,19 +47,33 @@ export const syncHealthData = async (data) => {
 export const checkServerConnection = async () => {
   const config = await getActiveServerConfig();
   if (!config || !config.url) {
+    console.log('[API Service] No active server configuration found for connection check.');
     return false; // No configuration, so no connection
   }
 
+  let { url, apiKey } = config;
+  url = url.endsWith('/') ? url.slice(0, -1) : url; // Ensure no trailing slash
+
   try {
-    const response = await fetch(`${config.url}/health-data/status`, { // Assuming a status endpoint
+    console.log(`[API Service] Attempting to check connection to: ${url}/auth/user`);
+    const response = await fetch(`${url}/auth/user`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
     });
-    return response.ok;
+    console.log(`[API Service] Connection check response status: ${response.status}`);
+    // Check for successful response (2xx status code)
+    if (response.ok) {
+      return true;
+    } else {
+      // For non-2xx responses, log the error and return false
+      const errorText = await response.text();
+      console.error(`[API Service] Connection check failed with status ${response.status}: ${errorText}`);
+      return false;
+    }
   } catch (error) {
-    console.error('Failed to check server connection', error);
+    console.error('[API Service] Failed to check server connection:', error);
     return false;
   }
 };

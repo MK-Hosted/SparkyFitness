@@ -20,6 +20,7 @@ const SettingsScreen = ({ navigation }) => {
   const [healthMetricStates, setHealthMetricStates] = useState(
     HEALTH_METRICS.reduce((acc, metric) => ({ ...acc, [metric.stateKey]: false }), {})
   );
+  const [isAllMetricsEnabled, setIsAllMetricsEnabled] = useState(false);
 
   const [syncDuration, setSyncDuration] = useState('24h'); // Default to 24 hours
   const [fourHourSyncTime, setFourHourSyncTime] = useState('00:00');
@@ -36,6 +37,7 @@ const SettingsScreen = ({ navigation }) => {
     setServerConfigs(allConfigs);
 
     const activeConfig = await getActiveServerConfig();
+    addLog(`[SettingsScreen] Loaded activeConfig: ${JSON.stringify(activeConfig)}`);
     if (activeConfig) {
       setUrl(activeConfig.url);
       setApiKey(activeConfig.apiKey);
@@ -63,6 +65,9 @@ const SettingsScreen = ({ navigation }) => {
       newHealthMetricStates[metric.stateKey] = enabled !== null ? enabled : false;
     }
     setHealthMetricStates(newHealthMetricStates);
+    // Check if all metrics are enabled to set the initial state of the master toggle
+    const allEnabled = HEALTH_METRICS.every(metric => newHealthMetricStates[metric.stateKey]);
+    setIsAllMetricsEnabled(allEnabled);
 
     // Load sync duration preference
     const duration = await loadSyncDuration();
@@ -83,6 +88,7 @@ const SettingsScreen = ({ navigation }) => {
 
     // Check server connection status
     const connectionStatus = await checkServerConnection();
+    addLog(`[SettingsScreen] Server connection status: ${connectionStatus}`);
     setIsConnected(connectionStatus);
   };
 
@@ -101,9 +107,10 @@ const SettingsScreen = ({ navigation }) => {
       return;
     }
     try {
+      const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url; // Remove trailing slash
       const configToSave = {
         id: currentConfigId || Date.now().toString(), // Use existing ID or generate new
-        url,
+        url: normalizedUrl,
         apiKey,
       };
       await saveServerConfig(configToSave);
@@ -172,19 +179,57 @@ const SettingsScreen = ({ navigation }) => {
     }));
     await saveHealthPreference(metric.preferenceKey, newValue);
     if (newValue) {
-      const granted = await requestHealthPermissions(metric.permissions);
-      if (!granted) {
-        Alert.alert('Permission Denied', `Please grant ${metric.label.toLowerCase()} permission in Health Connect settings.`);
+      try {
+        const granted = await requestHealthPermissions(metric.permissions);
+        if (!granted) {
+          Alert.alert('Permission Denied', `Please grant ${metric.label.toLowerCase()} permission in Health Connect settings.`);
+          setHealthMetricStates(prevStates => ({
+            ...prevStates,
+            [metric.stateKey]: false, // Revert toggle if permission not granted
+          }));
+          await saveHealthPreference(metric.preferenceKey, false);
+          addLog(`Permission Denied: ${metric.label} permission not granted.`, 'warn', 'WARNING');
+        } else {
+          addLog(`${metric.label} sync enabled and permissions granted.`, 'info', 'SUCCESS');
+        }
+      } catch (permissionError) {
+        Alert.alert('Permission Error', `Failed to request ${metric.label.toLowerCase()} permissions: ${permissionError.message}`);
         setHealthMetricStates(prevStates => ({
           ...prevStates,
-          [metric.stateKey]: false, // Revert toggle if permission not granted
+          [metric.stateKey]: false, // Revert toggle on any permission error
         }));
         await saveHealthPreference(metric.preferenceKey, false);
-        addLog(`Permission Denied: ${metric.label} permission not granted.`, 'warn', 'WARNING');
-      } else {
-        addLog(`${metric.label} sync enabled and permissions granted.`, 'info', 'SUCCESS');
+        addLog(`Permission Request Error for ${metric.label}: ${permissionError.message}`, 'error', 'ERROR');
       }
     }
+  };
+
+  const handleToggleAllMetrics = async (newValue) => {
+    setIsAllMetricsEnabled(newValue);
+    const newHealthMetricStates = { ...healthMetricStates };
+    for (const metric of HEALTH_METRICS) {
+      newHealthMetricStates[metric.stateKey] = newValue;
+      await saveHealthPreference(metric.preferenceKey, newValue);
+      if (newValue) {
+        try {
+          const granted = await requestHealthPermissions(metric.permissions);
+          if (!granted) {
+            Alert.alert('Permission Denied', `Please grant ${metric.label.toLowerCase()} permission in Health Connect settings.`);
+            newHealthMetricStates[metric.stateKey] = false; // Revert toggle if permission not granted
+            await saveHealthPreference(metric.preferenceKey, false);
+            addLog(`Permission Denied: ${metric.label} permission not granted.`, 'warn', 'WARNING');
+          } else {
+            addLog(`${metric.label} sync enabled and permissions granted.`, 'info', 'SUCCESS');
+          }
+        } catch (permissionError) {
+          Alert.alert('Permission Error', `Failed to request ${metric.label.toLowerCase()} permissions: ${permissionError.message}`);
+          newHealthMetricStates[metric.stateKey] = false; // Revert toggle on any permission error
+          await saveHealthPreference(metric.preferenceKey, false);
+          addLog(`Permission Request Error for ${metric.label}: ${permissionError.message}`, 'error', 'ERROR');
+        }
+      }
+    }
+    setHealthMetricStates(newHealthMetricStates);
   };
 
   const handleSyncDurationChange = async (itemValue) => {
@@ -219,11 +264,14 @@ const SettingsScreen = ({ navigation }) => {
             handleEditConfig={handleEditConfig}
             handleAddNewConfig={handleAddNewConfig}
             isConnected={isConnected}
+            checkServerConnection={checkServerConnection}
           />
 
           <HealthDataSync
             healthMetricStates={healthMetricStates}
             handleToggleHealthMetric={handleToggleHealthMetric}
+            isAllMetricsEnabled={isAllMetricsEnabled}
+            handleToggleAllMetrics={handleToggleAllMetrics}
           />
 
           <SyncFrequency

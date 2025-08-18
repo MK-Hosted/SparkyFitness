@@ -3,7 +3,7 @@ import { View, TextInput, Button, Text, TouchableOpacity, Image, Alert } from 'r
 import Clipboard from '@react-native-clipboard/clipboard';
 import styles from '../screens/SettingsScreenStyles'; // Assuming styles are shared
 
-const ServerConfig = ({ url, setUrl, apiKey, setApiKey, handleSaveConfig, serverConfigs, activeConfigId, handleSetActiveConfig, handleDeleteConfig, handleEditConfig, handleAddNewConfig, isConnected }) => {
+const ServerConfig = ({ url, setUrl, apiKey, setApiKey, handleSaveConfig, serverConfigs, activeConfigId, handleSetActiveConfig, handleDeleteConfig, handleEditConfig, handleAddNewConfig, isConnected, checkServerConnection }) => {
   return (
     <>
       {/* Server Configuration */}
@@ -88,12 +88,12 @@ const ServerConfig = ({ url, setUrl, apiKey, setApiKey, handleSaveConfig, server
 
       {/* Connected to server status */}
       {activeConfigId && (
-        <View style={styles.connectedStatusContainer}>
+        <TouchableOpacity style={styles.connectedStatusContainer} onPress={checkServerConnection}>
           <View style={[styles.dot, { backgroundColor: isConnected ? '#28a745' : '#dc3545' }]}></View>
           <Text style={[styles.connectedStatusText, { color: isConnected ? '#28a745' : '#dc3545' }]}>
             {isConnected ? 'Connected to server' : 'Connection failed'}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
     </>
   );

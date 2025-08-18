@@ -76,6 +76,16 @@ async function processHealthData(healthDataArray, userId) {
           result = await exerciseRepository.upsertExerciseEntryData(userId, exerciseId, activeCaloriesValue, parsedDate);
           processedResults.push({ type, status: 'success', data: result });
           break;
+        case 'weight': // Add case for weight
+          const weightValue = parseFloat(value);
+          if (isNaN(weightValue) || weightValue <= 0) {
+            errors.push({ error: "Invalid value for weight. Must be a positive number.", entry: dataEntry });
+            break;
+          }
+          // Assuming upsertCheckInMeasurements can handle individual fields
+          result = await measurementRepository.upsertCheckInMeasurements(userId, parsedDate, { weight: weightValue });
+          processedResults.push({ type, status: 'success', data: result });
+          break;
         default:
           // Handle as custom measurement
           const numericValue = parseFloat(value);

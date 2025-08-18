@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
 import { View, Text, Button, StyleSheet, Switch, Alert, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native'; // Import useFocusEffect
 import {
   initHealthConnect,
   readStepRecords,
@@ -17,121 +18,145 @@ import {
   loadStringPreference,
   getSyncStartDate,
 } from '../services/healthConnectService';
-import { syncHealthData } from '../services/api';
+import { syncHealthData as healthConnectSyncData } from '../services/healthConnectService';
+import { saveTimeRange, loadTimeRange } from '../services/storage'; // Import saveTimeRange and loadTimeRange
+import * as api from '../services/api'; // Keep api import for checkServerConnection
 import { addLog } from '../services/LogService';
+import { HEALTH_METRICS } from '../constants/HealthMetrics'; // Import HEALTH_METRICS
 
 const MainScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [isStepsEnabled, setIsStepsEnabled] = useState(false); // Initialize to false, will load from storage
-  const [isActiveCaloriesEnabled, setIsActiveCaloriesEnabled] = useState(false); // Initialize to false, will load from storage
-  const [isHeartRateEnabled, setIsHeartRateEnabled] = useState(false);
-  const [isActiveMinutesEnabled, setIsActiveMinutesEnabled] = useState(false);
+  const [healthMetricStates, setHealthMetricStates] = useState({}); // State to hold enabled status for all metrics
+  const [healthData, setHealthData] = useState({}); // State to hold fetched data for all metrics
   const [syncDuration, setSyncDuration] = useState(1); // This will be replaced by selectedTimeRange
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHealthConnectInitialized, setIsHealthConnectInitialized] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Last 24 Hours'); // New state for time range
-  const [syncDurationSetting, setSyncDurationSetting] = useState('24h'); // State for sync duration from settings
-  const [stepsData, setStepsData] = useState('0'); // State for steps data
-  const [caloriesData, setCaloriesData] = useState('0'); // State for calories data
-  const [heartRateData, setHeartRateData] = useState('0'); // State for heart rate data
-  const [activeMinutesData, setActiveMinutesData] = useState('0'); // State for active minutes data
+  const [selectedTimeRange, setSelectedTimeRange] = useState('24h'); // New state for time range, initialized to '24h'
   const [isConnected, setIsConnected] = useState(false); // State for server connection status
 
+  const initialize = useCallback(async () => { // Wrap initialize in useCallback
+    addLog('--- MainScreen: initialize function started ---'); // Prominent log
+    addLog('Initializing Health Connect...');
+    const initialized = await initHealthConnect();
+    if (initialized) {
+      addLog('Health Connect initialized successfully.', 'info', 'SUCCESS');
+    } else {
+      addLog('Health Connect initialization failed.', 'error', 'ERROR');
+    }
+    setIsHealthConnectInitialized(initialized);
+
+    // Load preferences from AsyncStorage for all health metrics
+    const newHealthMetricStates = {};
+    for (const metric of HEALTH_METRICS) {
+      const enabled = await loadHealthPreference(metric.preferenceKey);
+      newHealthMetricStates[metric.stateKey] = enabled !== null ? enabled : false;
+    }
+    setHealthMetricStates(newHealthMetricStates);
+
+    // Load selected time range preference
+    const loadedTimeRange = await loadTimeRange();
+    const initialTimeRange = loadedTimeRange !== null ? loadedTimeRange : '24h';
+    setSelectedTimeRange(initialTimeRange); // Initialize with loaded preference or default
+    addLog(`[MainScreen] Loaded selectedTimeRange from storage: ${initialTimeRange}`); // Add this log
+
+    // Fetch initial health data after setting the time range
+    await fetchHealthData(newHealthMetricStates, initialTimeRange); // Pass the loaded states and initial time range
+
+    // Check server connection status on initialization
+    const connectionStatus = await api.checkServerConnection(); // Use api.checkServerConnection
+    setIsConnected(connectionStatus);
+  }, []); // Empty dependency array for useCallback
+
+  useFocusEffect( // Use useFocusEffect to call initialize on focus
+    useCallback(() => {
+      initialize();
+      return () => {
+        // Optional: cleanup function when the screen loses focus
+      };
+    }, [initialize])
+  );
+
   useEffect(() => {
-    const initialize = async () => {
-      addLog('Initializing Health Connect...');
-      const initialized = await initHealthConnect();
-      if (initialized) {
-        addLog('Health Connect initialized successfully.', 'info', 'SUCCESS');
-      } else {
-        addLog('Health Connect initialization failed.', 'error', 'ERROR');
-      }
-      setIsHealthConnectInitialized(initialized);
+    // Only re-fetch when healthMetricStates change, as selectedTimeRange is handled in initialize and onValueChange
+    fetchHealthData(healthMetricStates, selectedTimeRange);
+  }, [healthMetricStates, selectedTimeRange]); // Keep selectedTimeRange here to trigger re-fetch when user changes it
 
-      // Load preferences from AsyncStorage
-      const stepsEnabled = await loadHealthPreference('syncStepsEnabled');
-      setIsStepsEnabled(stepsEnabled !== null ? stepsEnabled : false);
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const connectionStatus = await checkServerConnection();
+      setIsConnected(connectionStatus);
+    }, 5000); // Check every 5 seconds
 
-      const caloriesEnabled = await loadHealthPreference('syncCaloriesEnabled');
-      setIsActiveCaloriesEnabled(caloriesEnabled !== null ? caloriesEnabled : false);
-
-      const heartRateEnabled = await loadHealthPreference('syncHeartRateEnabled');
-      setIsHeartRateEnabled(heartRateEnabled !== null ? heartRateEnabled : false);
-
-      const activeMinutesEnabled = await loadHealthPreference('syncActiveMinutesEnabled');
-      setIsActiveMinutesEnabled(activeMinutesEnabled !== null ? activeMinutesEnabled : false);
-
-      // Fetch initial health data
-      await fetchHealthData();
-
-      // Load selected time range preference
-      const savedTimeRange = await loadStringPreference('selectedTimeRange');
-      if (savedTimeRange) {
-        setSelectedTimeRange(savedTimeRange);
-      }
-
-      // Load sync duration setting
-      const durationSetting = await loadStringPreference('syncDuration');
-      if (durationSetting) {
-        setSyncDurationSetting(durationSetting);
-      }
-    };
-    initialize();
+    return () => clearInterval(interval); // Clear interval on component unmount
   }, []);
 
-  useEffect(() => {
-    fetchHealthData();
-  }, [selectedTimeRange, isStepsEnabled, isActiveCaloriesEnabled, isHeartRateEnabled, isActiveMinutesEnabled]); // Re-fetch when time range or enabled states change
-
-  const fetchHealthData = async () => {
+  const fetchHealthData = async (currentHealthMetricStates, timeRange) => {
     const endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    const startDate = new Date(endDate);
-    startDate.setHours(0, 0, 0, 0); // Set to the beginning of today
+    let startDate = new Date(endDate);
 
-    let currentSteps = 0;
-    let currentCalories = 0;
-    let currentHeartRate = 0;
-    let currentActiveMinutes = 0;
-
-    console.log(`[MainScreen] Fetching health data for display from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
-    if (isStepsEnabled) {
-      const stepRecords = await readStepRecords(startDate, endDate);
-      const aggregatedStepsData = aggregateStepsByDate(stepRecords);
-      currentSteps = aggregatedStepsData.reduce((sum, record) => sum + record.value, 0); // Use record.value
-      console.log(`[MainScreen] Fetched steps: ${currentSteps}`);
+    switch (timeRange) { // Use timeRange parameter here
+      case '24h':
+        startDate.setHours(endDate.getHours() - 24, endDate.getMinutes(), endDate.getSeconds(), endDate.getMilliseconds());
+        break;
+      case '7d':
+        startDate.setDate(endDate.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '30d':
+        startDate.setDate(endDate.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      default:
+        startDate.setHours(0, 0, 0, 0); // Default to beginning of today
+        break;
     }
 
-    if (isActiveCaloriesEnabled) {
-      const activeCaloriesRecords = await readActiveCaloriesRecords(startDate, endDate);
-      const aggregatedActiveCaloriesData = aggregateActiveCaloriesByDate(activeCaloriesRecords);
-      currentCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.value, 0); // Use record.value
-      console.log(`[MainScreen] Fetched calories: ${currentCalories}`);
+    const newHealthData = {};
+
+    addLog(`[MainScreen] Fetching health data for display from ${startDate.toISOString()} to ${endDate.toISOString()} for range: ${timeRange}`);
+
+    for (const metric of HEALTH_METRICS) {
+      if (currentHealthMetricStates[metric.stateKey]) {
+        let records = [];
+        let aggregatedValue = 0;
+
+        switch (metric.id) {
+          case 'steps':
+            records = await readStepRecords(startDate, endDate);
+            aggregatedValue = aggregateStepsByDate(records).reduce((sum, record) => sum + record.value, 0);
+            newHealthData[metric.id] = aggregatedValue.toLocaleString();
+            break;
+          case 'calories':
+            records = await readActiveCaloriesRecords(startDate, endDate);
+            aggregatedValue = aggregateActiveCaloriesByDate(records).reduce((sum, record) => sum + record.value, 0);
+            newHealthData[metric.id] = aggregatedValue.toLocaleString();
+            break;
+          case 'heartRate':
+            records = await readHeartRateRecords(startDate, endDate);
+            aggregatedValue = aggregateHeartRateByDate(records).reduce((sum, record) => sum + record.value, 0);
+            newHealthData[metric.id] = aggregatedValue > 0 ? `${Math.round(aggregatedValue)} bpm` : '0 bpm';
+            break;
+          case 'activeMinutes':
+            records = await readActiveMinutesRecords(startDate, endDate);
+            aggregatedValue = aggregateActiveMinutesByDate(records).reduce((sum, record) => sum + record.value, 0);
+            newHealthData[metric.id] = aggregatedValue > 0 ? `${Math.round(aggregatedValue)} min` : '0 min';
+            break;
+          // Add cases for other health metrics as needed
+          default:
+            newHealthData[metric.id] = 'N/A'; // Or handle other metrics
+            break;
+        }
+        console.log(`[MainScreen] Fetched ${metric.label}: ${newHealthData[metric.id]}`);
+      }
     }
 
-    if (isHeartRateEnabled) {
-      const heartRateRecords = await readHeartRateRecords(startDate, endDate);
-      const aggregatedHeartRateData = aggregateHeartRateByDate(heartRateRecords);
-      currentHeartRate = aggregatedHeartRateData.reduce((sum, record) => sum + record.value, 0);
-      console.log(`[MainScreen] Fetched heart rate: ${currentHeartRate}`);
-    }
-
-    if (isActiveMinutesEnabled) {
-      const activeMinutesRecords = await readActiveMinutesRecords(startDate, endDate);
-      const aggregatedActiveMinutesData = aggregateActiveMinutesByDate(activeMinutesRecords);
-      currentActiveMinutes = aggregatedActiveMinutesData.reduce((sum, record) => sum + record.value, 0);
-      console.log(`[MainScreen] Fetched active minutes: ${currentActiveMinutes}`);
-    }
-
-
-    setStepsData(currentSteps.toLocaleString());
-    setCaloriesData(currentCalories.toLocaleString());
-    setHeartRateData(currentHeartRate > 0 ? `${Math.round(currentHeartRate)} bpm` : '0 bpm');
-    setActiveMinutesData(currentActiveMinutes > 0 ? `${Math.round(currentActiveMinutes)} min` : '0 min');
-    setIsConnected(true);
-    console.log(`[MainScreen] Displaying steps: ${currentSteps}, calories: ${currentCalories}, heart rate: ${currentHeartRate}, active minutes: ${currentActiveMinutes}`);
+    setHealthData(newHealthData);
+    // Re-check server connection status after fetching health data
+    const connectionStatus = await checkServerConnection();
+    setIsConnected(connectionStatus);
+    console.log(`[MainScreen] Displaying health data:`, newHealthData);
   };
 
   // Remove toggle functions as they are now handled in SettingsScreen
@@ -142,97 +167,20 @@ const MainScreen = ({ navigation }) => {
     addLog('Sync button pressed.');
 
     try {
-      const endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
+      // The healthConnectSyncData function in healthConnectService.js already handles
+      // reading, aggregating, and transforming data based on the sync duration.
+      // So, we just need to call it with the selected syncDurationSetting and enabled health metrics.
+      addLog(`[MainScreen] Sync duration setting: ${selectedTimeRange}`); // Use selectedTimeRange
+      addLog(`[MainScreen] healthMetricStates before sync: ${JSON.stringify(healthMetricStates)}`);
+      const result = await healthConnectSyncData(selectedTimeRange, healthMetricStates); // Pass selectedTimeRange
 
-      // Use selectedTimeRange for manual sync logic
-      const startDate = new Date(endDate);
-      if (selectedTimeRange === '24h') {
-        startDate.setDate(endDate.getDate());
-      } else if (selectedTimeRange === '7d') {
-        startDate.setDate(endDate.getDate() - 6);
-      } else if (selectedTimeRange === '30d') {
-        startDate.setDate(endDate.getDate() - 29);
+      if (result.success) {
+        addLog('Health data synced successfully.', 'info', 'SUCCESS');
+        Alert.alert('Success', 'Health data synced successfully.');
+      } else {
+        addLog(`Sync Error: ${result.error}`, 'error', 'ERROR');
+        Alert.alert('Sync Error', result.error);
       }
-      startDate.setHours(0, 0, 0, 0);
-
-      addLog(`[MainScreen] Syncing data from ${startDate.toISOString()} to ${endDate.toISOString()} for time range ${selectedTimeRange}.`);
-
-      let allAggregatedData = [];
-
-      if (isHeartRateEnabled) {
-        addLog('Reading heart rate records...');
-        const heartRateRecords = await readHeartRateRecords(startDate, endDate);
-        addLog(`Found ${heartRateRecords.length} heart rate records.`);
-        const aggregatedHeartRateData = aggregateHeartRateByDate(heartRateRecords);
-        allAggregatedData = allAggregatedData.concat(aggregatedHeartRateData);
-        const totalHeartRate = aggregatedHeartRateData.reduce((sum, record) => sum + record.value, 0);
-        setHeartRateData(totalHeartRate > 0 ? `${Math.round(totalHeartRate)} bpm` : '0 bpm');
-        console.log(`[MainScreen] Synced heart rate: ${totalHeartRate}`);
-
-        if (aggregatedHeartRateData.length === 0) {
-          addLog('No heart rate data found for the selected period.');
-        }
-      }
-
-      if (isActiveMinutesEnabled) {
-        addLog('Reading active minutes records...');
-        const activeMinutesRecords = await readActiveMinutesRecords(startDate, endDate);
-        addLog(`Found ${activeMinutesRecords.length} active minutes records.`);
-        const aggregatedActiveMinutesData = aggregateActiveMinutesByDate(activeMinutesRecords);
-        allAggregatedData = allAggregatedData.concat(aggregatedActiveMinutesData);
-        const totalActiveMinutes = aggregatedActiveMinutesData.reduce((sum, record) => sum + record.value, 0);
-        setActiveMinutesData(totalActiveMinutes > 0 ? `${Math.round(totalActiveMinutes)} min` : '0 min');
-        console.log(`[MainScreen] Synced active minutes: ${totalActiveMinutes}`);
-
-        if (aggregatedActiveMinutesData.length === 0) {
-          addLog('No active minutes data found for the selected period.');
-        }
-      }
-
-      if (isStepsEnabled) {
-        addLog('Reading step records...');
-        const stepRecords = await readStepRecords(startDate, endDate);
-        addLog(`Found ${stepRecords.length} step records.`);
-        const aggregatedStepsData = aggregateStepsByDate(stepRecords);
-        allAggregatedData = allAggregatedData.concat(aggregatedStepsData);
-        const totalSteps = aggregatedStepsData.reduce((sum, record) => sum + record.value, 0); // Use record.value
-        setStepsData(totalSteps.toLocaleString());
-        console.log(`[MainScreen] Synced steps: ${totalSteps}`);
-
-        if (aggregatedStepsData.length === 0) {
-          addLog('No step data found for the selected period.');
-        }
-      }
-
-      if (isActiveCaloriesEnabled) {
-        addLog('Reading active calories records...');
-        const activeCaloriesRecords = await readActiveCaloriesRecords(startDate, endDate);
-        addLog(`Found ${activeCaloriesRecords.length} active calories records.`);
-        const aggregatedActiveCaloriesData = aggregateActiveCaloriesByDate(activeCaloriesRecords);
-        allAggregatedData = allAggregatedData.concat(aggregatedActiveCaloriesData);
-        const totalCalories = aggregatedActiveCaloriesData.reduce((sum, record) => sum + record.value, 0); // Use record.value
-        setCaloriesData(totalCalories.toLocaleString());
-        console.log(`[MainScreen] Synced calories: ${totalCalories}`);
-
-        if (aggregatedActiveCaloriesData.length === 0) {
-          addLog('No active calories data found for the selected period.');
-        }
-      }
-
-      if (allAggregatedData.length === 0) {
-        addLog('No data selected or found for the selected period.');
-        Alert.alert('No Data', 'No data selected or found for the selected period.');
-        setIsSyncing(false);
-        return;
-      }
- 
-      const dataToSend = JSON.stringify(allAggregatedData, null, 2);
-      console.log(`[MainScreen] Data to be synced: ${dataToSend}`); // Use console.log
-      console.log('Syncing health data to server...'); // Use console.log
-      await syncHealthData(allAggregatedData);
-      addLog('Health data synced successfully.', 'info', 'SUCCESS');
-      Alert.alert('Success', 'Health data synced successfully.');
     } catch (error) {
       addLog(`Sync Error: ${error.message}`, 'error', 'ERROR');
       Alert.alert('Sync Error', error.message);
@@ -253,7 +201,8 @@ const MainScreen = ({ navigation }) => {
               style={styles.picker}
               onValueChange={async (itemValue) => {
                 setSelectedTimeRange(itemValue);
-                await saveStringPreference('selectedTimeRange', itemValue);
+                await saveTimeRange(itemValue); // Save selectedTimeRange using the new function
+                addLog(`[MainScreen] Time range changed and saved: ${itemValue}`);
               }}
             >
               <Picker.Item label="Last 24 Hours" value="24h" />
@@ -267,38 +216,15 @@ const MainScreen = ({ navigation }) => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Health Overview</Text>
           <View style={styles.healthMetricsContainer}>
-            {/* Steps */}
-            <View style={styles.metricItem}>
-              <Image source={require('../../assets/icons/steps.png')} style={styles.metricIcon} />
-              <View>
-                <Text style={styles.metricValue}>{stepsData}</Text>
-                <Text style={styles.metricLabel}>Steps</Text>
+            {HEALTH_METRICS.map(metric => healthMetricStates[metric.stateKey] && (
+              <View style={styles.metricItem} key={metric.id}>
+                <Image source={metric.icon} style={styles.metricIcon} />
+                <View>
+                  <Text style={styles.metricValue}>{healthData[metric.id] || '0'}</Text>
+                  <Text style={styles.metricLabel}>{metric.label}</Text>
+                </View>
               </View>
-            </View>
-            {/* Calories */}
-            <View style={styles.metricItem}>
-              <Image source={require('../../assets/icons/calories.png')} style={styles.metricIcon} />
-              <View>
-                <Text style={styles.metricValue}>{caloriesData}</Text>
-                <Text style={styles.metricLabel}>Calories</Text>
-              </View>
-            </View>
-            {/* Heart Rate */}
-            <View style={styles.metricItem}>
-              <Image source={require('../../assets/icons/heart_rate.png')} style={styles.metricIcon} />
-              <View>
-                <Text style={styles.metricValue}>{heartRateData}</Text>
-                <Text style={styles.metricLabel}>Heart Rate</Text>
-              </View>
-            </View>
-            {/* Active Minutes */}
-            <View style={styles.metricItem}>
-              <Image source={require('../../assets/icons/active_minutes.png')} style={styles.metricIcon} />
-              <View>
-                <Text style={styles.metricValue}>{activeMinutesData}</Text>
-                <Text style={styles.metricLabel}>Active Minutes</Text>
-              </View>
-            </View>
+            ))}
           </View>
         </View>
 

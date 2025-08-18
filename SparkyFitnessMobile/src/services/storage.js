@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SERVER_CONFIGS_KEY = 'serverConfigs';
 const ACTIVE_SERVER_CONFIG_ID_KEY = 'activeServerConfigId';
+const TIME_RANGE_KEY = 'timeRange';
 
 /**
  * Saves a new server configuration or updates an existing one.
@@ -97,5 +98,33 @@ export const deleteServerConfig = async (configId) => {
   } catch (e) {
     console.error('Failed to delete server config.', e);
     throw e;
+  }
+};
+
+/**
+ * Saves the selected time range.
+ * @param {string} timeRange - The time range string (e.g., 'today', 'last_week').
+ * @returns {Promise<void>}
+ */
+export const saveTimeRange = async (timeRange) => {
+  try {
+    await AsyncStorage.setItem(TIME_RANGE_KEY, timeRange);
+  } catch (e) {
+    console.error('Failed to save time range.', e);
+    throw e;
+  }
+};
+
+/**
+ * Retrieves the saved time range.
+ * @returns {Promise<string|null>} The time range string or null if not found.
+ */
+export const loadTimeRange = async () => {
+  try {
+    const timeRange = await AsyncStorage.getItem(TIME_RANGE_KEY);
+    return timeRange;
+  } catch (e) {
+    console.error('Failed to load time range.', e);
+    return null;
   }
 };
