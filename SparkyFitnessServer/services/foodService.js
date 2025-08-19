@@ -4,6 +4,7 @@ const userRepository = require('../models/userRepository'); // For authorization
 const mealService = require('./mealService');
 const { log } = require('../config/logging');
 const { getFatSecretAccessToken, foodNutrientCache, CACHE_DURATION_MS, FATSECRET_API_BASE_URL } = require('../integrations/fatsecret/fatsecretService');
+const MealieService = require('../integrations/mealie/mealieService'); // Import MealieService
 
 async function getFoodDataProviders(userId) { // This function will be removed from foodService later
   try {
@@ -475,7 +476,6 @@ async function getFoodEntriesByDate(authenticatedUserId, targetUserId, selectedD
       log('error', 'getFoodEntriesByDate: targetUserId is undefined. Returning empty array.');
       return [];
     }
-
     const entries = await foodRepository.getFoodEntriesByDate(targetUserId, selectedDate);
     return entries;
   } catch (error) {
@@ -617,7 +617,7 @@ async function copyFoodEntries(authenticatedUserId, sourceDate, sourceMealType, 
       const existingEntry = await foodRepository.getFoodEntryByDetails(
         authenticatedUserId,
         entry.food_id,
-        targetMealType,
+        mealType,
         targetDate,
         entry.variant_id
       );
@@ -639,13 +639,13 @@ async function copyFoodEntries(authenticatedUserId, sourceDate, sourceMealType, 
     }
 
     if (entriesToCreate.length === 0) {
-      log('info', `All food entries from ${sourceMealType} on ${sourceDate} already exist in ${targetMealType} on ${targetDate}. No new entries created.`);
+      log('info', `All food entries from prior day's ${mealType} already exist in ${targetDate} ${mealType}. No new entries created.`);
       return [];
     }
 
     // 3. Bulk insert new entries
     const newEntries = await foodRepository.bulkCreateFoodEntries(entriesToCreate);
-    log('info', `Successfully copied ${newEntries.length} new food entries from ${sourceMealType} on ${sourceDate} to ${targetMealType} on ${targetDate} for user ${authenticatedUserId}.`);
+    log('info', `Successfully copied ${newEntries.length} new food entries from prior day's ${mealType} to ${targetDate} ${mealType} for user ${authenticatedUserId}.`);
     return newEntries;
   } catch (error) {
     log('error', `Error copying food entries for user ${authenticatedUserId} from ${sourceDate} ${sourceMealType} to ${targetDate} ${targetMealType}:`, error);
@@ -722,6 +722,49 @@ async function getDailyNutritionSummary(userId, date) {
   }
 }
 
+async function searchMealieFoods(query, baseUrl, apiKey, userId, providerId) {
+  log('debug', `searchMealieFoods: query: ${query}, baseUrl: ${baseUrl}, apiKey: ${apiKey}, userId: ${userId}, providerId: ${providerId}`);
+  try {
+    const mealieService = new MealieService(baseUrl, apiKey, providerId);
+    const searchResults = await mealieService.searchRecipes(query);
+
+    // Concurrently fetch details for all recipes
+    const detailedRecipes = await Promise.all(
+      searchResults.map(recipe => mealieService.getRecipeDetails(recipe.slug))
+    );
+
+    // Filter out any null results (e.g., if a recipe detail fetch failed)
+    const validRecipes = detailedRecipes.filter(recipe => recipe !== null);
+
+    return validRecipes.map(recipe => {
+      const { food, variant } = mealieService.mapMealieRecipeToSparkyFood(recipe, userId);
+      return {
+        ...food,
+        default_variant: variant,
+        variants: [variant]
+      };
+    });
+  } catch (error) {
+    log('error', `Error searching Mealie foods for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+async function getMealieFoodDetails(slug, baseUrl, apiKey, userId, providerId) {
+  log('debug', `getMealieFoodDetails: slug: ${slug}, baseUrl: ${baseUrl}, apiKey: ${apiKey}, userId: ${userId}, providerId: ${providerId}`);
+  try {
+    const mealieService = new MealieService(baseUrl, apiKey, providerId);
+    const mealieRecipe = await mealieService.getRecipeDetails(slug);
+    if (!mealieRecipe) {
+      return null;
+    }
+    return mealieService.mapMealieRecipeToSparkyFood(mealieRecipe, userId);
+  } catch (error) {
+    log('error', `Error getting Mealie food details for slug ${slug} for user ${userId}:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   getFoodDataProviders,
   getFoodDataProvidersForUser,
@@ -754,6 +797,8 @@ module.exports = {
   copyFoodEntriesFromYesterday,
   getDailyNutritionSummary,
   getFoodDeletionImpact,
+  searchMealieFoods, // New export
+  getMealieFoodDetails, // New export
 };
 
 async function getFoodDeletionImpact(authenticatedUserId, foodId) {

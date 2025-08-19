@@ -34,6 +34,30 @@ router.use('/fatsecret', authenticateToken, async (req, res, next) => {
   }
 });
 
+router.use('/mealie', authenticateToken, async (req, res, next) => {
+  const providerId = req.headers['x-provider-id'];
+  log('debug', `foodRoutes: /mealie middleware: x-provider-id: ${providerId}`);
+
+  if (!providerId) {
+    return res.status(400).json({ error: "Missing x-provider-id header" });
+  }
+
+  try {
+    const providerDetails = await foodService.getFoodDataProviderDetails(req.userId, providerId);
+    if (!providerDetails || !providerDetails.base_url || !providerDetails.app_key) {
+      return next(new Error("Failed to retrieve Mealie API keys or base URL. Please check provider configuration."));
+    }
+    req.mealieBaseUrl = providerDetails.base_url;
+    req.mealieApiKey = providerDetails.app_key;
+    next();
+  } catch (error) {
+    if (error.message.startsWith('Forbidden')) {
+      return res.status(403).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 // Removed /food-data-providers routes as they are now handled by dataIntegrationRoutes.js
 
 router.get('/fatsecret/search', authenticateToken, async (req, res, next) => {
@@ -127,6 +151,39 @@ router.get('/nutritionix/item', authenticateToken, async (req, res, next) => {
   }
   try {
     const data = await getNutritionixBrandedNutrients(nix_item_id, providerId);
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// AI-dedicated food search route to handle /api/foods/search
+router.get('/mealie/search', authenticateToken, authorizeAccess('food_list', (req) => req.userId), async (req, res, next) => {
+  const { query } = req.query;
+  const { mealieBaseUrl, mealieApiKey, userId } = req;
+
+  if (!query) {
+    return res.status(400).json({ error: "Missing search query" });
+  }
+
+  try {
+    const data = await foodService.searchMealieFoods(query, mealieBaseUrl, mealieApiKey, userId);
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/mealie/details', authenticateToken, authorizeAccess('food_list', (req) => req.userId), async (req, res, next) => {
+  const { slug } = req.query;
+  const { mealieBaseUrl, mealieApiKey, userId } = req;
+
+  if (!slug) {
+    return res.status(400).json({ error: "Missing food slug" });
+  }
+
+  try {
+    const data = await foodService.getMealieFoodDetails(slug, mealieBaseUrl, mealieApiKey, userId);
     res.json(data);
   } catch (error) {
     next(error);

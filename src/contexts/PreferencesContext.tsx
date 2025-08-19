@@ -57,6 +57,7 @@ interface PreferencesContextType {
   loggingLevel: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'SILENT'; // Add logging level
   defaultFoodDataProviderId: string | null; // Add default food data provider ID
   timezone: string; // Add timezone
+  foodDisplayLimit: number; // Explicitly add foodDisplayLimit
   itemDisplayLimit: number;
   nutrientDisplayPreferences: NutrientPreference[];
   water_display_unit: 'ml' | 'oz' | 'liter';
@@ -99,6 +100,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [defaultFoodDataProviderId, setDefaultFoodDataProviderIdState] = useState<string | null>(null); // Default food data provider ID
   const [timezone, setTimezoneState] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone); // Add state for timezone
   const [itemDisplayLimit, setItemDisplayLimitState] = useState<number>(10);
+  const [foodDisplayLimit, setFoodDisplayLimitState] = useState<number>(10); // Add state for foodDisplayLimit
   const [nutrientDisplayPreferences, setNutrientDisplayPreferences] = useState<NutrientPreference[]>([]);
   const [waterDisplayUnit, setWaterDisplayUnitState] = useState<'ml' | 'oz' | 'liter'>('ml');
 
@@ -157,6 +159,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setDefaultFoodDataProviderIdState(data.default_food_data_provider_id || null); // Set default food data provider ID state
         setTimezoneState(data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone); // Set timezone state
         setItemDisplayLimitState(data.item_display_limit || 10);
+        setFoodDisplayLimitState(data.food_display_limit || 10); // Set foodDisplayLimit state
         setWaterDisplayUnitState(data.water_display_unit || 'ml');
         info(loggingLevel, 'PreferencesContext: Preferences states updated from database.');
       } else {
@@ -200,6 +203,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         default_food_data_provider_id: null, // Default to no specific food data provider
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Add default timezone
         item_display_limit: 10,
+        food_display_limit: 10, // Add default foodDisplayLimit
         water_display_unit: waterDisplayUnit // Set default water display unit
       };
 
@@ -233,6 +237,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
     default_food_data_provider_id: string | null; // Add default food data provider ID to updates type
     timezone: string; // Add timezone to updates type
     item_display_limit: number;
+    food_display_limit: number; // Add foodDisplayLimit to updates type
     water_display_unit: 'ml' | 'oz' | 'liter';
   }>) => {
     debug(loggingLevel, "PreferencesProvider: Attempting to update preferences with:", updates);
@@ -252,6 +257,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         debug(loggingLevel, "PreferencesProvider: Saved dateFormat to localStorage:", updates.date_format);
       }
       // default_food_data_provider_id, logging_level and item_display_limit are not stored in localStorage
+      // food_display_limit is also not stored in localStorage
       return;
     }
     info(loggingLevel, "PreferencesProvider: Updating preferences for user:", user.id);
@@ -408,6 +414,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         default_food_data_provider_id: defaultFoodDataProviderId,
         timezone: timezone,
         item_display_limit: itemDisplayLimit,
+        food_display_limit: foodDisplayLimit, // Add foodDisplayLimit to save
         water_display_unit: waterDisplayUnit,
       });
       info(loggingLevel, "PreferencesProvider: All preferences saved successfully.");
@@ -429,6 +436,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         volume: 240, // 240ml for a standard glass
         unit: "ml" as const, // Explicitly cast to literal type
         is_primary: true,
+        servings_per_container: 1, // Added default value
       };
       const createdContainer = await createWaterContainer(defaultContainer);
       if (createdContainer && createdContainer.id) {
@@ -449,13 +457,14 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
       loggingLevel, // Expose loggingLevel
       defaultFoodDataProviderId, // Expose defaultFoodDataProviderId
       timezone, // Expose timezone
-      itemDisplayLimit,
+      itemDisplayLimit, // Expose itemDisplayLimit
+      foodDisplayLimit, // Expose foodDisplayLimit
       nutrientDisplayPreferences,
       water_display_unit: waterDisplayUnit,
       setWeightUnit,
       setMeasurementUnit,
       setDateFormat,
-      setAutoClearHistory, // Expose setAutoClearHistory
+      setAutoClearHistory, // Expose autoClearHistory
       setLoggingLevel, // Expose setLoggingLevel
       setDefaultFoodDataProviderId, // Expose setDefaultFoodDataProviderId
       setTimezone, // Expose setTimezone

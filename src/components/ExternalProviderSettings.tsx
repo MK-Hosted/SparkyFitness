@@ -15,10 +15,11 @@ import { usePreferences } from "@/contexts/PreferencesContext";
 interface ExternalDataProvider { // Renamed interface
   id: string;
   provider_name: string;
-  provider_type: 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger'; // Added wger
-  app_id: string | null;
+  provider_type: 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie'; // Added mealie
+  app_id: string | null; // Keep app_id for other providers
   app_key: string | null;
   is_active: boolean;
+  base_url: string | null; // Add base_url field
 }
 
 const ExternalProviderSettings = () => { // Renamed component
@@ -28,10 +29,11 @@ const ExternalProviderSettings = () => { // Renamed component
   const [providers, setProviders] = useState<ExternalDataProvider[]>([]);
   const [newProvider, setNewProvider] = useState({
     provider_name: '',
-    provider_type: 'openfoodfacts' as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger', // Added wger
+    provider_type: 'openfoodfacts' as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', // Added mealie
     app_id: '',
     app_key: '',
     is_active: false,
+    base_url: '', // Initialize base_url
   });
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ExternalDataProvider>>({});
@@ -55,7 +57,7 @@ const ExternalProviderSettings = () => { // Renamed component
       });
       setProviders(data.map((provider: any) => ({
         ...provider,
-        provider_type: provider.provider_type as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' // Added wger
+        provider_type: provider.provider_type as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' // Added mealie
       })) || []);
     } catch (error: any) {
       console.error('Error loading external data providers:', error);
@@ -79,8 +81,17 @@ const ExternalProviderSettings = () => { // Renamed component
       return;
     }
 
-    // Wger might not need app_id/app_key, so adjust validation
-    if ((newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret') && (!newProvider.app_id || !newProvider.app_key)) {
+    // Wger and OpenFoodFacts might not need app_id/app_key, so adjust validation
+    if (newProvider.provider_type === 'mealie') {
+      if (!newProvider.base_url || !newProvider.app_key) {
+        toast({
+          title: "Error",
+          description: `Please provide App URL and API Key for Mealie`,
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if ((newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret') && (!newProvider.app_id || !newProvider.app_key)) {
       toast({
         title: "Error",
         description: `Please provide App ID and App Key for ${newProvider.provider_type}`,
@@ -97,9 +108,10 @@ const ExternalProviderSettings = () => { // Renamed component
           user_id: user.id, // user_id will be handled by backend from JWT
           provider_name: newProvider.provider_name,
           provider_type: newProvider.provider_type,
-          app_id: newProvider.app_id || null,
+          app_id: newProvider.provider_type === 'mealie' ? null : newProvider.app_id || null, // Only set app_id for non-mealie
           app_key: newProvider.app_key || null,
           is_active: newProvider.is_active,
+          base_url: newProvider.provider_type === 'mealie' ? newProvider.base_url || null : null, // Set base_url for mealie
         }),
       });
 
@@ -113,10 +125,11 @@ const ExternalProviderSettings = () => { // Renamed component
         app_id: '',
         app_key: '',
         is_active: false,
+        base_url: '', // Reset base_url
       });
       setShowAddForm(false);
       loadProviders();
-      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret')) { // Only set default for food providers
+      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret' || data.provider_type === 'mealie')) { // Only set default for food providers
         setDefaultFoodDataProviderId(data.id);
       }
     } catch (error: any) {
@@ -136,9 +149,10 @@ const ExternalProviderSettings = () => { // Renamed component
     const providerUpdateData: Partial<ExternalDataProvider> = { // Renamed interface
       provider_name: editData.provider_name,
       provider_type: editData.provider_type,
-      app_id: editData.app_id || null,
+      app_id: editData.provider_type === 'mealie' ? null : editData.app_id || null, // Only set app_id for non-mealie
       app_key: editData.app_key || null,
       is_active: editData.is_active,
+      base_url: editData.provider_type === 'mealie' ? editData.base_url || null : null, // Set base_url for mealie
     };
 
     try {
@@ -154,7 +168,7 @@ const ExternalProviderSettings = () => { // Renamed component
       setEditingProvider(null);
       setEditData({});
       loadProviders();
-      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret')) { // Only set default for food providers
+      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret' || data.provider_type === 'mealie')) { // Only set default for food providers
         setDefaultFoodDataProviderId(data.id);
       } else if (data && defaultFoodDataProviderId === data.id) {
         setDefaultFoodDataProviderId(null);
@@ -213,7 +227,7 @@ const ExternalProviderSettings = () => { // Renamed component
         description: `External data provider ${isActive ? 'activated' : 'deactivated'}` // Updated message
       });
       loadProviders();
-      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret')) { // Only set default for food providers
+      if (data && data.is_active && (data.provider_type === 'openfoodfacts' || data.provider_type === 'nutritionix' || data.provider_type === 'fatsecret' || data.provider_type === 'mealie')) { // Only set default for food providers
         setDefaultFoodDataProviderId(data.id);
       } else if (data && defaultFoodDataProviderId === data.id) {
         setDefaultFoodDataProviderId(null);
@@ -239,6 +253,7 @@ const ExternalProviderSettings = () => { // Renamed component
       app_id: provider.app_id || '',
       app_key: provider.app_key || '',
       is_active: provider.is_active,
+      base_url: provider.base_url || '', // Set base_url
     });
   };
 
@@ -252,6 +267,7 @@ const ExternalProviderSettings = () => { // Renamed component
     { value: "nutritionix", label: "Nutritionix" },
     { value: "fatsecret", label: "FatSecret" },
     { value: "wger", label: "Wger (Exercise)" }, // Added wger
+    { value: "mealie", label: "Mealie" }, // Added Mealie
   ];
 
   return (
@@ -289,7 +305,7 @@ const ExternalProviderSettings = () => { // Renamed component
                   <Label htmlFor="new_provider_type">Provider Type</Label>
                   <Select
                     value={newProvider.provider_type}
-                    onValueChange={(value) => setNewProvider(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger', app_id: '', app_key: '' }))} // Added wger
+                    onValueChange={(value) => setNewProvider(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', app_id: '', app_key: '', base_url: '' }))} // Added mealie, reset base_url
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -305,27 +321,27 @@ const ExternalProviderSettings = () => { // Renamed component
                 </div>
               </div>
 
-              {(newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret') && ( // Only show for these types
+              {(newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret' || newProvider.provider_type === 'mealie') && ( // Only show for these types
                 <>
                   <div>
-                    <Label htmlFor="new_app_id">App ID / Consumer Key</Label>
+                    <Label htmlFor="new_base_url">App URL</Label>
                     <Input
-                      id="new_app_id"
-                      type="password"
-                      value={newProvider.app_id}
-                      onChange={(e) => setNewProvider(prev => ({ ...prev, app_id: e.target.value }))}
-                      placeholder="Enter App ID or Consumer Key"
+                      id="new_base_url"
+                      type="text"
+                      value={newProvider.base_url}
+                      onChange={(e) => setNewProvider(prev => ({ ...prev, base_url: e.target.value }))}
+                      placeholder="e.g., http://your-mealie-instance.com"
                       autoComplete="off"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="new_app_key">App Key / Consumer Secret</Label>
+                    <Label htmlFor="new_app_key">API Key</Label>
                     <Input
                       id="new_app_key"
                       type="password"
                       value={newProvider.app_key}
                       onChange={(e) => setNewProvider(prev => ({ ...prev, app_key: e.target.value }))}
-                      placeholder="Enter App Key or Consumer Secret"
+                      placeholder="Enter Mealie API Key"
                       autoComplete="off"
                     />
                   </div>
@@ -377,7 +393,7 @@ const ExternalProviderSettings = () => { // Renamed component
                             <Label>Provider Type</Label>
                             <Select
                               value={editData.provider_type || ''}
-                              onValueChange={(value) => setEditData(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger', app_id: '', app_key: '' }))} // Added wger
+                              onValueChange={(value) => setEditData(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', app_id: '', app_key: '', base_url: '' }))} // Added mealie, reset base_url
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -392,25 +408,25 @@ const ExternalProviderSettings = () => { // Renamed component
                             </Select>
                           </div>
                         </div>
-                        {(editData.provider_type === 'nutritionix' || editData.provider_type === 'fatsecret') && ( // Only show for these types
+                        {(editData.provider_type === 'nutritionix' || editData.provider_type === 'fatsecret' || editData.provider_type === 'mealie') && ( // Only show for these types
                           <>
                             <div>
-                              <Label>App ID / Consumer Key</Label>
+                              <Label>App URL</Label>
                               <Input
-                                type="password"
-                                value={editData.app_id || ''}
-                                onChange={(e) => setEditData(prev => ({ ...prev, app_id: e.target.value }))}
-                                placeholder="Enter App ID or Consumer Key"
+                                type="text"
+                                value={editData.base_url || ''}
+                                onChange={(e) => setEditData(prev => ({ ...prev, base_url: e.target.value }))}
+                                placeholder="e.g., http://your-mealie-instance.com"
                                 autoComplete="off"
                               />
                             </div>
                             <div>
-                              <Label>App Key / Consumer Secret</Label>
+                              <Label>API Key</Label>
                               <Input
                                 type="password"
                                 value={editData.app_key || ''}
                                 onChange={(e) => setEditData(prev => ({ ...prev, app_key: e.target.value }))}
-                                placeholder="Enter App Key or Consumer Secret"
+                                placeholder="Enter Mealie API Key"
                                 autoComplete="off"
                               />
                             </div>
@@ -442,7 +458,8 @@ const ExternalProviderSettings = () => { // Renamed component
                             <h4 className="font-medium">{provider.provider_name}</h4>
                             <p className="text-sm text-muted-foreground">
                               {getProviderTypes().find(t => t.value === provider.provider_type)?.label || provider.provider_type}
-                              {provider.app_id && ` - App ID: ${provider.app_id.substring(0, 4)}...`}
+                              {provider.provider_type === 'mealie' && provider.base_url && ` - URL: ${provider.base_url}`}
+                              {provider.provider_type !== 'mealie' && provider.app_id && ` - App ID: ${provider.app_id.substring(0, 4)}...`}
                               {provider.app_key && ` - App Key: ${provider.app_key.substring(0, 4)}...`}
                             </p>
                           </div>

@@ -6,7 +6,7 @@ async function getExternalDataProviders(userId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT id, provider_name, provider_type, is_active FROM external_data_providers WHERE user_id = $1 ORDER BY created_at DESC',
+      'SELECT id, provider_name, provider_type, is_active, base_url FROM external_data_providers WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
     log('debug', `getExternalDataProviders: Raw query results for user ${userId}:`, result.rows);
@@ -20,7 +20,7 @@ async function getExternalDataProvidersByUserId(targetUserId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT id, provider_name, provider_type, encrypted_app_id, app_id_iv, app_id_tag, encrypted_app_key, app_key_iv, app_key_tag, is_active FROM external_data_providers WHERE user_id = $1 ORDER BY created_at DESC',
+      'SELECT id, provider_name, provider_type, encrypted_app_id, app_id_iv, app_id_tag, encrypted_app_key, app_key_iv, app_key_tag, is_active, base_url FROM external_data_providers WHERE user_id = $1 ORDER BY created_at DESC',
       [targetUserId]
     );
     const providers = await Promise.all(result.rows.map(async (row) => {
@@ -49,6 +49,7 @@ async function getExternalDataProvidersByUserId(targetUserId) {
         app_id: decryptedAppId,
         app_key: decryptedAppKey,
         is_active: row.is_active,
+        base_url: row.base_url,
       };
     }));
     return providers;
@@ -82,13 +83,13 @@ async function createExternalDataProvider(providerData) {
 
     const result = await client.query(
       `INSERT INTO external_data_providers (
-        provider_name, provider_type, user_id, is_active,
+        provider_name, provider_type, user_id, is_active, base_url,
         encrypted_app_id, app_id_iv, app_id_tag,
         encrypted_app_key, app_key_iv, app_key_tag,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now()) RETURNING id`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), now()) RETURNING id`,
       [
-        providerData.provider_name, providerData.provider_type, providerData.user_id, providerData.is_active,
+        providerData.provider_name, providerData.provider_type, providerData.user_id, providerData.is_active, providerData.base_url,
         encryptedAppId, appIdIv, appIdTag,
         encryptedAppKey, appKeyIv, appKeyTag
       ]
@@ -127,17 +128,18 @@ async function updateExternalDataProvider(id, userId, updateData) {
         provider_name = COALESCE($1, provider_name),
         provider_type = COALESCE($2, provider_type),
         is_active = COALESCE($3, is_active),
-        encrypted_app_id = COALESCE($4, encrypted_app_id),
-        app_id_iv = COALESCE($5, app_id_iv),
-        app_id_tag = COALESCE($6, app_id_tag),
-        encrypted_app_key = COALESCE($7, encrypted_app_key),
-        app_key_iv = COALESCE($8, app_key_iv),
-        app_key_tag = COALESCE($9, app_key_tag),
+        base_url = COALESCE($4, base_url),
+        encrypted_app_id = COALESCE($5, encrypted_app_id),
+        app_id_iv = COALESCE($6, app_id_iv),
+        app_id_tag = COALESCE($7, app_id_tag),
+        encrypted_app_key = COALESCE($8, encrypted_app_key),
+        app_key_iv = COALESCE($9, app_key_iv),
+        app_key_tag = COALESCE($10, app_key_tag),
         updated_at = now()
-      WHERE id = $10 AND user_id = $11
+      WHERE id = $11 AND user_id = $12
       RETURNING *`,
       [
-        updateData.provider_name, updateData.provider_type, updateData.is_active,
+        updateData.provider_name, updateData.provider_type, updateData.is_active, updateData.base_url,
         encryptedAppId, appIdIv, appIdTag,
         encryptedAppKey, appKeyIv, appKeyTag,
         id, userId
@@ -153,7 +155,7 @@ async function getExternalDataProviderById(providerId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT encrypted_app_id, app_id_iv, app_id_tag, encrypted_app_key, app_key_iv, app_key_tag FROM external_data_providers WHERE id = $1',
+      'SELECT encrypted_app_id, app_id_iv, app_id_tag, encrypted_app_key, app_key_iv, app_key_tag, base_url FROM external_data_providers WHERE id = $1',
       [providerId]
     );
     const data = result.rows[0];
@@ -176,7 +178,7 @@ async function getExternalDataProviderById(providerId) {
         log('error', 'Error decrypting app_key for provider:', providerId, e);
       }
     }
-    return { app_id: decryptedAppId, app_key: decryptedAppKey };
+    return { app_id: decryptedAppId, app_key: decryptedAppKey, base_url: data.base_url };
   } finally {
     client.release();
   }

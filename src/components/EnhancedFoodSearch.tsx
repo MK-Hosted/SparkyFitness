@@ -29,6 +29,10 @@ import {
   FatSecretFoodItem,
 } from "@/services/FatSecretService";
 import {
+  searchMealieFoods, // Import searchMealieFoods
+  getMealieFoodDetails, // Import getMealieFoodDetails
+} from "@/services/foodService"; // Assuming these are in foodService.ts
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -367,7 +371,18 @@ const EnhancedFoodSearch = ({
           selectedFoodDataProvider,
         );
         setFatSecretResults(results);
-      } else {
+      } else if (provider?.provider_type === "mealie") {
+        debug(loggingLevel, `EnhancedFoodSearch: Calling searchMealieFoods with provider.id: ${provider.id}`);
+        const results = await searchMealieFoods(
+          searchTerm,
+          provider.base_url, // Use base_url for Mealie URL
+          provider.app_key, // Mealie API Key
+          activeUserId!,
+          provider.id
+        );
+        setFoods(results); // Assuming Mealie results are mapped to Food[]
+      }
+      else {
         toast({
           title: "Error",
           description: "Selected provider type is not supported for search.",
@@ -504,6 +519,26 @@ const EnhancedFoodSearch = ({
         variant: "destructive",
       });
     }
+  };
+
+  const handleMealieEdit = async (food: Food) => {
+    setLoading(true);
+    const provider = foodDataProviders.find(p => p.id === selectedFoodDataProvider);
+    if (!provider) {
+      toast({
+        title: "Error",
+        description: "Could not find the selected food provider.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+    // Since Mealie search results are already in the `Food` format,
+    // we can directly use the food object for the edit dialog.
+    // No need to call getMealieFoodDetails here as the search result should be sufficient.
+    setEditingProduct(food);
+    setShowEditDialog(true);
+    setLoading(false);
   };
 
   const foodSearchPreferences = nutrientDisplayPreferences.find(
@@ -779,11 +814,72 @@ const EnhancedFoodSearch = ({
           hasOnlineSearchBeenPerformed &&
           openFoodFactsResults.length === 0 &&
           nutritionixResults.length === 0 &&
-          fatSecretResults.length === 0 && (
+          fatSecretResults.length === 0 &&
+          foods.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               No foods found from the selected online provider.
             </div>
           )}
+
+        {activeTab === "online" && foods.length > 0 && (
+            foods.map((food) => (
+                <Card
+                    key={`${food.provider_type}-${food.provider_external_id}`}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                    <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                    <h3 className="font-medium">{food.name}</h3>
+                                    {food.brand && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            {food.brand}
+                                        </Badge>
+                                    )}
+                                    <Badge variant="outline" className="text-xs">
+                                        Mealie
+                                    </Badge>
+                                </div>
+                                <div
+                                    className={`grid grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
+                                >
+                                    {visibleNutrients.map((nutrient) => {
+                                        const details = nutrientDetails[nutrient];
+                                        if (!details) return null;
+                                        const value =
+                                            (food.default_variant?.[
+                                                nutrient as keyof FoodVariant
+                                            ] as number) || 0;
+                                        return (
+                                            <span key={nutrient}>
+                                                <strong>
+                                                    {value.toFixed(nutrient === "calories" ? 0 : 1)}
+                                                    {details.unit}
+                                                </strong>{" "}
+                                                {details.label}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Per {food.default_variant?.serving_size}
+                                    {food.default_variant?.serving_unit}
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                onClick={() => handleMealieEdit(food)}
+                                className="ml-2"
+                            >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit & Add
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))
+        )}
 
         {activeTab === "database" &&
           searchTerm.trim() !== "" &&
@@ -1071,7 +1167,7 @@ const EnhancedFoodSearch = ({
           ))}
       </div>
 
-      {/* Edit Dialog for OpenFoodFacts products */}
+      {/* Edit Dialog for OpenFoodFacts, Nutritionix, FatSecret, and Mealie products */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1083,13 +1179,17 @@ const EnhancedFoodSearch = ({
           {editingProduct && (
             <EnhancedCustomFoodForm
               food={
+                // If it's an OpenFoodFacts product, convert it
                 editingProduct && "product_name" in editingProduct
-                  ? convertOpenFoodFactsToFood(
-                      editingProduct as OpenFoodFactsProduct,
-                    )
-                  : (editingProduct as Food)
+                  ? convertOpenFoodFactsToFood(editingProduct as OpenFoodFactsProduct)
+                  : // Otherwise, assume it's already a Food type (from Nutritionix, FatSecret, or Mealie)
+                    (editingProduct as Food)
               }
-              initialVariants={(editingProduct as Food).variants} // Pass the variants array
+              initialVariants={
+                editingProduct && "variants" in editingProduct
+                  ? (editingProduct as Food).variants
+                  : undefined
+              } // Pass the variants array if available
               onSave={handleSaveEditedFood}
             />
           )}

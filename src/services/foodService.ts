@@ -4,6 +4,15 @@ import { Food, FoodDeletionImpact, FoodSearchResult, FoodVariant } from '@/types
 
 export type FoodFilter = 'all' | 'mine' | 'family' | 'public';
 
+export interface ExternalDataProvider {
+  id: string;
+  provider_name: string;
+  provider_type: 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie';
+  app_id: string | null;
+  app_key: string | null;
+  is_active: boolean;
+}
+
 interface FoodPayload {
   name: string;
   brand?: string;
@@ -120,4 +129,55 @@ export const updateFood = async (id: string, payload: Partial<FoodPayload>): Pro
     method: 'PUT',
     body: payload,
   });
+};
+
+export const getFoodDataProviders = async (userId: string): Promise<ExternalDataProvider[]> => {
+  console.log('Calling getFoodDataProviders for userId:', userId); // Added log
+  const response = await apiCall(`/external-providers/user/${userId}`, {
+    method: 'GET',
+  });
+  console.log('Response from getFoodDataProviders:', response); // Added log
+  return response;
+};
+
+export const searchMealieFoods = async (
+  query: string,
+  baseUrl: string,
+  apiKey: string,
+  userId: string,
+  providerId: string
+): Promise<Food[]> => {
+  const params = new URLSearchParams();
+  params.append('query', query);
+
+  const response = await apiCall(`/foods/mealie/search?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'x-mealie-base-url': baseUrl,
+      'x-mealie-api-key': apiKey,
+      'x-provider-id': providerId,
+    },
+  });
+  return response;
+};
+
+export const getMealieFoodDetails = async (
+  slug: string,
+  baseUrl: string,
+  apiKey: string,
+  userId: string,
+  providerId: string
+): Promise<Food | null> => {
+  const params = new URLSearchParams();
+  params.append('slug', slug);
+
+  const response = await apiCall(`/foods/mealie/details?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'x-mealie-base-url': baseUrl,
+      'x-mealie-api-key': apiKey,
+      'x-provider-id': providerId,
+    },
+  });
+  return response;
 };
