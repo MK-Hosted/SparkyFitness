@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -270,6 +270,17 @@ const EnhancedCustomFoodForm = ({
         is_locked: false, // New variants are not locked
       },
     ]);
+  };
+
+  const duplicateVariant = (index: number) => {
+    const variantToDuplicate = variants[index];
+    const newVariant: FoodVariant = {
+      ...variantToDuplicate,
+      id: undefined, // New variant should not have an ID
+      is_default: false, // New variant is not default
+      is_locked: false, // New variant is not locked
+    };
+    setVariants([...variants, newVariant]);
   };
 
   const removeVariant = (index: number) => {
@@ -595,17 +606,28 @@ const EnhancedCustomFoodForm = ({
                       </div>
                     </div>
 
-                    {index > 0 && ( // Only allow removing non-primary units
+                    <div className="flex items-center gap-2 ml-auto sm:ml-0">
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeVariant(index)}
-                        className="ml-auto sm:ml-0" // Push to right on mobile, align left on sm
+                        onClick={() => duplicateVariant(index)}
+                        title="Duplicate Unit"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Copy className="w-4 h-4" />
                       </Button>
-                    )}
+                      {index > 0 && ( // Only allow removing non-primary units
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariant(index)}
+                          title="Remove Unit"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Nutrition for this specific variant */}
