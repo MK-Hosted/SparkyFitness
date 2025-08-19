@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar as CalendarIcon } from "lucide-react"; // Import CalendarIcon
 import { Calendar } from "@/components/ui/calendar"; // Import Calendar component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
-import { Save, Upload, User, Settings as SettingsIcon, Lock, Camera, ClipboardCopy, Copy, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
+import { Save, Upload, User, Settings as SettingsIcon, Lock, Camera, ClipboardCopy, Copy, Eye, EyeOff, KeyRound, Trash2, Droplet, ListChecks, Users, Tag, Cloud, Sparkles } from "lucide-react";
 import { apiCall } from '@/services/api'; // Assuming a common API utility
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePre
 import NutrientDisplaySettings from "./NutrientDisplaySettings"; // Import NutrientDisplaySettings
 import WaterContainerManager from "./WaterContainerManager"; // Import WaterContainerManager
 import { parse } from "date-fns"; // Import parse for parsing user-entered date strings
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"; // Import Accordion components
 
 interface Profile {
   id: string;
@@ -423,442 +424,489 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-2 mb-6">
-        <SettingsIcon className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Settings</h1>
-      </div>
-
-      {/* Profile Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+    <div className="space-y-6 w-full">
+      {/* Removed redundant Settings heading */}
+      <Accordion type="multiple" className="w-full">
+        {/* Profile Information */}
+        <AccordionItem value="profile-information" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Manage your personal information and profile picture"
+          >
             <User className="h-5 w-5" />
             Profile Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Profile Picture */}
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name || 'User'} />
-              <AvatarFallback className="text-lg">
-                {getInitials(profile?.full_name)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <Label htmlFor="avatar-upload" className="cursor-pointer">
-                <Button variant="outline" size="sm" disabled={uploadingImage} asChild>
-                  <span>
-                    <Camera className="h-4 w-4 mr-2" />
-                    {uploadingImage ? 'Uploading...' : 'Change Photo'}
-                  </span>
-                </Button>
-              </Label>
-              <Input
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                PNG, JPG up to 5MB
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                value={profileForm.full_name}
-                onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
-                placeholder="Enter your full name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                value={profileForm.phone}
-                onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Enter your phone number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="date_of_birth">Date of Birth</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {profileForm.date_of_birth ? (
-                      <span>{formatDate(profileForm.date_of_birth)}</span> // Format for display
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0 space-y-6">
+            {/* Profile Picture */}
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name || 'User'} />
+                <AvatarFallback className="text-lg">
+                  {getInitials(profile?.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <Label htmlFor="avatar-upload" className="cursor-pointer">
+                  <Button variant="outline" size="sm" disabled={uploadingImage} asChild>
+                    <span>
+                      <Camera className="h-4 w-4 mr-2" />
+                      {uploadingImage ? 'Uploading...' : 'Change Photo'}
+                    </span>
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={profileForm.date_of_birth ? parseISO(profileForm.date_of_birth) : undefined} // Parse YYYY-MM-DD string to Date object
-                    onSelect={(date) => {
-                      setProfileForm(prev => ({
-                        ...prev,
-                        date_of_birth: date ? formatDateToYYYYMMDD(date) : '' // Store as YYYY-MM-DD string
-                      }));
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+                </Label>
+                <Input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG up to 5MB
+                </p>
+              </div>
             </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                value={profileForm.bio}
-                onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
-                placeholder="Tell us about yourself"
-                rows={3}
-              />
-            </div>
-          </div>
 
-          <Button onClick={handleProfileUpdate} disabled={loading}>
-            <Save className="h-4 w-4 mr-2" />
-            {loading ? 'Saving...' : 'Save Profile'}
-          </Button>
-        </CardContent>
-      </Card>
+            <Separator />
 
-      {/* User Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Preferences
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="date_format">Date Format</Label>
-              <Select
-                value={dateFormat}
-                onValueChange={setDateFormat}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MM/dd/yyyy">MM/dd/yyyy (12/25/2024)</SelectItem>
-                  <SelectItem value="dd/MM/yyyy">dd/MM/yyyy (25/12/2024)</SelectItem>
-                  <SelectItem value="dd-MMM-yyyy">dd-MMM-yyyy (25-Dec-2024)</SelectItem>
-                  <SelectItem value="yyyy-MM-dd">yyyy-MM-dd (2024-12-25)</SelectItem>
-                  <SelectItem value="MMM dd, yyyy">MMM dd, yyyy (Dec 25, 2024)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="weight_unit">Weight Unit</Label>
-              <Select
-                value={weightUnit}
-                onValueChange={setWeightUnit}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                  <SelectItem value="lbs">Pounds (lbs)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="measurement_unit">Measurement Unit</Label>
-              <Select
-                value={measurementUnit}
-                onValueChange={setMeasurementUnit}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cm">Centimeters (cm)</SelectItem>
-                  <SelectItem value="inches">Inches (in)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="logging_level">Minimum Logging Level</Label>
-              <Select
-                value={loggingLevel}
-                onValueChange={setLoggingLevel}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DEBUG">DEBUG (Most Detailed)</SelectItem>
-                  <SelectItem value="INFO">INFO</SelectItem>
-                  <SelectItem value="WARN">WARN</SelectItem>
-                  <SelectItem value="ERROR">ERROR</SelectItem>
-                  <SelectItem value="SILENT">SILENT (No Logs)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="item_display_limit">Recent/Top Limit</Label>
-              <Select
-                value={String(itemDisplayLimit)}
-                onValueChange={(value) => setItemDisplayLimit(Number(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 items</SelectItem>
-                  <SelectItem value="10">10 items</SelectItem>
-                  <SelectItem value="15">15 items</SelectItem>
-                  <SelectItem value="20">20 items</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <Button onClick={handlePreferencesUpdate} disabled={loading}>
-            <Save className="h-4 w-4 mr-2" />
-            {loading ? 'Saving...' : 'Save Preferences'}
-          </Button>
-         </CardContent>
-       </Card>
-
-      {/* Water Tracking Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Water Tracking
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-           <div>
-             <Label htmlFor="water_display_unit">Water Display Unit</Label>
-             <Select
-               value={water_display_unit}
-               onValueChange={setWaterDisplayUnit}
-             >
-               <SelectTrigger>
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="ml">Milliliters (ml)</SelectItem>
-                 <SelectItem value="oz">Fluid Ounces (oz)</SelectItem>
-                 <SelectItem value="cup">Cups</SelectItem>
-               </SelectContent>
-             </Select>
-
-           </div>
-           <Button onClick={handlePreferencesUpdate} disabled={loading}>
-            <Save className="h-4 w-4 mr-2" />
-            {loading ? 'Saving...' : 'Save Water Display Unit'}
-            </Button>
-           <Separator />
-           <WaterContainerManager />
-        </CardContent>
-      </Card>
- 
-      {/* Nutrient Display Settings */}
-      <NutrientDisplaySettings />
-
-       {/* Family Access Management */}
-       <FamilyAccessManager />
-
-      {/* Custom Categories Management */}
-      <CustomCategoryManager
-        categories={customCategories}
-        onCategoriesChange={setCustomCategories}
-      />
-
-      {/* Food Data Provider Settings */}
-      <ExternalProviderSettings />
-
-      {/* AI Service Settings */}
-      <AIServiceSettings />
-
-      {/* API Key Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5" />
-            API Key Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Generate API keys to securely submit data from external applications like iPhone Shortcuts.
-            These keys are tied to your account and can be revoked at any time.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              placeholder="Description (e.g., 'iPhone Health Shortcut')"
-              value={newApiKeyDescription}
-              onChange={(e) => setNewApiKeyDescription(e.target.value)}
-              className="flex-grow"
-            />
-            <Button onClick={handleGenerateApiKey} disabled={generatingApiKey}>
-              <Save className="h-4 w-4 mr-2" />
-              {generatingApiKey ? 'Generating...' : 'Generate New Key'}
-            </Button>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3">
-            {apiKeys.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No API keys generated yet.</p>
-            ) : (
-              apiKeys.map((key) => (
-                <div key={key.id} className="flex items-center space-x-2 p-2 border rounded-md">
-                  <div className="flex-grow">
-                    <p className="font-medium">{key.description || 'No Description'}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-mono text-xs">
-                        {showApiKey === key.id ? key.api_key : '********************'}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowApiKey(showApiKey === key.id ? null : key.id)}
-                        className="h-auto p-1"
-                      >
-                        {showApiKey === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(key.api_key);
-                          toast({ title: "Copied!", description: "API key copied to clipboard." });
-                        }}
-                        className="h-auto p-1"
-                      >
-                        <ClipboardCopy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Created: {new Date(key.created_at).toLocaleDateString()}
-                      {key.last_used_at && ` | Last Used: ${new Date(key.last_used_at).toLocaleDateString()}`}
-                      {/* Removed Inactive status as per user request */}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDeleteApiKey(key.id)}
-                    disabled={loading}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Account Security */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
-            Account Security
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Email Change */}
-          <div>
-            <Label htmlFor="current_email">Current Email</Label>
-            <div className="flex gap-2">
-              <Input
-                id="current_email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Enter new email address"
-              />
-              <Button onClick={handleEmailChange} disabled={loading} variant="outline">
-                Update Email
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              You'll need to verify your new email address
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Password Change */}
-          <form onSubmit={(e) => { e.preventDefault(); handlePasswordChange(); }} className="space-y-4">
-            <h3 className="text-lg font-medium">Change Password</h3>
-            {/* Hidden username field for password managers */}
-            <Input
-              type="text"
-              id="username"
-              name="username"
-              autoComplete="username"
-              className="hidden"
-              tabIndex={-1}
-              aria-hidden="true"
-              value={user?.email || ''} // Pre-fill with user's email if available
-              readOnly
-            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="new_password">New Password</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <Input
-                  id="new_password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwordForm.new_password}
-                  onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                  placeholder="Enter new password"
+                  id="full_name"
+                  value={profileForm.full_name}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                  placeholder="Enter your full name"
                 />
               </div>
               <div>
-                <Label htmlFor="confirm_password">Confirm New Password</Label>
+                <Label htmlFor="phone">Phone Number</Label>
                 <Input
-                  id="confirm_password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwordForm.confirm_password}
-                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                  placeholder="Confirm new password"
+                  id="phone"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="date_of_birth">Date of Birth</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {profileForm.date_of_birth ? (
+                        <span>{formatDate(profileForm.date_of_birth)}</span> // Format for display
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={profileForm.date_of_birth ? parseISO(profileForm.date_of_birth) : undefined} // Parse YYYY-MM-DD string to Date object
+                      onSelect={(date) => {
+                        setProfileForm(prev => ({
+                          ...prev,
+                          date_of_birth: date ? formatDateToYYYYMMDD(date) : '' // Store as YYYY-MM-DD string
+                        }));
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
+                  placeholder="Tell us about yourself"
+                  rows={3}
                 />
               </div>
             </div>
-            <Button
-              type="submit"
-              disabled={loading || !passwordForm.new_password || !passwordForm.confirm_password}
-            >
-              <Lock className="h-4 w-4 mr-2" />
-              {loading ? 'Updating...' : 'Update Password'}
+
+            <Button onClick={handleProfileUpdate} disabled={loading}>
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Profile'}
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </AccordionContent>
+        </AccordionItem>
 
+        <AccordionItem value="user-preferences" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Customize your app settings and display preferences"
+          >
+            <SettingsIcon className="h-5 w-5" />
+            Preferences
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="date_format">Date Format</Label>
+                <Select
+                  value={dateFormat}
+                  onValueChange={setDateFormat}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MM/dd/yyyy">MM/dd/yyyy (12/25/2024)</SelectItem>
+                    <SelectItem value="dd/MM/yyyy">dd/MM/yyyy (25/12/2024)</SelectItem>
+                    <SelectItem value="dd-MMM-yyyy">dd-MMM-yyyy (25-Dec-2024)</SelectItem>
+                    <SelectItem value="yyyy-MM-dd">yyyy-MM-dd (2024-12-25)</SelectItem>
+                    <SelectItem value="MMM dd, yyyy">MMM dd, yyyy (Dec 25, 2024)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="weight_unit">Weight Unit</Label>
+                <Select
+                  value={weightUnit}
+                  onValueChange={setWeightUnit}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                    <SelectItem value="lbs">Pounds (lbs)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="measurement_unit">Measurement Unit</Label>
+                <Select
+                  value={measurementUnit}
+                  onValueChange={setMeasurementUnit}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cm">Centimeters (cm)</SelectItem>
+                    <SelectItem value="inches">Inches (in)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="logging_level">Minimum Logging Level</Label>
+                <Select
+                  value={loggingLevel}
+                  onValueChange={setLoggingLevel}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DEBUG">DEBUG (Most Detailed)</SelectItem>
+                    <SelectItem value="INFO">INFO</SelectItem>
+                    <SelectItem value="WARN">WARN</SelectItem>
+                    <SelectItem value="ERROR">ERROR</SelectItem>
+                    <SelectItem value="SILENT">SILENT (No Logs)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="item_display_limit">Recent/Top Limit</Label>
+                <Select
+                  value={String(itemDisplayLimit)}
+                  onValueChange={(value) => setItemDisplayLimit(Number(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 items</SelectItem>
+                    <SelectItem value="10">10 items</SelectItem>
+                    <SelectItem value="15">15 items</SelectItem>
+                    <SelectItem value="20">20 items</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button onClick={handlePreferencesUpdate} disabled={loading}>
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Preferences'}
+            </Button>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="water-tracking" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Configure your water intake tracking settings"
+          >
+            <Droplet className="h-5 w-5" />
+            Water Tracking
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0 space-y-4">
+            <div>
+              <Label htmlFor="water_display_unit">Water Display Unit</Label>
+              <Select
+                value={water_display_unit}
+                onValueChange={setWaterDisplayUnit}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ml">Milliliters (ml)</SelectItem>
+                  <SelectItem value="oz">Fluid Ounces (oz)</SelectItem>
+                  <SelectItem value="cup">Cups</SelectItem>
+                </SelectContent>
+              </Select>
+
+            </div>
+            <Button onClick={handlePreferencesUpdate} disabled={loading}>
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Water Display Unit'}
+            </Button>
+            <Separator />
+            <WaterContainerManager />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="nutrient-display" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Choose which nutrients to display in food and meal views"
+          >
+            <ListChecks className="h-5 w-5" />
+            Nutrient Display
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <NutrientDisplaySettings />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="family-access" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Manage access to your data for family members"
+          >
+            <Users className="h-5 w-5" />
+            Family Access
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <FamilyAccessManager />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="custom-categories" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Create and manage custom measurement categories"
+          >
+            <Tag className="h-5 w-5" />
+            Custom Categories
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <CustomCategoryManager
+              categories={customCategories}
+              onCategoriesChange={setCustomCategories}
+            />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="food-data-providers" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Configure external food data sources like Mealie and Nutritionix"
+          >
+            <Cloud className="h-5 w-5" />
+            Food Data Providers
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <ExternalProviderSettings />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="ai-service" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Manage settings for AI-powered features"
+          >
+            <Sparkles className="h-5 w-5" />
+            AI Service
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <AIServiceSettings />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="api-key-management" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Generate and manage API keys for external integrations"
+          >
+            <KeyRound className="h-5 w-5" />
+            API Key Management
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Generate API keys to securely submit data from external applications like iPhone Shortcuts.
+              These keys are tied to your account and can be revoked at any time.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                placeholder="Description (e.g., 'iPhone Health Shortcut')"
+                value={newApiKeyDescription}
+                onChange={(e) => setNewApiKeyDescription(e.target.value)}
+                className="flex-grow"
+              />
+              <Button onClick={handleGenerateApiKey} disabled={generatingApiKey}>
+                <Save className="h-4 w-4 mr-2" />
+                {generatingApiKey ? 'Generating...' : 'Generate New Key'}
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              {apiKeys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No API keys generated yet.</p>
+              ) : (
+                apiKeys.map((key) => (
+                  <div key={key.id} className="flex items-center space-x-2 p-2 border rounded-md">
+                    <div className="flex-grow">
+                      <p className="font-medium">{key.description || 'No Description'}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="font-mono text-xs">
+                          {showApiKey === key.id ? key.api_key : '********************'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowApiKey(showApiKey === key.id ? null : key.id)}
+                          className="h-auto p-1"
+                        >
+                          {showApiKey === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(key.api_key);
+                            toast({ title: "Copied!", description: "API key copied to clipboard." });
+                          }}
+                          className="h-auto p-1"
+                        >
+                          <ClipboardCopy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Created: {new Date(key.created_at).toLocaleDateString()}
+                        {key.last_used_at && ` | Last Used: ${new Date(key.last_used_at).toLocaleDateString()}`}
+                        {/* Removed Inactive status as per user request */}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDeleteApiKey(key.id)}
+                      disabled={loading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="account-security" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Change your email or password"
+          >
+            <Lock className="h-5 w-5" />
+            Account Security
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0 space-y-6">
+            {/* Email Change */}
+            <div>
+              <Label htmlFor="current_email">Current Email</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="current_email"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter new email address"
+                />
+                <Button onClick={handleEmailChange} disabled={loading} variant="outline">
+                  Update Email
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                You'll need to verify your new email address
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Password Change */}
+            <form onSubmit={(e) => { e.preventDefault(); handlePasswordChange(); }} className="space-y-4">
+              <h3 className="text-lg font-medium">Change Password</h3>
+              {/* Hidden username field for password managers */}
+              <Input
+                type="text"
+                id="username"
+                name="username"
+                autoComplete="username"
+                className="hidden"
+                tabIndex={-1}
+                aria-hidden="true"
+                value={user?.email || ''} // Pre-fill with user's email if available
+                readOnly
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="new_password">New Password</Label>
+                  <Input
+                    id="new_password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwordForm.new_password}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Input
+                    id="confirm_password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwordForm.confirm_password}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+              <Button
+                type="submit"
+                disabled={loading || !passwordForm.new_password || !passwordForm.confirm_password}
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                {loading ? 'Updating...' : 'Update Password'}
+              </Button>
+            </form>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
