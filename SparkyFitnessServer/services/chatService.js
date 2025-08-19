@@ -339,7 +339,7 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           },
           body: JSON.stringify({
             model: model,
-            messages: messages,
+            messages: messagesForAI,
             temperature: 0.7,
           }),
         });

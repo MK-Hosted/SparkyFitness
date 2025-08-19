@@ -300,7 +300,14 @@ const AIServiceSettings = () => {
   };
 
   const getServiceTypes = () => [
-    { value: "google", label: "Google Gemini" }
+    { value: "openai", label: "OpenAI" },
+    { value: "openai_compatible", label: "OpenAI Compatible" },
+    { value: "anthropic", label: "Anthropic" },
+    { value: "google", label: "Google Gemini" },
+    { value: "mistral", label: "Mistral AI" },
+    { value: "groq", label: "Groq" },
+    { value: "ollama", label: "Ollama" },
+    { value: "custom", label: "Custom" }
   ];
 
   const getModelOptions = (serviceType: string) => {
@@ -340,10 +347,11 @@ const AIServiceSettings = () => {
         ];
       case 'groq':
         return [
-          'llama3-8b-8192',
-          'llama3-70b-8192',
-          'mixtral-8x7b-32768',
-          'gemma-7b-it'
+          'llama-3.1-8b-instant',
+          'llama-3.3-70b-versatile',
+          'meta-llama/llama-guard-4-12b',
+          'whisper-large-v3',
+          'whisper-large-v3-turbo'
         ];
       default:
         return [];
@@ -397,6 +405,9 @@ const AIServiceSettings = () => {
             <Bot className="h-5 w-5" />
             AI Services
           </CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Note: Not all AI models and services have been fully tested for all features. Please verify functionality after configuration.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Add New Service Button */}
