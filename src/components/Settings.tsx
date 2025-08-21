@@ -20,6 +20,7 @@ import FamilyAccessManager from "./FamilyAccessManager";
 import AIServiceSettings from "./AIServiceSettings";
 import CustomCategoryManager from "./CustomCategoryManager";
 import ExternalProviderSettings from "./ExternalProviderSettings"; // Import ExternalProviderSettings
+import GarminConnectSettings from "./GarminConnectSettings"; // Import GarminConnectSettings
 import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePreferences
 import NutrientDisplaySettings from "./NutrientDisplaySettings"; // Import NutrientDisplaySettings
 import WaterContainerManager from "./WaterContainerManager"; // Import WaterContainerManager
@@ -729,6 +730,19 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
           </AccordionTrigger>
           <AccordionContent className="p-4 pt-0">
             <ExternalProviderSettings />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="garmin-connect" className="border rounded-lg mb-4">
+          <AccordionTrigger
+            className="flex items-center gap-2 p-4 hover:no-underline"
+            description="Connect and synchronize data with Garmin Connect"
+          >
+            <Cloud className="h-5 w-5" /> {/* Using Cloud icon for now, consider a specific Garmin icon if available */}
+            Garmin Connect
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <GarminConnectSettings />
           </AccordionContent>
         </AccordionItem>
 
