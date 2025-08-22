@@ -292,7 +292,7 @@ const ExerciseDatabaseManager = () => {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteRequest(exercise)}
-                    className="h-8 w-8 hover:bg-gray-200"
+                    className="h-8 w-8 hover:bg-gray-200 dark:hover:bg-gray-800"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

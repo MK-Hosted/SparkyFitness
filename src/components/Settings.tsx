@@ -652,7 +652,7 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
             Water Tracking
           </AccordionTrigger>
           <AccordionContent className="p-4 pt-0 space-y-4">
-            <div>
+            <div className="grid gap-1.5">
               <Label htmlFor="water_display_unit">Water Display Unit</Label>
               <Select
                 value={water_display_unit}

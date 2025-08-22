@@ -354,7 +354,7 @@ const ExerciseCard = ({
             {exerciseEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center justify-between p-4 bg-gray-100 rounded-md"
+                className="flex items-center justify-between p-4 bg-gray-100 rounded-md dark:bg-gray-800"
               >
                 <div className="flex items-center">
                   <Dumbbell className="w-5 h-5 mr-2" />
@@ -398,7 +398,7 @@ const ExerciseCard = ({
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDelete(entry.id)}
-                    className="h-8 w-8 hover:bg-gray-200"
+                    className="h-8 w-8 hover:bg-gray-200 dark:hover:bg-gray-800"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -699,7 +699,7 @@ const ExerciseCard = ({
               </Button>
               <Button
                 variant="ghost"
-                className="mt-2 px-4 py-2 text-gray-500 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                className="mt-2 px-4 py-2 text-gray-500 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:focus:ring-gray-700"
                 onClick={() => setShowDurationDialog(false)}
               >
                 Cancel
