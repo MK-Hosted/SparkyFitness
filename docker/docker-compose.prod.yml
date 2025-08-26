@@ -42,19 +42,20 @@ services:
     depends_on:
       - sparkyfitness-server # Frontend depends on the server
   
-  sparkyfitness-garmin:
-    image: codewithcj/garmin_microservice:latest
-    container_name: sparkyfitness-garmin
-    environment:
-      GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000
-    networks:
-      - sparkyfitness-network
-    restart: unless-stopped
-    volumes:
-      - ../SparkyFitnessGarmin:/app
-    depends_on:
-      - sparkyfitness-db
-      - sparkyfitness-server
+  # Garmin integration is still work in progress. Enable once table is ready.
+  # sparkyfitness-garmin:
+  #   image: codewithcj/garmin_microservice:latest
+  #   container_name: sparkyfitness-garmin
+  #   environment:
+  #     GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000
+  #   networks:
+  #     - sparkyfitness-network
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ../SparkyFitnessGarmin:/app
+  #   depends_on:
+  #     - sparkyfitness-db
+  #     - sparkyfitness-server
 
 networks:
   sparkyfitness-network:
