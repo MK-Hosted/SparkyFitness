@@ -122,3 +122,6 @@ SparkyFitnessMobile/docs/SampleApp/*
 # Keystore
 *.keystore
 SparkyFitnessMobile/android/keystores/
+
+# Python bytecode
+__pycache__/

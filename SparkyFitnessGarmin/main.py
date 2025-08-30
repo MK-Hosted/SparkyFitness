@@ -110,13 +110,7 @@ async def get_daily_summary(request: Request):
         logger.debug(f"Garth oauth1_token: {garmin.garth.oauth1_token}")
         logger.debug(f"Garth oauth2_token: {garmin.garth.oauth2_token}")
         logger.debug(f"OAuth2 Token Expires At: {garmin.garth.oauth2_token.expires_at}")
-        # Add necessary scopes for daily summary data
-        current_scopes = set(garmin.garth.oauth2_token.scope)
-        current_scopes.add("WELLNESS_READ")
-        current_scopes.add("ACTIVITY_READ")
-        garmin.garth.oauth2_token.scope = list(current_scopes)
-
-        logger.debug(f"OAuth2 Token Scopes (modified): {garmin.garth.oauth2_token.scope}")
+        logger.debug(f"OAuth2 Token Scopes: {garmin.garth.oauth2_token.scope}")
 
         # Explicitly fetch the user's profile to get the display name
         # The garminconnect library's get_user_summary expects only the date argument.
