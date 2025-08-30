@@ -14,7 +14,7 @@ const ServerConfig = ({ url, setUrl, apiKey, setApiKey, handleSaveConfig, server
           <View style={styles.inputWithIcon}>
             <TextInput
               style={[styles.input, { flex: 1, borderWidth: 0 }]}
-              placeholder="https://api.healthsync.com"
+              placeholder="https://your-server-url.com"
               value={url}
               onChangeText={setUrl}
               autoCapitalize="none"

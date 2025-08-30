@@ -11,8 +11,6 @@ import {
   aggregateActiveCaloriesByDate,
   readHeartRateRecords,
   aggregateHeartRateByDate,
-  readActiveMinutesRecords,
-  aggregateActiveMinutesByDate,
   loadHealthPreference,
   saveStringPreference,
   loadStringPreference,
@@ -137,11 +135,6 @@ const MainScreen = ({ navigation }) => {
             records = await readHeartRateRecords(startDate, endDate);
             aggregatedValue = aggregateHeartRateByDate(records).reduce((sum, record) => sum + record.value, 0);
             newHealthData[metric.id] = aggregatedValue > 0 ? `${Math.round(aggregatedValue)} bpm` : '0 bpm';
-            break;
-          case 'activeMinutes':
-            records = await readActiveMinutesRecords(startDate, endDate);
-            aggregatedValue = aggregateActiveMinutesByDate(records).reduce((sum, record) => sum + record.value, 0);
-            newHealthData[metric.id] = aggregatedValue > 0 ? `${Math.round(aggregatedValue)} min` : '0 min';
             break;
           // Add cases for other health metrics as needed
           default:

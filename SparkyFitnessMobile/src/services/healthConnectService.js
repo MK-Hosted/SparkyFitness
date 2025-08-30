@@ -4,7 +4,6 @@ import {
   readRecords,
   // Add new record types as needed
   HeartRateRecord,
-  ActiveMinutesRecord,
   WeightRecord,
   BloodPressureRecord,
   NutritionRecord,
@@ -222,46 +221,6 @@ export const aggregateHeartRateByDate = (records) => {
   }));
 };
 
-/**
- * Reads active minutes records for a given date range.
- * @param {Date} startDate - The start date of the range.
- * @param {Date} endDate - The end date of the range.
- * @returns {Promise<Array>} An array of active minutes records.
- */
-export const readActiveMinutesRecords = async (startDate, endDate) => readHealthRecords('ActiveMinutesRecord', startDate, endDate);
-
-/**
- * Aggregates active minutes records by date.
- * @param {Array} records - An array of active minutes records from Health Connect.
- * @returns {Array} An array of objects, where each object has a date and the total active minutes for that date.
- */
-export const aggregateActiveMinutesByDate = (records) => {
-  if (!Array.isArray(records)) {
-    addLog(`[HealthConnectService] aggregateActiveMinutesByDate received non-array records: ${JSON.stringify(records)}`);
-    console.warn('aggregateActiveMinutesByDate received non-array records:', records);
-    return [];
-  }
-  addLog(`[HealthConnectService] Input records for active minutes aggregation: ${JSON.stringify(records)}`);
-
-  const aggregatedData = records.reduce((acc, record) => {
-    const date = record.startTime.split('T')[0];
-    const activeMinutes = typeof record.activeTime === 'number' ? record.activeTime / 60000 : 0; // Convert milliseconds to minutes
-
-    if (!acc[date]) {
-      acc[date] = 0;
-    }
-    acc[date] += activeMinutes;
-
-    return acc;
-  }, {});
-  addLog(`[HealthConnectService] Aggregated active minutes data: ${JSON.stringify(aggregatedData)}`);
-
-  return Object.keys(aggregatedData).map(date => ({
-    date,
-    value: Math.round(aggregatedData[date]),
-    type: 'active_minutes',
-  }));
-};
 
 /**
  * Aggregates step records by date.
