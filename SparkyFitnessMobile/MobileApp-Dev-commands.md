@@ -20,6 +20,25 @@ cd android && ./gradlew clean && ./gradlew assembleRelease && cd ..
 
 
 
+## SDK Location (local.properties)
+
+If you encounter an "SDK location not found" error when building the Android app, you need to create a `local.properties` file in the `SparkyFitnessMobile/android/` directory. This file specifies the path to your Android SDK.
+
+1.  Create the file: `SparkyFitnessMobile/android/local.properties`
+2.  Add the following line to the file, replacing `YOUR_ANDROID_SDK_PATH` with the actual path to your Android SDK:
+
+    ```
+    sdk.dir=YOUR_ANDROID_SDK_PATH
+    ```
+
+    Example for Windows:
+    `sdk.dir=C\:\\Users\\YourUsername\\AppData\\Local\\Android\\Sdk`
+
+    Example for macOS/Linux:
+    `sdk.dir=/Users/YourUsername/Library/Android/sdk`
+
+    Note: The backslashes in the Windows path need to be escaped with an additional backslash.
+
 adb logcat --clear
 adb logcat -s "ReactNative" "HealthConnect" "SparkyFitnessMobile" *:E
 

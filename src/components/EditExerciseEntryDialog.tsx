@@ -95,7 +95,7 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
              id="exercise-name"
              value={entry.exercises?.name || "Unknown Exercise"}
              disabled
-             className="bg-gray-100"
+             className="bg-gray-100 dark:bg-gray-800"
            />
          </div>
          

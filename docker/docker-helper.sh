@@ -101,9 +101,9 @@ case $ACTION in
     "up")
         echo "Starting services..."
         if [ "$ENVIRONMENT" = "dev" ]; then
-            docker-compose -f "$COMPOSE_FILE" up --build -d
+            docker compose -f "$COMPOSE_FILE" up --build -d
         else
-            docker-compose -f "$COMPOSE_FILE" up -d
+            docker compose -f "$COMPOSE_FILE" up -d
         fi
         echo "✅ Services started successfully!"
         echo ""
@@ -120,25 +120,25 @@ case $ACTION in
         ;;
     "down")
         echo "Stopping services..."
-        docker-compose -f "$COMPOSE_FILE" down
+        docker compose -f "$COMPOSE_FILE" down
         echo "✅ Services stopped successfully!"
         ;;
     "build")
         echo "Building services..."
-        docker-compose -f "$COMPOSE_FILE" build
+        docker compose -f "$COMPOSE_FILE" build
         echo "✅ Services built successfully!"
         ;;
     "logs")
         echo "Showing logs..."
-        docker-compose -f "$COMPOSE_FILE" logs -f
+        docker compose -f "$COMPOSE_FILE" logs -f
         ;;
     "ps")
         echo "Service status:"
-        docker-compose -f "$COMPOSE_FILE" ps
+        docker compose -f "$COMPOSE_FILE" ps
         ;;
     "clean")
         echo "Cleaning up containers, networks, and images..."
-        docker-compose -f "$COMPOSE_FILE" down --volumes --remove-orphans
+        docker compose -f "$COMPOSE_FILE" down --volumes --remove-orphans
         docker system prune -f
         echo "✅ Cleanup completed!"
         ;;
