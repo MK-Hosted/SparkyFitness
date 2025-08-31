@@ -131,19 +131,27 @@ async function deleteWaterIntake(id, userId) {
 async function upsertCheckInMeasurements(userId, entryDate, measurements) {
   const client = await pool.connect();
   try {
+    let query;
+    let values;
+    const measurementKeys = Object.keys(measurements);
+
+    if (measurementKeys.length === 0) {
+      // If no measurements are provided, and no existing record, there's nothing to do.
+      // If there's an existing record, we don't update it if no new measurements are provided.
+      return null; // Return null if no measurements to update/insert
+    }
+
     const existingRecord = await client.query(
       'SELECT * FROM check_in_measurements WHERE user_id = $1 AND entry_date = $2',
       [userId, entryDate]
     );
 
-    let query;
-    let values;
     if (existingRecord.rows.length > 0) {
-      const fields = Object.keys(measurements).map((key, index) => `${key} = $${index + 3}`).join(', ');
+      const fields = measurementKeys.map((key, index) => `${key} = $${index + 3}`).join(', ');
       values = [userId, entryDate, ...Object.values(measurements), new Date().toISOString()];
       query = `UPDATE check_in_measurements SET ${fields}, updated_at = $${values.length} WHERE user_id = $1 AND entry_date = $2 RETURNING *`;
     } else {
-      const cols = ['user_id', 'entry_date', ...Object.keys(measurements), 'created_at', 'updated_at'];
+      const cols = ['user_id', 'entry_date', ...measurementKeys, 'created_at', 'updated_at'];
       const placeholders = cols.map((_, index) => `$${index + 1}`).join(', ');
       values = [userId, entryDate, ...Object.values(measurements), new Date().toISOString(), new Date().toISOString()];
       query = `INSERT INTO check_in_measurements (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`;

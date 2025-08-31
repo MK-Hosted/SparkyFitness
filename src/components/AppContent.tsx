@@ -13,6 +13,7 @@ import OidcCallback from '@/components/OidcCallback'; // Import OidcCallback
 import Auth from '@/components/Auth'; // Import Auth component
 import MealManagement from './MealManagement'; // Import MealManagement
 import MealPlanCalendar from './MealPlanCalendar'; // Import MealPlanCalendar
+import MoodReports from './reports/MoodReports'; // Import MoodReports
 
 interface AppContentProps {
   onShowAboutDialog: () => void;
@@ -38,6 +39,7 @@ const AppContent: React.FC<AppContentProps> = ({ onShowAboutDialog }) => {
             <Route path="/meals" element={user ? <MealManagement /> : <Navigate to="/" />} />
             <Route path="/meal-plan" element={user ? <MealPlanCalendar /> : <Navigate to="/" />} />
             <Route path="/admin/oidc-settings" element={user ? <AuthenticationSettings /> : <Navigate to="/" />} />
+            <Route path="/reports/mood" element={user ? <MoodReports /> : <Navigate to="/" />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>

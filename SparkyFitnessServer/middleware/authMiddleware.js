@@ -14,17 +14,19 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (token) {
+    log('debug', `Authentication: JWT token found. Verifying...`);
     jwt.verify(token, JWT_SECRET, (err, user) => {
       if (err) {
         log('warn', 'Authentication: Invalid or expired token.', err.message);
         return res.status(403).json({ error: 'Authentication: Invalid or expired token.' });
       }
       req.userId = user.userId; // Attach userId from JWT payload to request
+      log('debug', `Authentication: JWT token valid. User ID: ${req.userId}`);
       next();
     });
   } else if (req.session && req.session.user && req.session.user.userId) {
     // If no JWT token, check for session-based authentication (for OIDC)
-    log('debug', `Session-based authentication: User ID from session: ${req.session.user.userId}`);
+    log('debug', `Authentication: No JWT token found, checking session. User ID from session: ${req.session.user.userId}`);
     req.userId = req.session.user.userId;
     next();
   } else {
@@ -144,7 +146,9 @@ const authorizeAccess = (permissionType, getTargetUserIdFromRequest = null) => {
       );
       client.release();
 
+      log('debug', `Authorization: can_access_user_data result: ${result.rows[0].can_access}`);
       if (result.rows[0].can_access) {
+        log('debug', `Authorization: Access granted for user ${authenticatedUserId} to ${permissionType} data for user ${targetUserId}.`);
         next();
       } else {
         log('warn', `Authorization: User ${authenticatedUserId} denied ${permissionType} access to data for user ${targetUserId}.`);

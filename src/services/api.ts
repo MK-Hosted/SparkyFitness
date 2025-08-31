@@ -42,6 +42,7 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
   };
 
   if (options?.body && typeof options.body === 'object') {
+    debug(userLoggingLevel, `API Call: Request body for ${endpoint}:`, options.body);
     config.body = JSON.stringify(options.body);
   }
 
@@ -64,8 +65,8 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
 
       // Suppress toast for 404 errors if suppress404Toast is true
       if (response.status === 404 && options?.suppress404Toast) {
-        debug(userLoggingLevel, `API call returned 404 for ${endpoint}, toast suppressed. Returning empty array.`);
-        return []; // Return empty array for 404 with suppression
+        debug(userLoggingLevel, `API call returned 404 for ${endpoint}, toast suppressed. Returning null.`);
+        return null; // Return null for 404 with suppression
       } else {
         toast({
           title: "API Error",

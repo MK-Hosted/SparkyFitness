@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import { toast } from "@/hooks/use-toast";
 import CheckInPreferences from "./CheckInPreferences";
+import MoodMeter from "./MoodMeter"; // Import MoodMeter component
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { Trash2 } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
@@ -27,6 +28,7 @@ import {
   CheckInMeasurement,
   CombinedMeasurement,
 } from '@/services/checkInService';
+import { saveMoodEntry, getMoodEntryByDate } from '@/services/moodService'; // Import mood service
 
 
 
@@ -50,6 +52,8 @@ const CheckIn = () => {
   const [waist, setWaist] = useState("");
   const [hips, setHips] = useState("");
   const [steps, setSteps] = useState("");
+  const [mood, setMood] = useState<number | null>(50); // Initialize mood to 50
+  const [moodNotes, setMoodNotes] = useState<string>(""); // New state for mood notes
   const [displayWeightUnit, setDisplayWeightUnit] = useState<'kg' | 'lbs'>(defaultWeightUnit);
   const [displayMeasurementUnit, setDisplayMeasurementUnit] = useState<'cm' | 'inches'>(defaultMeasurementUnit);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
@@ -260,6 +264,20 @@ const CheckIn = () => {
         setSteps("");
       }
 
+      // Load mood entry for the selected date
+      info(loggingLevel, "Fetching mood entry for selectedDate:", selectedDate, "and currentUserId:", currentUserId);
+      const moodEntry = await getMoodEntryByDate(selectedDate);
+      debug(loggingLevel, "CheckIn: Mood entry from getMoodEntryByDate:", moodEntry);
+      if (moodEntry) {
+        info(loggingLevel, "Existing mood entry loaded:", moodEntry);
+        setMood(moodEntry.mood_value);
+        setMoodNotes(moodEntry.notes);
+      } else {
+        info(loggingLevel, "No existing mood entry for this date, setting to default.");
+        setMood(50); // Default mood value
+        setMoodNotes(""); // Clear mood notes
+      }
+
       const customData = await loadExistingCustomMeasurements(selectedDate);
       info(loggingLevel, "Custom measurements loaded for date:", { selectedDate, customData });
       const newCustomValues: {[key: string]: string} = {};
@@ -283,6 +301,24 @@ const CheckIn = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Only save mood entry if mood is explicitly set or notes are provided
+    if (mood !== null || moodNotes.trim() !== '') {
+      try {
+        // Ensure mood is a number, default to 50 if null
+        const moodToSend = mood === null ? 50 : mood;
+        info(loggingLevel, "Attempting to save mood entry with moodToSend:", moodToSend, "and moodNotes:", moodNotes, "and selectedDate:", selectedDate);
+        await saveMoodEntry(moodToSend, moodNotes, selectedDate);
+        info(loggingLevel, "Mood entry saved successfully.");
+      } catch (err) {
+        error(loggingLevel, 'Error saving mood entry:', err);
+        toast({
+          title: "Error",
+          description: "Failed to save mood entry",
+          variant: "destructive",
+        });
+      }
+    }
 
     if (!currentUserId) {
       warn(loggingLevel, "Submit called with no current user ID.");
@@ -382,6 +418,16 @@ const CheckIn = () => {
           // When date changes, reload existing data for the new date
           // This will be triggered by the useEffect hook
         }}
+      />
+
+      {/* Mood Meter Section */}
+      <MoodMeter
+        onMoodChange={(newMood, newNotes) => {
+          setMood(newMood);
+          setMoodNotes(newNotes);
+        }}
+        initialMood={mood}
+        initialNotes={moodNotes}
       />
 
       {/* Check-In Form */}

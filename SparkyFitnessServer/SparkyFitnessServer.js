@@ -25,6 +25,7 @@ const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const externalProviderRoutes = require('./routes/externalProviderRoutes'); // Renamed import
 const garminRoutes = require('./routes/garminRoutes'); // Import Garmin routes
+const moodRoutes = require('./routes/moodRoutes'); // Import Mood routes
 const { router: openidRoutes, initializeOidcClient } = require('./openidRoutes');
 const oidcSettingsRoutes = require('./routes/oidcSettingsRoutes');
 const versionRoutes = require('./routes/versionRoutes');
@@ -131,6 +132,7 @@ app.use('/user', authRoutes);
 app.use('/health', healthRoutes);
 app.use('/external-providers', externalProviderRoutes); // Renamed route for generic data providers
 app.use('/integrations/garmin', garminRoutes); // Add Garmin integration routes
+app.use('/mood', moodRoutes); // Add Mood routes
 app.use('/admin/oidc-settings', oidcSettingsRoutes); // Admin OIDC settings routes
 app.use('/version', versionRoutes); // Version routes
 log('debug', 'Registering /openid routes');
