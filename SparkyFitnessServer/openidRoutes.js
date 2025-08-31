@@ -208,9 +208,26 @@ router.post("/callback", async (req, res, next) => {
     }
     
     log('debug', "Validated ID Token claims:", tokenSet.claims());
- 
-    const claims = tokenSet.claims();
-    // log('info', 'OIDC callback: Received claims:', claims);
+    
+    let claims = tokenSet.claims();
+    let userinfoClaims = {};
+
+    // Explicitly fetch user info from the userinfo_endpoint
+    if (context.client.userinfo) {
+      try {
+        userinfoClaims = await context.client.userinfo(tokenSet.access_token);
+        log('info', 'OIDC DEBUG: Fetched Userinfo Claims:', userinfoClaims);
+        // Merge userinfo claims with id_token claims, prioritizing userinfo claims
+        claims = { ...claims, ...userinfoClaims };
+        log('info', 'OIDC DEBUG: Merged Claims (ID Token + Userinfo):', claims);
+      } catch (userinfoError) {
+        log('error', 'OIDC DEBUG: Failed to fetch userinfo from endpoint:', userinfoError.message);
+        // Continue with claims from id_token if userinfo fetch fails
+      }
+    } else {
+      log('debug', 'OIDC DEBUG: userinfo_endpoint not available or client not configured for it.');
+    }
+
     const userEmail = (claims.email || claims.preferred_username)?.toLowerCase();
     const oidcSub = claims.sub;
 
