@@ -111,13 +111,17 @@ async function handleGarminTokens(userId, tokensB64) {
     }
 }
 
-async function getGarminDailySummary(userId, tokensB64, date) {
+async function getGarminDailySummary(userId, date) {
     try {
-        log('debug', `getGarminDailySummary: Sending tokensB64 (masked) to microservice: ${tokensB64 ? tokensB64.substring(0, 30) + '...' : 'N/A'}`);
-        log('debug', `getGarminDailySummary: Sending tokensB64 (masked) to microservice: ${tokensB64 ? tokensB64.substring(0, 30) + '...' : 'N/A'}`);
+        const provider = await externalProviderRepository.getExternalDataProviderByUserIdAndProviderName(userId, 'garmin');
+        if (!provider || !provider.garth_dump) {
+            throw new Error("Garmin tokens not found for this user.");
+        }
+        const decryptedGarthDump = provider.garth_dump; // This is already decrypted by the repository
+        log('debug', `getGarminDailySummary: Sending decrypted Garth dump (masked) to microservice: ${decryptedGarthDump ? decryptedGarthDump.substring(0, 30) + '...' : 'N/A'}`);
         const response = await axios.post(`${GARMIN_MICROSERVICE_URL}/data/daily_summary`, {
             user_id: userId,
-            tokens: tokensB64, // Base64 encoded tokens string
+            tokens: decryptedGarthDump, // Decrypted, base64 encoded tokens string
             date: date
         });
         return response.data;
@@ -127,11 +131,17 @@ async function getGarminDailySummary(userId, tokensB64, date) {
     }
 }
 
-async function getGarminBodyComposition(userId, tokensB64, startDate, endDate = null) {
+async function getGarminBodyComposition(userId, startDate, endDate = null) {
     try {
+        const provider = await externalProviderRepository.getExternalDataProviderByUserIdAndProviderName(userId, 'garmin');
+        if (!provider || !provider.garth_dump) {
+            throw new Error("Garmin tokens not found for this user.");
+        }
+        const decryptedGarthDump = provider.garth_dump; // This is already decrypted by the repository
+        log('debug', `getGarminBodyComposition: Sending decrypted Garth dump (masked) to microservice: ${decryptedGarthDump ? decryptedGarthDump.substring(0, 30) + '...' : 'N/A'}`);
         const response = await axios.post(`${GARMIN_MICROSERVICE_URL}/data/body_composition`, {
             user_id: userId,
-            tokens: tokensB64, // Base64 encoded tokens string
+            tokens: decryptedGarthDump, // Decrypted, base64 encoded tokens string
             start_date: startDate,
             end_date: endDate
         });

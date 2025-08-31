@@ -62,7 +62,7 @@ router.post('/sync/daily_summary', authenticateToken, async (req, res, next) => 
         // Pass the full garth_dump directly to the Python microservice
         const tokensB64 = provider.garth_dump;
 
-        const summaryData = await garminConnectService.getGarminDailySummary(userId, tokensB64, date);
+        const summaryData = await garminConnectService.getGarminDailySummary(userId, date);
         // TODO: Process and store summaryData into check_in_measurements or custom_measurements
         res.status(200).json({ message: 'Daily summary synced successfully.', data: summaryData });
     } catch (error) {
@@ -84,7 +84,7 @@ router.post('/sync/body_composition', authenticateToken, async (req, res, next) 
  
         const tokensB64 = provider.garth_dump;
 
-        const bodyCompData = await garminConnectService.getGarminBodyComposition(userId, tokensB64, startDate, endDate);
+        const bodyCompData = await garminConnectService.getGarminBodyComposition(userId, startDate, endDate);
         // TODO: Process and store bodyCompData into check_in_measurements or custom_measurements
         res.status(200).json({ message: 'Body composition synced successfully.', data: bodyCompData });
     } catch (error) {
