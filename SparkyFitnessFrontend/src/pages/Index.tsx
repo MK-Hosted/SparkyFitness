@@ -10,6 +10,7 @@ import FoodDiary from "@/components/FoodDiary";
 import FoodDatabaseManager from "@/components/FoodDatabaseManager";
 import ExerciseDatabaseManager from "@/components/ExerciseDatabaseManager";
 import Reports from "@/components/Reports";
+import AddComp from "@/components/AddComp";
 import CheckIn from "@/components/CheckIn";
 import Settings from "@/components/Settings";
 import GoalsSettings from "@/components/GoalsSettings"; // Import GoalsSettings
@@ -19,26 +20,35 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import {
   Home,
-  Activity,
+  Activity, // Used for Check-In
   BarChart3,
-  Utensils,
+  Utensils, // Used for Foods
   Settings as SettingsIcon,
   LogOut,
-  Dumbbell,
-  Target,
+  Dumbbell, // Used for Exercises
+  Target, // Used for Goals
   Shield,
-} from "lucide-react"; // Import Target and Shield icons
+  X, // Add X here for the close icon
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import AuthenticationSettings from "@/pages/Admin/AuthenticationSettings"; // Import AuthenticationSettings
-import axios from "axios"; // Import axios
+import AuthenticationSettings from "@/pages/Admin/AuthenticationSettings";
+import axios from "axios";
 
 import { API_BASE_URL } from "@/services/api";
+
+// Define an interface for AddComp items, matching what AddComp expects
+interface AddCompItem {
+  value: string;
+  label: string;
+  icon: LucideIcon;
+}
+
 interface IndexProps {
   onShowAboutDialog: () => void;
 }
 
 const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
-  const { user, signOut, loading } = useAuth(); // Destructure loading from useAuth
+  const { user, signOut, loading } = useAuth();
   const {
     isActingOnBehalf,
     hasPermission,
@@ -48,7 +58,8 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
   const { loggingLevel } = usePreferences();
   debug(loggingLevel, "Index: Component rendered.");
 
-  const [appVersion, setAppVersion] = useState("Loading..."); // State for app version
+  const [appVersion, setAppVersion] = useState("Loading...");
+  const [isAddCompOpen, setIsAddCompOpen] = useState(false); // Renamed from showAddComp
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -68,7 +79,7 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
     formatDateInUserTimezone(new Date(), "yyyy-MM-dd"),
   );
   const [activeTab, setActiveTab] = useState<string>("");
-  const [foodDiaryRefreshTrigger, setFoodDiaryRefreshTrigger] = useState(0); // New state for FoodDiary refresh
+  const [foodDiaryRefreshTrigger, setFoodDiaryRefreshTrigger] = useState(0);
 
   // Listen for global foodDiaryRefresh events
   useEffect(() => {
@@ -94,7 +105,7 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
   const handleSignOut = async () => {
     info(loggingLevel, "Index: Attempting to sign out.");
     try {
-      await signOut(); // Call the signOut function from useAuth
+      await signOut();
       toast({
         title: "Success",
         description: "Signed out successfully",
@@ -109,21 +120,17 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
     }
   };
 
-  // Get display name for welcome message
   const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
     const fetchDisplayName = async () => {
       if (!loading && user?.id) {
-        // Only fetch if not loading and user is available
         try {
           const profile = await apiCall(`/auth/profiles`, {
             suppress404Toast: true,
           });
-          setDisplayName(profile?.full_name || user.email || ""); // Handle null profile
+          setDisplayName(profile?.full_name || user.email || "");
         } catch (err) {
-          // If it's a 404, it means no profile is found, which is a valid scenario.
-          // We set display name to user's email or empty string.
           if (err.message && err.message.includes("404")) {
             setDisplayName(user.email || "");
           } else {
@@ -136,14 +143,100 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
           }
         }
       } else if (!loading && !user) {
-        // If loading is false and no user, clear display name
         setDisplayName("");
       }
     };
     fetchDisplayName();
-  }, [user, loading, loggingLevel]); // Add loading to dependency array
+  }, [user, loading, loggingLevel]);
 
-  // Memoize available tabs to prevent hook order violations
+  // Define items for the AddComp semicircle
+  const addCompItems: AddCompItem[] = useMemo(() => {
+    const items: AddCompItem[] = [];
+    if (!isActingOnBehalf) {
+      // If user is acting on their own behalf
+      items.push(
+        { value: "checkin", label: "Check-In", icon: Activity },
+        { value: "foods", label: "Foods", icon: Utensils },
+        { value: "exercises", label: "Exercises", icon: Dumbbell },
+        { value: "goals", label: "Goals", icon: Target },
+      );
+    } else {
+      // If acting on behalf, filter by permissions
+      if (hasWritePermission("checkin")) {
+        items.push({ value: "checkin", label: "Check-In", icon: Activity });
+      }
+      // Assuming 'foods', 'exercises', 'goals' would also be permission-based if acting on behalf
+      // For now, I'll keep them out for acting on behalf as per the original commented structure
+      // You can add permission checks here if needed for these items.
+    }
+    return items;
+  }, [isActingOnBehalf, hasWritePermission]);
+
+  // Memoize available mobile tabs
+  const availableMobileTabs = useMemo(() => {
+    debug(loggingLevel, "Index: Calculating available tabs in mobile view.", {
+      isActingOnBehalf,
+      hasPermission,
+      hasWritePermission,
+      isAddCompOpen, // Include isAddCompOpen in dependencies for icon change
+    });
+
+    const mobileTabs = [];
+
+    if (!isActingOnBehalf) {
+      mobileTabs.push(
+        { value: "home", label: "Diary", icon: Home },
+        { value: "reports", label: "Reports", icon: BarChart3 },
+        {
+          value: "Add",
+          label: "Add",
+          icon: isAddCompOpen ? X : Home, // Dynamic icon based on state
+        },
+        { value: "settings", label: "Settings", icon: SettingsIcon },
+      );
+    } else {
+      if (hasWritePermission("calorie")) {
+        mobileTabs.push({ value: "home", label: "Diary", icon: Home });
+      }
+      if (hasWritePermission("checkin")) {
+        mobileTabs.push({
+          value: "checkin",
+          label: "Check-In",
+          icon: Activity,
+        });
+      }
+      if (hasPermission("reports")) {
+        mobileTabs.push({
+          value: "reports",
+          label: "Reports",
+          icon: BarChart3,
+        });
+      }
+    }
+
+    if (user?.role === "admin") {
+      mobileTabs.push({
+        value: "admin",
+        label: "Admin",
+        icon: Shield,
+      });
+    }
+
+    info(
+      loggingLevel,
+      "Index: Available tabs calculated in mobile view:",
+      mobileTabs.map((tab) => tab.value),
+    );
+    return mobileTabs;
+  }, [
+    isActingOnBehalf,
+    hasPermission,
+    hasWritePermission,
+    loggingLevel,
+    user?.role,
+    isAddCompOpen,
+  ]);
+
   const availableTabs = useMemo(() => {
     debug(loggingLevel, "Index: Calculating available tabs.", {
       isActingOnBehalf,
@@ -154,104 +247,32 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
     const tabs = [];
 
     if (!isActingOnBehalf) {
-      // User viewing their own profile - show all tabs excluding measurements
-      debug(loggingLevel, "Index: User viewing own profile, showing all tabs.");
       tabs.push(
-        { value: "home", label: "Diary", icon: Home, component: FoodDiary },
-        {
-          value: "checkin",
-          label: "Check-In",
-          icon: Activity,
-          component: CheckIn,
-        },
-        {
-          value: "reports",
-          label: "Reports",
-          icon: BarChart3,
-          component: Reports,
-        },
-        {
-          value: "foods",
-          label: "Foods",
-          icon: Utensils,
-          component: FoodDatabaseManager,
-        },
-        {
-          value: "exercises",
-          label: "Exercises",
-          icon: Dumbbell,
-          component: ExerciseDatabaseManager,
-        },
-        {
-          value: "goals",
-          label: "Goals",
-          icon: Target,
-          component: GoalsSettings,
-        }, // New Goals tab
-        {
-          value: "settings",
-          label: "Settings",
-          icon: SettingsIcon,
-          component: Settings,
-        },
+        { value: "home", label: "Diary", icon: Home },
+        { value: "checkin", label: "Check-In", icon: Activity },
+        { value: "reports", label: "Reports", icon: BarChart3 },
+        { value: "foods", label: "Foods", icon: Utensils },
+        { value: "exercises", label: "Exercises", icon: Dumbbell },
+        { value: "goals", label: "Goals", icon: Target },
+        { value: "settings", label: "Settings", icon: SettingsIcon },
       );
     } else {
-      // User acting on behalf of someone else - filter by permissions
-      debug(
-        loggingLevel,
-        "Index: User acting on behalf, filtering tabs by permissions.",
-      );
-
-      // Only show tabs if user has write permission (direct permission)
       if (hasWritePermission("calorie")) {
-        debug(
-          loggingLevel,
-          "Index: User has calorie write permission, adding Diary tab.",
-        );
-        tabs.push({
-          value: "home",
-          label: "Diary",
-          icon: Home,
-          component: FoodDiary,
-        });
+        tabs.push({ value: "home", label: "Diary", icon: Home });
       }
-
       if (hasWritePermission("checkin")) {
-        debug(
-          loggingLevel,
-          "Index: User has checkin write permission, adding Check-In tab.",
-        );
-        tabs.push({
-          value: "checkin",
-          label: "Check-In",
-          icon: Activity,
-          component: CheckIn,
-        });
+        tabs.push({ value: "checkin", label: "Check-In", icon: Activity });
       }
-
-      // Reports tab shows if user has reports permission (read or write)
       if (hasPermission("reports")) {
-        debug(
-          loggingLevel,
-          "Index: User has reports permission, adding Reports tab.",
-        );
-        tabs.push({
-          value: "reports",
-          label: "Reports",
-          icon: BarChart3,
-          component: Reports,
-        });
+        tabs.push({ value: "reports", label: "Reports", icon: BarChart3 });
       }
     }
 
-    // Add Admin tab if user is an admin
     if (user?.role === "admin") {
-      debug(loggingLevel, "Index: User is admin, adding Admin tab.");
       tabs.push({
         value: "admin",
         label: "Admin",
         icon: Shield,
-        component: AuthenticationSettings,
       });
     }
 
@@ -277,7 +298,6 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
       { availableTabs, activeTab },
     );
     if (user && availableTabs.length > 0 && !activeTab) {
-      // Only set default if no active tab is selected and user is logged in
       info(
         loggingLevel,
         "Index: Setting initial active tab to 'home' (Diary) for logged-in user.",
@@ -288,6 +308,37 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
       setActiveTab("");
     }
   }, [availableTabs, activeTab, loggingLevel]);
+
+  useEffect(() => {
+    debug(
+      loggingLevel,
+      "Index: availableMobileTabs or activeTab useEffect triggered.",
+      { availableMobileTabs, activeTab },
+    );
+    if (user && availableMobileTabs.length > 0 && !activeTab) {
+      info(
+        loggingLevel,
+        "Index: Setting initial active tab to 'home' (Diary) for logged-in user on mobile.",
+      );
+      setActiveTab("home");
+    } else if (availableMobileTabs.length === 0 && activeTab) {
+      warn(
+        loggingLevel,
+        "Index: No available tabs, clearing active tab on mobile.",
+      );
+      setActiveTab("");
+    }
+  }, [availableMobileTabs, activeTab, loggingLevel]);
+
+  // Handler for navigation from AddComp
+  const handleNavigateFromAddComp = useCallback(
+    (value: string) => {
+      info(loggingLevel, `Index: Navigating to ${value} from AddComp.`);
+      setActiveTab(value);
+      setIsAddCompOpen(false); // Close the semicircle after navigating
+    },
+    [loggingLevel],
+  );
 
   // Get the appropriate grid class based on the number of tabs
   const getGridClass = (count: number) => {
@@ -308,13 +359,15 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
       case 7:
         return "grid-cols-7";
       case 8:
-        return "grid-cols-8"; // Added for Admin tab
+        return "grid-cols-8";
       default:
         return "grid-cols-7";
     }
   };
 
   const gridClass = getGridClass(availableTabs.length);
+  const mobileGridClass = getGridClass(availableMobileTabs.length);
+
   debug(loggingLevel, "Index: Calculated grid class:", gridClass);
 
   info(
@@ -363,8 +416,14 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
         <Tabs
           value={activeTab}
           onValueChange={(value) => {
-            debug(loggingLevel, "Index: Tab changed to:", value);
-            setActiveTab(value);
+            if (value === "Add") {
+              setIsAddCompOpen((prev) => !prev); // Toggle the state
+              // Do NOT set activeTab, keep current tab active
+            } else {
+              debug(loggingLevel, "Index: Tab changed to:", value);
+              setIsAddCompOpen(false); // Close AddComp when another tab is selected
+              setActiveTab(value);
+            }
           }}
           className="space-y-6"
         >
@@ -384,9 +443,9 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
 
           {/* Mobile Navigation - Increased icon sizes */}
           <TabsList
-            className={`grid w-full gap-1 fixed bottom-0 left-0 right-0 sm:hidden bg-background border-t py-2 px-2 h-14 z-50 ${gridClass}`}
+            className={`grid w-full gap-1 fixed bottom-0 left-0 right-0 sm:hidden bg-background border-t py-2 px-2 h-14 z-50 ${mobileGridClass}`}
           >
-            {availableTabs.map(({ value, label, icon: Icon }) => (
+            {availableMobileTabs.map(({ value, label, icon: Icon }) => (
               <TabsTrigger
                 key={value}
                 value={value}
@@ -398,21 +457,38 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
           </TabsList>
 
           <div className="pb-16 sm:pb-0">
-            {availableTabs.map(({ value, component: Component }) => (
-              <TabsContent key={value} value={value} className="space-y-6">
-                {value === "home" ? (
-                  <Component
-                    selectedDate={selectedDate}
-                    onDateChange={setSelectedDate}
-                    refreshTrigger={foodDiaryRefreshTrigger} // Pass the new refresh trigger
-                  />
-                ) : value === "settings" ? (
-                  <Component onShowAboutDialog={onShowAboutDialog} />
-                ) : (
-                  <Component />
-                )}
+            {/* Render all possible TabsContent components, and let activeTab control visibility */}
+            <TabsContent value="home" className="space-y-6">
+              <FoodDiary
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                refreshTrigger={foodDiaryRefreshTrigger}
+              />
+            </TabsContent>
+            <TabsContent value="checkin" className="space-y-6">
+              <CheckIn />
+            </TabsContent>
+            <TabsContent value="reports" className="space-y-6">
+              <Reports />
+            </TabsContent>
+            <TabsContent value="foods" className="space-y-6">
+              <FoodDatabaseManager />
+            </TabsContent>
+            <TabsContent value="exercises" className="space-y-6">
+              <ExerciseDatabaseManager />
+            </TabsContent>
+            <TabsContent value="goals" className="space-y-6">
+              <GoalsSettings />
+            </TabsContent>
+            <TabsContent value="settings" className="space-y-6">
+              <Settings onShowAboutDialog={onShowAboutDialog} />
+            </TabsContent>
+            {user?.role === "admin" && (
+              <TabsContent value="admin" className="space-y-6">
+                <AuthenticationSettings />
               </TabsContent>
-            ))}
+            )}
+            {/* The "Add" tab does not have a content component */}
           </div>
         </Tabs>
 
@@ -420,6 +496,14 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
         <SparkyChat />
       </div>
       {/* Footer with Version Info */}
+
+      <AddComp
+        isVisible={isAddCompOpen}
+        onClose={() => setIsAddCompOpen(false)}
+        items={addCompItems}
+        onNavigate={handleNavigateFromAddComp}
+      />
+
       <footer className="hidden sm:block text-center text-muted-foreground text-sm py-4">
         <p className="cursor-pointer underline" onClick={onShowAboutDialog}>
           SparkyFitness v{appVersion}
