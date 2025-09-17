@@ -604,6 +604,7 @@ const EnhancedFoodSearch = ({
         <Input
           placeholder="Search for foods..."
           value={searchTerm}
+          autoFocus
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={(e) => {
             if (
