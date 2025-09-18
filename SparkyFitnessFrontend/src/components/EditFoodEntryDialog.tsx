@@ -126,7 +126,8 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
 
   if (!entry) return null;
 
-  const handleSave = async () => {
+  const handleSubmit = async (event) => {
+      event.preventDefault();
     debug(loggingLevel, "Handling save food entry.");
     if (!selectedVariant) {
       warn(loggingLevel, "Save called with no selected variant.");
@@ -218,7 +219,7 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
         {loading ? (
           <div>Loading units...</div>
         ) : (
-          <>
+          <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold mb-2">{entry.foods.name}</h3>
@@ -380,15 +381,15 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
               )}
 
               <div className="flex justify-end space-x-2 mt-6">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>
+                <Button type="submit">
                   Save Changes
                 </Button>
               </div>
             </div>
-          </>
+          </form>
         )}
       </DialogContent>
     </Dialog>

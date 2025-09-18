@@ -136,7 +136,8 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (event) => {
+    event.preventDefault();
     debug(loggingLevel, "Handling submit.");
     if (selectedVariant) {
       info(loggingLevel, 'Submitting food selection:', {
@@ -223,6 +224,7 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
         {loading ? (
           <div>Loading units...</div>
         ) : (
+          <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -281,14 +283,15 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
             )}
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={!selectedVariant}>
+              <Button type="submit" disabled={!selectedVariant}>
                 Add to Meal
               </Button>
             </div>
           </div>
+          </form>
         )}
       </DialogContent>
     </Dialog>
