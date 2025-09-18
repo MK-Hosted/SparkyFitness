@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,7 +126,8 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
 
   if (!entry) return null;
 
-  const handleSave = async () => {
+  const handleSubmit = async (event) => {
+      event.preventDefault();
     debug(loggingLevel, "Handling save food entry.");
     if (!selectedVariant) {
       warn(loggingLevel, "Save called with no selected variant.");
@@ -197,6 +198,13 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
   };
 
   const nutrition = calculateNutrition();
+  const focusAndSelect = useCallback(e => {
+    if (e) {
+      e.focus();
+      e.select();
+    }
+  }, []);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,7 +219,7 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
         {loading ? (
           <div>Loading units...</div>
         ) : (
-          <>
+          <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold mb-2">{entry.foods.name}</h3>
@@ -229,6 +237,7 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
                     step="0.1"
                     min="0.1"
                     value={quantity}
+                    ref={focusAndSelect}
                     onChange={(e) => {
                       debug(loggingLevel, "Quantity changed in edit dialog:", e.target.value);
                       setQuantity(Number(e.target.value));
@@ -372,15 +381,15 @@ const EditFoodEntryDialog = ({ entry, open, onOpenChange, onSave }: EditFoodEntr
               )}
 
               <div className="flex justify-end space-x-2 mt-6">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>
+                <Button type="submit">
                   Save Changes
                 </Button>
               </div>
             </div>
-          </>
+          </form>
         )}
       </DialogContent>
     </Dialog>

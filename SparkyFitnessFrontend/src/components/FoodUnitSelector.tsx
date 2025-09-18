@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,7 +136,8 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (event) => {
+    event.preventDefault();
     debug(loggingLevel, "Handling submit.");
     if (selectedVariant) {
       info(loggingLevel, 'Submitting food selection:', {
@@ -203,6 +204,12 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
   };
 
   const nutrition = calculateNutrition();
+  const focusAndSelect = useCallback(e => {
+    if (e) {
+      e.focus();
+      e.select();
+    }
+  }, []);
 
   return (
     <Dialog open={open && (showUnitSelector ?? true)} onOpenChange={onOpenChange}>
@@ -217,6 +224,7 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
         {loading ? (
           <div>Loading units...</div>
         ) : (
+          <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -227,6 +235,7 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
                   step="0.1"
                   min="0.1"
                   value={quantity}
+                  ref={focusAndSelect}
                   onChange={(e) => {
                     const newQuantity = Number(e.target.value);
                     debug(loggingLevel, "Quantity changed:", newQuantity);
@@ -274,14 +283,15 @@ const FoodUnitSelector = ({ food, open, onOpenChange, onSelect, showUnitSelector
             )}
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={!selectedVariant}>
+              <Button type="submit" disabled={!selectedVariant}>
                 Add to Meal
               </Button>
             </div>
           </div>
+          </form>
         )}
       </DialogContent>
     </Dialog>
