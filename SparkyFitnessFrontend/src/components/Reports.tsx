@@ -603,7 +603,9 @@ const Reports = () => {
                                     return [`${value.toFixed(1)} ${unit}`];
                                   }
                                   return ['N/A'];
-                                }} />
+                                }}
+                                contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
+                                />
                                 <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
                               </LineChart>
                             </ResponsiveContainer>

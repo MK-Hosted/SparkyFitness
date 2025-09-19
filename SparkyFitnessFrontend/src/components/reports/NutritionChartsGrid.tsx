@@ -128,6 +128,7 @@ const NutritionChartsGrid = ({ nutritionData }: NutritionChartsGridProps) => {
                         }
                         return [`${formattedValue} ${chart.unit}`];
                       }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                     />
                     <Line
                       type="monotone"

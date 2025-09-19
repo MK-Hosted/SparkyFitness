@@ -238,7 +238,7 @@ const ReportsTables = ({
                   const multiplier = entry.isTotal ? 1 : entry.quantity / (food.serving_size || 100);
 
                   return (
-                    <TableRow key={index} className={entry.isTotal ? "bg-gray-50 font-semibold border-t-2" : ""}>
+                    <TableRow key={index} className={entry.isTotal ? "bg-gray-50 dark:bg-gray-900 font-semibold border-t-2" : ""}>
                       <TableCell>{formatDateInUserTimezone(parseISO(entry.entry_date), dateFormat)}</TableCell>
                       <TableCell className="capitalize">{entry.meal_type}</TableCell>
                       <TableCell className="min-w-[250px]">

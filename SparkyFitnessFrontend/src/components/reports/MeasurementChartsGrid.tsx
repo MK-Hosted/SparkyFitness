@@ -62,6 +62,7 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showWeightInKg ? 'kg' : 'lbs'}`]}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                     />
                     <Line type="monotone" dataKey="weight" stroke="#e74c3c" strokeWidth={2} dot={false} />
                   </LineChart>
@@ -91,6 +92,7 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                     />
                     <Line type="monotone" dataKey="neck" stroke="#3498db" strokeWidth={2} dot={false} />
                   </LineChart>
@@ -120,6 +122,7 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                     />
                     <Line type="monotone" dataKey="waist" stroke="#e74c3c" strokeWidth={2} dot={false} />
                   </LineChart>
@@ -149,6 +152,7 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                     />
                     <Line type="monotone" dataKey="hips" stroke="#f39c12" strokeWidth={2} dot={false} />
                   </LineChart>
@@ -180,6 +184,7 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                   <YAxis />
                   <Tooltip
                     labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
                   />
                   <Bar dataKey="steps" fill="#2ecc71" />
                 </BarChart>

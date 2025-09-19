@@ -127,6 +127,7 @@ const NutritionTrendChart = ({ selectedDate }: NutritionTrendChartProps) => {
                   const unit = name.includes('calorie') ? ' cal' : 'g';
                   return [`${value}${unit}`, name];
                 }}
+                contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
               />
               <Legend />
               {visibleNutrients.map(nutrientKey => {
