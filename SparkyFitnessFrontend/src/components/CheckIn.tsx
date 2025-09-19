@@ -566,10 +566,10 @@ const CheckIn = () => {
                 } else if (measurement.type === 'standard') {
                   // Apply unit conversion for standard measurements if applicable
                   if (measurement.display_name === 'Weight') {
-                    displayValue = convertWeight(measurement.value, measurement.display_unit as 'kg' | 'lbs', displayWeightUnit);
+                    displayValue = convertWeight(measurement.value, 'kg', displayWeightUnit);
                     displayUnit = displayWeightUnit;
                   } else if (['Neck', 'Waist', 'Hips'].includes(measurement.display_name)) {
-                    displayValue = convertMeasurement(measurement.value, measurement.display_unit as 'cm' | 'inches', displayMeasurementUnit);
+                    displayValue = convertMeasurement(measurement.value, 'cm', displayMeasurementUnit);
                     displayUnit = displayMeasurementUnit;
                   }
                 }
