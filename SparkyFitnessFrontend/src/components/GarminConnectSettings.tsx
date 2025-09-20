@@ -248,6 +248,9 @@ const GarminConnectSettings: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-3 rounded">
+        <strong>Note:</strong> Garmin Connect integration is still a Work In Progress (WIP) and does not work yet.
+      </div>
       <p className="text-sm text-muted-foreground">
         Sparky Fitness does not store your Garmin email or password. They are used only during login to obtain secure tokens.
       </p>

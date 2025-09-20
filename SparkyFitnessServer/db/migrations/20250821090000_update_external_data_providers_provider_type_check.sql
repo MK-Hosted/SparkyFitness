@@ -5,4 +5,4 @@ ALTER TABLE public.external_data_providers DROP CONSTRAINT IF EXISTS external_da
 -- Add the new constraint with 'garmin' and 'health'
 ALTER TABLE public.external_data_providers
 ADD CONSTRAINT external_data_providers_provider_type_check
-CHECK (provider_type IN ('fatsecret', 'openfoodfacts', 'mealie', 'garmin', 'health'));
+CHECK (provider_type IN ('fatsecret', 'openfoodfacts', 'mealie', 'garmin', 'health','nutritionix','wger'));
