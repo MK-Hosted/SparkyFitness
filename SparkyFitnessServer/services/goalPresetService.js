@@ -1,6 +1,24 @@
 const goalPresetRepository = require('../models/goalPresetRepository');
 const { log } = require('../config/logging');
 
+// Convert water_goal_ml to the correct repository field name
+function mapWaterGoalMlToDb(presetData) {
+  const { water_goal_ml, ...rest } = presetData;
+  return {
+    ...rest,
+    water_goal: water_goal_ml,
+  };
+}
+
+// Convert water_goal repository field name to water_goal_ml
+function mapDbToWaterGoalMl(presetData) {
+  const { water_goal, ...rest } = presetData;
+  return {
+    ...rest,
+    water_goal_ml: water_goal,
+  };
+}
+
 // Helper function to calculate grams from percentages
 function calculateGramsFromPercentages(calories, protein_percentage, carbs_percentage, fat_percentage) {
   const protein_grams = calories * (protein_percentage / 100) / 4;
@@ -24,7 +42,8 @@ async function createGoalPreset(userId, presetData) {
       presetData.fat = fat_grams;
     }
 
-    const newPreset = await goalPresetRepository.createGoalPreset({ ...presetData, user_id: userId });
+    const dbPresetData = mapWaterGoalMlToDb({ ...presetData, user_id: userId });    
+    const newPreset = await goalPresetRepository.createGoalPreset(dbPresetData);
     return newPreset;
   } catch (error) {
     log('error', `Error creating goal preset for user ${userId}:`, error);
@@ -35,7 +54,7 @@ async function createGoalPreset(userId, presetData) {
 async function getGoalPresets(userId) {
   try {
     const presets = await goalPresetRepository.getGoalPresetsByUserId(userId);
-    return presets;
+    return presets.map(mapDbToWaterGoalMl);
   } catch (error) {
     log('error', `Error fetching goal presets for user ${userId}:`, error);
     throw new Error('Failed to fetch goal presets.');
@@ -45,7 +64,7 @@ async function getGoalPresets(userId) {
 async function getGoalPreset(presetId, userId) {
   try {
     const preset = await goalPresetRepository.getGoalPresetById(presetId, userId);
-    return preset;
+    return preset ? mapDbToWaterGoalMl(preset) : null;
   } catch (error) {
     log('error', `Error fetching goal preset ${presetId} for user ${userId}:`, error);
     throw new Error('Failed to fetch goal preset.');
@@ -67,7 +86,8 @@ async function updateGoalPreset(presetId, userId, presetData) {
       presetData.fat = fat_grams;
     }
 
-    const updatedPreset = await goalPresetRepository.updateGoalPreset(presetId, { ...presetData, user_id: userId });
+    const dbPresetData = mapWaterGoalMlToDb({ ...presetData, user_id: userId });
+    const updatedPreset = await goalPresetRepository.updateGoalPreset(presetId, dbPresetData); 
     return updatedPreset;
   } catch (error) {
     log('error', `Error updating goal preset ${presetId} for user ${userId}:`, error);
