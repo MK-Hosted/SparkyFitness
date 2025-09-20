@@ -1,5 +1,8 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const { log } = require('../config/logging'); // Assuming logging.js will be created here
+
+// Parse numeric types
+types.setTypeParser(types.builtins.NUMERIC, value => parseFloat(value));
 
 // Initialize PostgreSQL client globally
 const pool = new Pool({
