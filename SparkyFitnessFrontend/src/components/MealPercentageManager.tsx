@@ -78,7 +78,7 @@ const MealPercentageManager = ({ initialPercentages, onPercentagesChange }: Meal
         currentPercentages[m] = perMealShare;
       });
     }
-    setPercentages(normalizePercentages(currentPercentages));
+    setPercentages(normalizePercentages(currentPercentages, changedMeal));
   };
   
   const distributeRemaining = () => {
@@ -99,11 +99,11 @@ const MealPercentageManager = ({ initialPercentages, onPercentagesChange }: Meal
     }
   };
 
-  const normalizePercentages = (currentPercentages: MealPercentages) => {
+  const normalizePercentages = (currentPercentages: MealPercentages, changedMeal: keyof MealPercentages) => {
     const total = Object.values(currentPercentages).reduce((sum, p) => sum + p, 0);
     if (Math.round(total) !== 100) {
         const diff = 100 - total;
-        const unlockedMeals = Object.keys(locks).filter(key => !locks[key as keyof MealPercentages]) as (keyof MealPercentages)[];
+        const unlockedMeals = Object.keys(locks).filter(key => !locks[key as keyof MealPercentages] && key !== changedMeal) as (keyof MealPercentages)[];
         if (unlockedMeals.length > 0) {
             const adjustment = diff / unlockedMeals.length;
             unlockedMeals.forEach(m => {
@@ -121,7 +121,7 @@ const MealPercentageManager = ({ initialPercentages, onPercentagesChange }: Meal
 
     // Adjust for rounding errors
     let roundingDiff = 100 - roundedTotal;
-    const unlockedMeals = Object.keys(locks).filter(key => !locks[key as keyof MealPercentages]) as (keyof MealPercentages)[];
+    const unlockedMeals = Object.keys(locks).filter(key => !locks[key as keyof MealPercentages] && key !== changedMeal) as (keyof MealPercentages)[];
     if(unlockedMeals.length > 0) {
         let i = 0;
         while(roundingDiff !== 0) {
