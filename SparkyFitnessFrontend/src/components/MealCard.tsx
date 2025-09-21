@@ -158,11 +158,9 @@ const MealCard = ({
               <CardTitle className="text-lg sm:text-xl dark:text-slate-300">
                 {meal.name}
               </CardTitle>
-              {meal.targetCalories && (
-                <span className="text-xs sm:text-sm text-gray-500">
-                  {Math.round(totals.calories)} / {meal.targetCalories} cal
-                </span>
-              )}
+              <span className="text-xs sm:text-sm text-gray-500">
+                {Math.round(totals.calories)}{!!meal.targetCalories && ` / ${Math.round(meal.targetCalories)}`} cal
+              </span>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-4 justify-end">
               <Dialog>
