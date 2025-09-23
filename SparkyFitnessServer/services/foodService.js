@@ -617,7 +617,7 @@ async function copyFoodEntries(authenticatedUserId, sourceDate, sourceMealType, 
       const existingEntry = await foodRepository.getFoodEntryByDetails(
         authenticatedUserId,
         entry.food_id,
-        mealType,
+        targetMealType,
         targetDate,
         entry.variant_id
       );
@@ -639,13 +639,13 @@ async function copyFoodEntries(authenticatedUserId, sourceDate, sourceMealType, 
     }
 
     if (entriesToCreate.length === 0) {
-      log('info', `All food entries from prior day's ${mealType} already exist in ${targetDate} ${mealType}. No new entries created.`);
+      log('info', `All food entries from ${sourceMealType} on ${sourceDate} already exist in ${targetMealType} on ${targetDate}. No new entries created.`);
       return [];
     }
 
     // 3. Bulk insert new entries
     const newEntries = await foodRepository.bulkCreateFoodEntries(entriesToCreate);
-    log('info', `Successfully copied ${newEntries.length} new food entries from prior day's ${mealType} to ${targetDate} ${mealType} for user ${authenticatedUserId}.`);
+    log('info', `Successfully copied ${newEntries.length} new food entries from ${sourceMealType} on ${sourceDate} to ${targetMealType} on ${targetDate} for user ${authenticatedUserId}.`);
     return newEntries;
   } catch (error) {
     log('error', `Error copying food entries for user ${authenticatedUserId} from ${sourceDate} ${sourceMealType} to ${targetDate} ${targetMealType}:`, error);
