@@ -298,7 +298,7 @@ const ExternalProviderSettings = () => { // Renamed component
                     id="new_provider_name"
                     value={newProvider.provider_name}
                     onChange={(e) => setNewProvider(prev => ({ ...prev, provider_name: e.target.value }))}
-                    placeholder="My Nutritionix Account"
+                    placeholder="My Proivider name" // Fixed placeholder text
                   />
                 </div>
                 <div>
@@ -321,7 +321,7 @@ const ExternalProviderSettings = () => { // Renamed component
                 </div>
               </div>
 
-              {(newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret' || newProvider.provider_type === 'mealie') && ( // Only show for these types
+              {newProvider.provider_type === 'mealie' && (
                 <>
                   <div>
                     <Label htmlFor="new_base_url">App URL</Label>
@@ -342,6 +342,32 @@ const ExternalProviderSettings = () => { // Renamed component
                       value={newProvider.app_key}
                       onChange={(e) => setNewProvider(prev => ({ ...prev, app_key: e.target.value }))}
                       placeholder="Enter Mealie API Key"
+                      autoComplete="off"
+                    />
+                  </div>
+                </>
+              )}
+              {(newProvider.provider_type === 'nutritionix' || newProvider.provider_type === 'fatsecret') && (
+                <>
+                  <div>
+                    <Label htmlFor="new_app_id">App ID</Label>
+                    <Input
+                      id="new_app_id"
+                      type="text"
+                      value={newProvider.app_id}
+                      onChange={(e) => setNewProvider(prev => ({ ...prev, app_id: e.target.value }))}
+                      placeholder="Enter App ID"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new_app_key">App Key</Label>
+                    <Input
+                      id="new_app_key"
+                      type="password"
+                      value={newProvider.app_key}
+                      onChange={(e) => setNewProvider(prev => ({ ...prev, app_key: e.target.value }))}
+                      placeholder="Enter App Key"
                       autoComplete="off"
                     />
                   </div>
@@ -408,7 +434,7 @@ const ExternalProviderSettings = () => { // Renamed component
                             </Select>
                           </div>
                         </div>
-                        {(editData.provider_type === 'nutritionix' || editData.provider_type === 'fatsecret' || editData.provider_type === 'mealie') && ( // Only show for these types
+                        {editData.provider_type === 'mealie' && (
                           <>
                             <div>
                               <Label>App URL</Label>
@@ -427,6 +453,30 @@ const ExternalProviderSettings = () => { // Renamed component
                                 value={editData.app_key || ''}
                                 onChange={(e) => setEditData(prev => ({ ...prev, app_key: e.target.value }))}
                                 placeholder="Enter Mealie API Key"
+                                autoComplete="off"
+                              />
+                            </div>
+                          </>
+                        )}
+                        {(editData.provider_type === 'nutritionix' || editData.provider_type === 'fatsecret') && (
+                          <>
+                            <div>
+                              <Label>App ID</Label>
+                              <Input
+                                type="text"
+                                value={editData.app_id || ''}
+                                onChange={(e) => setEditData(prev => ({ ...prev, app_id: e.target.value }))}
+                                placeholder="Enter App ID"
+                                autoComplete="off"
+                              />
+                            </div>
+                            <div>
+                              <Label>App Key</Label>
+                              <Input
+                                type="password"
+                                value={editData.app_key || ''}
+                                onChange={(e) => setEditData(prev => ({ ...prev, app_key: e.target.value }))}
+                                placeholder="Enter App Key"
                                 autoComplete="off"
                               />
                             </div>
