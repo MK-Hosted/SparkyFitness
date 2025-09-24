@@ -6,6 +6,7 @@ import ZoomableChart from "../ZoomableChart";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { debug, info, warn, error } from "@/utils/logging";
 import { parseISO } from "date-fns"; // Import parseISO
+import { calculateSmartYAxisDomain, getChartConfig } from "@/utils/chartUtils";
 
 interface MeasurementData {
   entry_date: string; // Changed from 'date' to 'entry_date'
@@ -35,6 +36,15 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
     return formatDateInUserTimezone(parseISO(date), 'MMM dd');
   };
 
+  // Helper function to get smart Y-axis domain for measurements
+  const getYAxisDomain = (data: MeasurementData[], dataKey: string) => {
+    const config = getChartConfig(dataKey);
+    return calculateSmartYAxisDomain(data, dataKey, {
+      marginPercent: config.marginPercent,
+      minRangeThreshold: config.minRangeThreshold
+    });
+  };
+
   return (
     <>
       {/* Body Measurements Charts */}
@@ -58,7 +68,10 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                       fontSize={10}
                       tickFormatter={formatDateForChart} // Apply formatter
                     />
-                    <YAxis fontSize={10} />
+                    <YAxis 
+                      fontSize={10} 
+                      domain={getYAxisDomain(measurementData.filter(d => d.weight), 'weight') || undefined}
+                    />
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showWeightInKg ? 'kg' : 'lbs'}`]}
@@ -88,7 +101,10 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                       fontSize={10}
                       tickFormatter={formatDateForChart} // Apply formatter
                     />
-                    <YAxis fontSize={10} />
+                    <YAxis 
+                      fontSize={10} 
+                      domain={getYAxisDomain(measurementData.filter(d => d.neck), 'neck') || undefined}
+                    />
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}
@@ -118,7 +134,10 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                       fontSize={10}
                       tickFormatter={formatDateForChart} // Apply formatter
                     />
-                    <YAxis fontSize={10} />
+                    <YAxis 
+                      fontSize={10} 
+                      domain={getYAxisDomain(measurementData.filter(d => d.waist), 'waist') || undefined}
+                    />
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}
@@ -148,7 +167,10 @@ const MeasurementChartsGrid = ({ measurementData, showWeightInKg, showMeasuremen
                       fontSize={10}
                       tickFormatter={formatDateForChart} // Apply formatter
                     />
-                    <YAxis fontSize={10} />
+                    <YAxis 
+                      fontSize={10} 
+                      domain={getYAxisDomain(measurementData.filter(d => d.hips), 'hips') || undefined}
+                    />
                     <Tooltip
                       labelFormatter={(value) => formatDateForChart(value as string)} // Apply formatter
                       formatter={(value: number) => [`${value.toFixed(1)} ${showMeasurementsInCm ? 'cm' : 'inches'}`]}

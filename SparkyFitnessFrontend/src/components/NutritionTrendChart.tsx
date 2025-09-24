@@ -8,6 +8,7 @@ import { TrendingUp } from "lucide-react";
 import { parseISO, subDays, addDays, format } from "date-fns"; // Import parseISO, subDays, addDays, format
 import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePreferences
 import { loadNutritionTrendData, DayData } from '@/services/nutritionTrendService';
+import { calculateSmartYAxisDomain, excludeIncompleteDay, getChartConfig } from "@/utils/chartUtils";
 
 interface NutritionTrendChartProps {
   selectedDate: string;
@@ -48,7 +49,12 @@ const NutritionTrendChart = ({ selectedDate }: NutritionTrendChartProps) => {
         endDateStr
       );
       console.log("DEBUG: NutritionTrendChart - Fetched chartData:", fetchedChartData);
-      setChartData(fetchedChartData);
+      
+      // Exclude current incomplete day from nutrition trend data
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const filteredChartData = excludeIncompleteDay(fetchedChartData, today) as DayData[];
+      
+      setChartData(filteredChartData);
 
     } catch (error) {
       console.error('Error loading trend data:', error);
@@ -120,7 +126,19 @@ const NutritionTrendChart = ({ selectedDate }: NutritionTrendChartProps) => {
                 stroke="#6b7280"
                 fontSize={12}
               />
-              <YAxis stroke="#6b7280" fontSize={12} domain={[0, 'dataMax + (dataMax * 0.1)']} />
+              <YAxis 
+                stroke="#6b7280" 
+                fontSize={12} 
+                domain={(() => {
+                  // Calculate smart domain for nutrition trend chart
+                  // Use calories as primary metric for overall chart scaling
+                  const caloriesDomain = calculateSmartYAxisDomain(chartData, 'calories', {
+                    marginPercent: 0.1,
+                    minRangeThreshold: 0.3
+                  });
+                  return caloriesDomain || [0, 'dataMax + (dataMax * 0.1)'];
+                })()} 
+              />
               <Tooltip
                 labelFormatter={(value) => formatDateForChart(value as string)}
                 formatter={(value: number, name: string) => {
