@@ -151,12 +151,12 @@ async function createExternalDataProvider(providerData) {
 async function updateExternalDataProvider(id, userId, updateData) {
   const client = await pool.connect();
   try {
-    let encryptedAppId = updateData.encryptedAppId || null;
-    let appIdIv = updateData.appIdIv || null;
-    let appIdTag = updateData.appIdTag || null;
-    let encryptedAppKey = updateData.encryptedAppKey || null;
-    let appKeyIv = updateData.appKeyIv || null;
-    let appKeyTag = updateData.appKeyTag || null;
+    let encryptedAppId = updateData.encrypted_app_id || null;
+    let appIdIv = updateData.app_id_iv || null;
+    let appIdTag = updateData.app_id_tag || null;
+    let encryptedAppKey = updateData.encrypted_app_key || null;
+    let appKeyIv = updateData.app_key_iv || null;
+    let appKeyTag = updateData.app_key_tag || null;
 
     let encryptedGarthDump = updateData.encrypted_garth_dump || null;
     let garthDumpIv = updateData.garth_dump_iv || null;
@@ -187,19 +187,32 @@ async function updateExternalDataProvider(id, userId, updateData) {
         encrypted_app_key = COALESCE($8, encrypted_app_key),
         app_key_iv = COALESCE($9, app_key_iv),
         app_key_tag = COALESCE($10, app_key_tag),
-        token_expires_at = COALESCE($17, token_expires_at),
-        external_user_id = COALESCE($18, external_user_id),
+        encrypted_garth_dump = COALESCE($11, encrypted_garth_dump),
+        garth_dump_iv = COALESCE($12, garth_dump_iv),
+        garth_dump_tag = COALESCE($13, garth_dump_tag),
+        token_expires_at = COALESCE($14, token_expires_at),
+        external_user_id = COALESCE($15, external_user_id),
         updated_at = now()
-      WHERE id = $19 AND user_id = $20
+      WHERE id = $16 AND user_id = $17
       RETURNING *`,
       [
-        updateData.provider_name, updateData.provider_type, updateData.is_active, updateData.base_url,
-        encryptedAppId, appIdIv, appIdTag,
-        encryptedAppKey, appKeyIv, appKeyTag,
-        encryptedAccessToken, accessTokenIv, accessTokenTag,
-        encryptedRefreshToken, refreshTokenIv, refresh_token_tag,
-        updateData.token_expires_at, updateData.external_user_id,
-        id, userId
+        updateData.provider_name,
+        updateData.provider_type,
+        updateData.is_active,
+        updateData.base_url,
+        encryptedAppId,
+        appIdIv,
+        appIdTag,
+        encryptedAppKey,
+        appKeyIv,
+        appKeyTag,
+        encryptedGarthDump,
+        garthDumpIv,
+        garthDumpTag,
+        updateData.token_expires_at,
+        updateData.external_user_id,
+        id,
+        userId,
       ]
     );
     return result.rows[0];

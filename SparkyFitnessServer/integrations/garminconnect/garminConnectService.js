@@ -80,7 +80,7 @@ async function handleGarminTokens(userId, tokensB64) {
             garth_dump_tag: encryptedGarthDump.tag,
 
             // These fields are now derived from the garth dump if needed, or can be removed from the schema
-            token_expires_at: tokens.expires_at ? new Date(tokens.expires_at * 1000) : null, // Convert Unix timestamp to Date object, handle null/undefined
+            token_expires_at: tokens.refresh_token_expires_at ? new Date(tokens.refresh_token_expires_at * 1000) : null, // Convert Unix timestamp to Date object, handle null/undefined
             external_user_id: tokens.external_user_id || externalUserId // Use external_user_id from tokens if available
         };
         log('debug', `handleGarminTokens: Update data for provider (masked):`, {

@@ -32,7 +32,7 @@ async def garmin_login(request_data: GarminLoginRequest):
     """
     try:
         garmin = Garmin(email=request_data.email, password=request_data.password, return_on_mfa=True)
-        result1, result2 = garmin.login(scopes=["ACTIVITY_READ", "CONNECT_READ", "WELLNESS_READ"])
+        result1, result2 = garmin.login()
 
         if result1 == "needs_mfa":
             logger.info(f"MFA required for user {request_data.user_id}.")
@@ -105,6 +105,7 @@ async def get_daily_summary(request: Request):
 
         garmin = Garmin()
         garmin.garth.loads(tokens_b64) # Load tokens from base64 string
+        garmin.display_name = garmin.garth.profile["displayName"] # Set display_name after loading tokens
         logger.debug(f"Loaded tokens into garth. Username (external_user_id): {garmin.garth.username}")
         logger.debug(f"Garth profile: {garmin.garth.profile}")
         logger.debug(f"Garth oauth1_token: {garmin.garth.oauth1_token}")
@@ -112,15 +113,9 @@ async def get_daily_summary(request: Request):
         logger.debug(f"OAuth2 Token Expires At: {garmin.garth.oauth2_token.expires_at}")
         logger.debug(f"OAuth2 Token Scopes: {garmin.garth.oauth2_token.scope}")
 
-        # Explicitly fetch the user's profile to get the display name
         # The garminconnect library's get_user_summary expects only the date argument.
         # The display_name is handled internally by the garth session.
-        # The garminconnect library's get_user_summary expects only the date argument.
-        # The display_name is handled internally by the garth session.
-        # Manually construct the URL with the numerical user ID
-        summary_url = f"{garmin.garmin_connect_daily_summary_url}/{garmin.garth._user_profile['id']}"
-        params = {"calendarDate": str(cdate)}
-        summary_data = garmin.connectapi(summary_url, params=params)
+        summary_data = garmin.get_user_summary(cdate)
         logger.info(f"Successfully retrieved daily summary for user {user_id} on {cdate}.")
         return {"user_id": user_id, "date": cdate, "data": summary_data}
 

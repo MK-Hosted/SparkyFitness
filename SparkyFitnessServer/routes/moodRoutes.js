@@ -72,7 +72,7 @@ router.get('/date/:entryDate', authenticateToken, async (req, res, next) => {
     const moodEntry = await moodRepository.getMoodEntryByDate(authenticatedUserId, entryDate);
 
     if (!moodEntry) {
-      return res.status(404).json({ message: 'Mood entry not found for this date.' });
+      return res.status(200).json({}); // Return empty object with 200 OK
     }
 
     if (!await canAccessUserData(moodEntry.user_id, 'mood', authenticatedUserId)) {
