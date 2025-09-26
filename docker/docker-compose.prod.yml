@@ -58,8 +58,6 @@ services:
   #   networks:
   #     - sparkyfitness-network
   #   restart: unless-stopped
-  #   volumes:
-  #     - ../SparkyFitnessGarmin:/app
   #   depends_on:
   #     - sparkyfitness-db
   #     - sparkyfitness-server
