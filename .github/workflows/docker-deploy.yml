@@ -110,3 +110,32 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}-server
           subject-digest: ${{ steps.push-server.outputs.digest }}
           push-to-registry: true
+
+      - name: Metadata Garmin Microservice
+        id: meta-garmin
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            codewithcj/sparkyfitness_garmin
+            ghcr.io/${{ github.repository }}-garmin
+          tags: |
+            type=raw,value=${{ steps.get_latest_release.outputs.tag }}
+            type=raw,value=latest
+
+      - name: Build and push Garmin Microservice
+        id: push-garmin
+        uses: docker/build-push-action@v6
+        with:
+          context: SparkyFitnessGarmin
+          file: docker/Dockerfile.garmin_microservice
+          push: true
+          tags: ${{ steps.meta-garmin.outputs.tags }}
+          labels: ${{ steps.meta-garmin.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Generate artifact attestation Garmin Microservice
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}-garmin
+          subject-digest: ${{ steps.push-garmin.outputs.digest }}
+          push-to-registry: true

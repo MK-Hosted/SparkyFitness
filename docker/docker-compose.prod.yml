@@ -30,6 +30,7 @@ services:
       SPARKY_FITNESS_FRONTEND_URL: ${SPARKY_FITNESS_FRONTEND_URL}
       SPARKY_FITNESS_DISABLE_SIGNUP: ${SPARKY_FITNESS_DISABLE_SIGNUP}
       SPARKY_FITNESS_ADMIN_EMAIL: ${SPARKY_FITNESS_ADMIN_EMAIL}  #User with this email can access the admin panel
+      GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000 # Add Garmin microservice URL
     networks:
       - sparkyfitness-network # Use the new named network
     restart: always
@@ -46,6 +47,7 @@ services:
     restart: always
     depends_on:
       - sparkyfitness-server # Frontend depends on the server
+      - sparkyfitness-garmin # Frontend depends on Garmin microservice
   
   # Garmin integration is still work in progress. Enable once table is ready.
   # sparkyfitness-garmin:
