@@ -31,7 +31,7 @@ async def garmin_login(request_data: GarminLoginRequest):
     Returns base64 encoded tokens or an MFA challenge.
     """
     try:
-        garmin = Garmin(email=request_data.email, password=request_data.password, return_on_mfa=True)
+        garmin = Garmin(email=request_data.email, password=request_data.password)
         result1, result2 = garmin.login()
 
         if result1 == "needs_mfa":

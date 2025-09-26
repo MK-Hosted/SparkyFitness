@@ -5,6 +5,7 @@ const garminConnectService = require('../integrations/garminconnect/garminConnec
 const externalProviderRepository = require('../models/externalProviderRepository');
 const measurementService = require('../services/measurementService'); // Import measurementService
 const { log } = require('../config/logging');
+const moment = require('moment'); // Import moment for date manipulation
 
 router.use(express.json());
 
@@ -48,39 +49,59 @@ router.post('/resume_login', authenticateToken, async (req, res, next) => {
     }
 });
 
-// Endpoint to manually sync daily summary data from Garmin
+// Endpoint to manually sync daily summary data from Garmin for the last 3 days
 router.post('/sync/daily_summary', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.userId;
-        const { date } = req.body; // Date in YYYY-MM-DD format
-        
-        // Retrieve Garmin tokens for the user from the database
-        const provider = await externalProviderRepository.getExternalDataProviderByUserIdAndProviderName(userId, 'garmin');
-        if (!provider || !provider.garth_dump) {
-            return res.status(400).json({ error: 'Garmin Connect not linked for this user or tokens missing.' });
+        const syncedDates = [];
+        const errors = [];
+
+        // Sync for the last 3 days (today, yesterday, day before yesterday)
+        for (let i = 0; i < 3; i++) {
+            const date = moment().subtract(i, 'days').format('YYYY-MM-DD');
+            log('info', `Attempting to sync daily summary for user ${userId} on ${date}`);
+
+            try {
+                // Retrieve Garmin tokens for the user from the database
+                const provider = await externalProviderRepository.getExternalDataProviderByUserIdAndProviderName(userId, 'garmin');
+                if (!provider || !provider.garth_dump) {
+                    throw new Error('Garmin Connect not linked for this user or tokens missing.');
+                }
+
+                const summaryData = await garminConnectService.getGarminDailySummary(userId, date);
+                log('debug', `Raw summaryData from Garmin microservice for user ${userId} on ${date}:`, summaryData);
+
+                if (summaryData && summaryData.data) {
+                    const healthDataArray = [
+                        { type: 'step', value: summaryData.data.totalSteps, date: date, timestamp: new Date(date).toISOString() },
+                        { type: 'Calories', value: summaryData.data.totalKilocalories, date: date, timestamp: new Date(date).toISOString() },
+                        { type: 'Floors Climbed', value: summaryData.data.floorsClimbed, date: date, timestamp: new Date(date).toISOString() },
+                        { type: 'Distance (km)', value: summaryData.data.totalDistanceMeters ? (summaryData.data.totalDistanceMeters / 1000) : null, date: date, timestamp: new Date(date).toISOString() }
+                    ].filter(entry => entry.value !== null && entry.value !== undefined);
+
+                    log('debug', `HealthDataArray for daily summary for user ${userId} on ${date}:`, healthDataArray);
+                    const processedResults = await measurementService.processHealthData(healthDataArray, userId);
+                    log('info', `Daily summary data processed for user ${userId} on ${date}. Results:`, processedResults);
+                    syncedDates.push(date);
+                } else {
+                    log('warn', `No summary data received for user ${userId} on ${date}.`);
+                    errors.push(`No summary data for ${date}.`);
+                }
+            } catch (innerError) {
+                log('error', `Error syncing daily summary for user ${userId} on ${date}:`, innerError.message);
+                errors.push(`Failed to sync ${date}: ${innerError.message}`);
+            }
         }
-        
-        // Pass the full garth_dump directly to the Python microservice
-        const tokensB64 = provider.garth_dump; // This is already decrypted by the repository
 
-        const summaryData = await garminConnectService.getGarminDailySummary(userId, date);
-        log('debug', `Raw summaryData from Garmin microservice for user ${userId} on ${date}:`, summaryData);
-
-        if (summaryData && summaryData.data) {
-            const healthDataArray = [
-                { type: 'step', value: summaryData.data.totalSteps, date: date, timestamp: new Date(date).toISOString() },
-                { type: 'Calories', value: summaryData.data.totalKilocalories, date: date, timestamp: new Date(date).toISOString() },
-                { type: 'Floors Climbed', value: summaryData.data.floorsClimbed, date: date, timestamp: new Date(date).toISOString() },
-                { type: 'Distance (km)', value: summaryData.data.totalDistanceMeters ? (summaryData.data.totalDistanceMeters / 1000) : null, date: date, timestamp: new Date(date).toISOString() }
-            ].filter(entry => entry.value !== null && entry.value !== undefined); // Filter out null/undefined values
-
-            log('debug', `HealthDataArray for daily summary for user ${userId} on ${date}:`, healthDataArray);
-            const processedResults = await measurementService.processHealthData(healthDataArray, userId);
-            log('info', `Daily summary data processed for user ${userId} on ${date}. Results:`, processedResults);
-        } else {
-            log('warn', `No summary data received for user ${userId} on ${date}.`);
+        if (errors.length > 0) {
+            return res.status(500).json({
+                message: `Daily summary sync completed with errors for some days. Synced: ${syncedDates.join(', ')}. Errors: ${errors.join('; ')}`,
+                syncedDates: syncedDates,
+                errors: errors
+            });
         }
-        res.status(200).json({ message: 'Daily summary synced successfully.', data: summaryData });
+
+        res.status(200).json({ message: `Daily summary synced successfully for the last ${syncedDates.length} days.`, syncedDates: syncedDates });
     } catch (error) {
         next(error);
     }
