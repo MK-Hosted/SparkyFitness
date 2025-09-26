@@ -51,7 +51,7 @@ services:
   
   # Garmin integration is still work in progress. Enable once table is ready.
   # sparkyfitness-garmin:
-  #   image: codewithcj/garmin_microservice:latest
+  #   image: codewithcj/sparkyfitness_garmin:latest
   #   container_name: sparkyfitness-garmin
   #   environment:
   #     GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000
