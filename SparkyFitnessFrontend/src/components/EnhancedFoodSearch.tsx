@@ -14,6 +14,7 @@ import { Search, Plus, Loader2, Edit, Camera } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import EnhancedCustomFoodForm from "./EnhancedCustomFoodForm";
 import BarcodeScanner from "./BarcodeScanner";
+import ImportFromCSV from "./ImportFromCSV";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debug, error } from "@/utils/logging"; // Import logging functions
@@ -92,11 +93,11 @@ const EnhancedFoodSearch = ({
   >([]);
   const [nutritionixResults, setNutritionixResults] = useState<any[]>([]); // To store Nutritionix search results
   const [fatSecretResults, setFatSecretResults] = useState<FatSecretFoodItem[]>(
-    [],
+    []
   ); // To store FatSecret search results
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"database" | "online" | "barcode">(
-    hideDatabaseTab ? "online" : "database",
+    hideDatabaseTab ? "online" : "database"
   );
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<
@@ -104,6 +105,7 @@ const EnhancedFoodSearch = ({
   >(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showAddFoodDialog, setShowAddFoodDialog] = useState(false); // New state for Add Food dialog
+  const [showImportFromCsvDialog, setShowImportFromCsvDialog] = useState(false);
   const [foodDataProviders, setFoodDataProviders] = useState<any[]>([]); // To store configured food data providers
   const [selectedFoodDataProvider, setSelectedFoodDataProvider] = useState<
     string | null
@@ -154,7 +156,7 @@ const EnhancedFoodSearch = ({
         } else {
           // Otherwise, perform a regular search
           const data = await apiCall(
-            `/foods?name=${encodeURIComponent(term)}&broadMatch=true`,
+            `/foods?name=${encodeURIComponent(term)}&broadMatch=true`
           );
           setFoods(data.searchResults || []);
         }
@@ -168,7 +170,7 @@ const EnhancedFoodSearch = ({
         setLoading(false);
       }
     },
-    [itemDisplayLimit],
+    [itemDisplayLimit]
   ); // Add itemDisplayLimit to dependency array
 
   // Debounce effect for database search
@@ -190,17 +192,15 @@ const EnhancedFoodSearch = ({
     setLoading(true);
     try {
       const data = await apiCall(
-        `/foods/openfoodfacts/search?query=${encodeURIComponent(searchTerm)}`,
+        `/foods/openfoodfacts/search?query=${encodeURIComponent(searchTerm)}`
       ); // This is for OpenFoodFacts search, remains the same
 
       if (data.products) {
         setOpenFoodFactsResults(
           data.products.filter(
             (p: any) =>
-              p.product_name &&
-              p.nutriments &&
-              p.nutriments["energy-kcal_100g"],
-          ),
+              p.product_name && p.nutriments && p.nutriments["energy-kcal_100g"]
+          )
         );
       }
     } catch (error: any) {
@@ -336,8 +336,8 @@ const EnhancedFoodSearch = ({
         const fetchedMeals = await getMeals(activeUserId!, true); // Fetch public meals
         setMeals(
           fetchedMeals.filter((meal) =>
-            meal.name.toLowerCase().includes(searchTerm.toLowerCase()),
-          ),
+            meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
         );
       } catch (err: any) {
         error(loggingLevel, "Error searching meals:", err);
@@ -355,24 +355,27 @@ const EnhancedFoodSearch = ({
       }
 
       const provider = foodDataProviders.find(
-        (p) => p.id === selectedFoodDataProvider,
+        (p) => p.id === selectedFoodDataProvider
       );
       if (provider?.provider_type === "openfoodfacts") {
         await searchOpenFoodFacts();
       } else if (provider?.provider_type === "nutritionix") {
         const results = await searchNutritionixFoods(
           searchTerm,
-          selectedFoodDataProvider,
+          selectedFoodDataProvider
         );
         setNutritionixResults(results);
       } else if (provider?.provider_type === "fatsecret") {
         const results = await searchFatSecretFoods(
           searchTerm,
-          selectedFoodDataProvider,
+          selectedFoodDataProvider
         );
         setFatSecretResults(results);
       } else if (provider?.provider_type === "mealie") {
-        debug(loggingLevel, `EnhancedFoodSearch: Calling searchMealieFoods with provider.id: ${provider.id}`);
+        debug(
+          loggingLevel,
+          `EnhancedFoodSearch: Calling searchMealieFoods with provider.id: ${provider.id}`
+        );
         const results = await searchMealieFoods(
           searchTerm,
           provider.base_url, // Use base_url for Mealie URL
@@ -381,8 +384,7 @@ const EnhancedFoodSearch = ({
           provider.id
         );
         setFoods(results); // Assuming Mealie results are mapped to Food[]
-      }
-      else {
+      } else {
         toast({
           title: "Error",
           description: "Selected provider type is not supported for search.",
@@ -437,13 +439,13 @@ const EnhancedFoodSearch = ({
       // It's a branded item, use nix_item_id to get full details
       nutrientData = await getNutritionixBrandedNutrients(
         item.id,
-        selectedFoodDataProvider,
+        selectedFoodDataProvider
       );
     } else {
       // It's a common item, use natural language query
       nutrientData = await getNutritionixNutrients(
         item.name,
-        selectedFoodDataProvider,
+        selectedFoodDataProvider
       );
     }
     setLoading(false);
@@ -462,7 +464,7 @@ const EnhancedFoodSearch = ({
 
   const convertFatSecretToFood = (
     item: FatSecretFoodItem,
-    nutrientData: any,
+    nutrientData: any
   ): Food => {
     const defaultVariant: FoodVariant = {
       id: "default", // Assign a default ID for now
@@ -505,7 +507,7 @@ const EnhancedFoodSearch = ({
     // Only fetch detailed nutrients when "Edit & Add" is clicked
     const nutrientData = await getFatSecretNutrients(
       item.food_id,
-      selectedFoodDataProvider,
+      selectedFoodDataProvider
     );
     setLoading(false);
 
@@ -523,7 +525,9 @@ const EnhancedFoodSearch = ({
 
   const handleMealieEdit = async (food: Food) => {
     setLoading(true);
-    const provider = foodDataProviders.find(p => p.id === selectedFoodDataProvider);
+    const provider = foodDataProviders.find(
+      (p) => p.id === selectedFoodDataProvider
+    );
     if (!provider) {
       toast({
         title: "Error",
@@ -542,7 +546,7 @@ const EnhancedFoodSearch = ({
   };
 
   const foodSearchPreferences = nutrientDisplayPreferences.find(
-    (p) => p.view_group === "food_search" && p.platform === platform,
+    (p) => p.view_group === "food_search" && p.platform === platform
   );
   const visibleNutrients = foodSearchPreferences
     ? foodSearchPreferences.visible_nutrients
@@ -598,6 +602,12 @@ const EnhancedFoodSearch = ({
         >
           <Plus className="w-4 h-4 mr-2" /> Custom Food
         </Button>
+        <Button
+          onClick={() => setShowImportFromCsvDialog(true)}
+          className="whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Import from CSV
+        </Button>
       </div>
 
       <div className="flex space-x-2 items-center">
@@ -640,7 +650,7 @@ const EnhancedFoodSearch = ({
                 .filter(
                   (provider) =>
                     getProviderCategory(provider).includes("food") &&
-                    provider.is_active,
+                    provider.is_active
                 )
                 .map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
@@ -703,7 +713,7 @@ const EnhancedFoodSearch = ({
                                 <span key={nutrient}>
                                   <strong>
                                     {value.toFixed(
-                                      nutrient === "calories" ? 0 : 1,
+                                      nutrient === "calories" ? 0 : 1
                                     )}
                                     {details.unit}
                                   </strong>{" "}
@@ -763,7 +773,7 @@ const EnhancedFoodSearch = ({
                                 <span key={nutrient}>
                                   <strong>
                                     {value.toFixed(
-                                      nutrient === "calories" ? 0 : 1,
+                                      nutrient === "calories" ? 0 : 1
                                     )}
                                     {details.unit}
                                   </strong>{" "}
@@ -822,65 +832,65 @@ const EnhancedFoodSearch = ({
             </div>
           )}
 
-        {activeTab === "online" && foods.length > 0 && (
-            foods.map((food) => (
-                <Card
-                    key={`${food.provider_type}-${food.provider_external_id}`}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                    <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                    <h3 className="font-medium">{food.name}</h3>
-                                    {food.brand && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            {food.brand}
-                                        </Badge>
-                                    )}
-                                    <Badge variant="outline" className="text-xs">
-                                        Mealie
-                                    </Badge>
-                                </div>
-                                <div
-                                    className={`grid grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
-                                >
-                                    {visibleNutrients.map((nutrient) => {
-                                        const details = nutrientDetails[nutrient];
-                                        if (!details) return null;
-                                        const value =
-                                            (food.default_variant?.[
-                                                nutrient as keyof FoodVariant
-                                            ] as number) || 0;
-                                        return (
-                                            <span key={nutrient}>
-                                                <strong>
-                                                    {value.toFixed(nutrient === "calories" ? 0 : 1)}
-                                                    {details.unit}
-                                                </strong>{" "}
-                                                {details.label}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Per {food.default_variant?.serving_size}
-                                    {food.default_variant?.serving_unit}
-                                </p>
-                            </div>
-                            <Button
-                                size="sm"
-                                onClick={() => handleMealieEdit(food)}
-                                className="ml-2"
-                            >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit & Add
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            ))
-        )}
+        {activeTab === "online" &&
+          foods.length > 0 &&
+          foods.map((food) => (
+            <Card
+              key={`${food.provider_type}-${food.provider_external_id}`}
+              className="hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="font-medium">{food.name}</h3>
+                      {food.brand && (
+                        <Badge variant="secondary" className="text-xs">
+                          {food.brand}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        Mealie
+                      </Badge>
+                    </div>
+                    <div
+                      className={`grid grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
+                    >
+                      {visibleNutrients.map((nutrient) => {
+                        const details = nutrientDetails[nutrient];
+                        if (!details) return null;
+                        const value =
+                          (food.default_variant?.[
+                            nutrient as keyof FoodVariant
+                          ] as number) || 0;
+                        return (
+                          <span key={nutrient}>
+                            <strong>
+                              {value.toFixed(nutrient === "calories" ? 0 : 1)}
+                              {details.unit}
+                            </strong>{" "}
+                            {details.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Per {food.default_variant?.serving_size}
+                      {food.default_variant?.serving_unit}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleMealieEdit(food)}
+                    className="ml-2"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit & Add
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
 
         {activeTab === "database" &&
           searchTerm.trim() !== "" &&
@@ -1182,7 +1192,9 @@ const EnhancedFoodSearch = ({
               food={
                 // If it's an OpenFoodFacts product, convert it
                 editingProduct && "product_name" in editingProduct
-                  ? convertOpenFoodFactsToFood(editingProduct as OpenFoodFactsProduct)
+                  ? convertOpenFoodFactsToFood(
+                      editingProduct as OpenFoodFactsProduct
+                    )
                   : // Otherwise, assume it's already a Food type (from Nutritionix, FatSecret, or Mealie)
                     (editingProduct as Food)
               }
@@ -1228,6 +1240,21 @@ const EnhancedFoodSearch = ({
             isActive={showBarcodeScanner}
             cameraFacing="back"
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showImportFromCsvDialog}
+        onOpenChange={setShowImportFromCsvDialog}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import from CSV</DialogTitle>
+            <DialogDescription>
+              Import a CSV file to add multiple foods at once.
+            </DialogDescription>
+          </DialogHeader>
+          <ImportFromCSV onSave={handleSaveEditedFood} />
         </DialogContent>
       </Dialog>
     </div>

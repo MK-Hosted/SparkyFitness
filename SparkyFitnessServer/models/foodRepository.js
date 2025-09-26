@@ -1,6 +1,6 @@
-const pool = require('../db/connection');
-const { log } = require('../config/logging');
-const format = require('pg-format'); // Required for bulkCreateFoodVariants
+const pool = require("../db/connection");
+const { log } = require("../config/logging");
+const format = require("pg-format"); // Required for bulkCreateFoodVariants
 
 async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
   const client = await pool.connect();
@@ -36,7 +36,7 @@ async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
       WHERE f.is_quick_food = FALSE AND `;
     const queryParams = [];
     let paramIndex = 1;
- 
+
     if (exactMatch) {
       query += `CONCAT(f.brand, ' ', f.name) ILIKE $${paramIndex++} AND f.user_id = $${paramIndex++}`;
       queryParams.push(name, userId);
@@ -47,10 +47,10 @@ async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
       query += `f.name = $${paramIndex++} AND f.user_id = $${paramIndex++}`;
       queryParams.push(name, userId);
     } else {
-      throw new Error('Invalid search parameters.');
+      throw new Error("Invalid search parameters.");
     }
- 
-    query += ' LIMIT 3';
+
+    query += " LIMIT 3";
     const result = await client.query(query, queryParams);
     return result.rows;
   } finally {
@@ -61,7 +61,7 @@ async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
 async function createFood(foodData) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN'); // Start transaction
+    await client.query("BEGIN"); // Start transaction
 
     // 1. Create the food entry
     const foodResult = await client.query(
@@ -69,7 +69,15 @@ async function createFood(foodData) {
         name, is_custom, user_id, brand, barcode, provider_external_id, shared_with_public, provider_type, is_quick_food, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) RETURNING id, name, brand, is_custom, user_id, shared_with_public, is_quick_food`,
       [
-        foodData.name, foodData.is_custom, foodData.user_id, foodData.brand, foodData.barcode, foodData.provider_external_id, foodData.shared_with_public, foodData.provider_type, foodData.is_quick_food || false
+        foodData.name,
+        foodData.is_custom,
+        foodData.user_id,
+        foodData.brand,
+        foodData.barcode,
+        foodData.provider_external_id,
+        foodData.shared_with_public,
+        foodData.provider_type,
+        foodData.is_quick_food || false,
       ]
     );
     const newFood = foodResult.rows[0];
@@ -83,15 +91,31 @@ async function createFood(foodData) {
         vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, now(), now()) RETURNING id`,
       [
-        newFood.id, foodData.serving_size, foodData.serving_unit, foodData.calories, foodData.protein, foodData.carbs, foodData.fat,
-        foodData.saturated_fat, foodData.polyunsaturated_fat, foodData.monounsaturated_fat, foodData.trans_fat,
-        foodData.cholesterol, foodData.sodium, foodData.potassium, foodData.dietary_fiber, foodData.sugars,
-        foodData.vitamin_a, foodData.vitamin_c, foodData.calcium, foodData.iron
+        newFood.id,
+        foodData.serving_size,
+        foodData.serving_unit,
+        foodData.calories,
+        foodData.protein,
+        foodData.carbs,
+        foodData.fat,
+        foodData.saturated_fat,
+        foodData.polyunsaturated_fat,
+        foodData.monounsaturated_fat,
+        foodData.trans_fat,
+        foodData.cholesterol,
+        foodData.sodium,
+        foodData.potassium,
+        foodData.dietary_fiber,
+        foodData.sugars,
+        foodData.vitamin_a,
+        foodData.vitamin_c,
+        foodData.calcium,
+        foodData.iron,
       ]
     );
     const newVariantId = variantResult.rows[0].id;
 
-    await client.query('COMMIT'); // Commit transaction
+    await client.query("COMMIT"); // Commit transaction
 
     // Return the new food with its default variant details
     return {
@@ -118,10 +142,10 @@ async function createFood(foodData) {
         calcium: foodData.calcium,
         iron: foodData.iron,
         is_default: true,
-      }
+      },
     };
   } catch (error) {
-    await client.query('ROLLBACK'); // Rollback transaction on error
+    await client.query("ROLLBACK"); // Rollback transaction on error
     throw error;
   } finally {
     client.release();
@@ -172,11 +196,11 @@ async function getFoodOwnerId(foodId) {
   const client = await pool.connect();
   try {
     const foodResult = await client.query(
-      'SELECT user_id FROM foods WHERE id = $1',
+      "SELECT user_id FROM foods WHERE id = $1",
       [foodId]
     );
     const ownerId = foodResult.rows[0]?.user_id;
-    log('info', `getFoodOwnerId: Food ID ${foodId} owner: ${ownerId}`);
+    log("info", `getFoodOwnerId: Food ID ${foodId} owner: ${ownerId}`);
     return ownerId;
   } finally {
     client.release();
@@ -199,8 +223,15 @@ async function updateFood(id, userId, foodData) {
       WHERE id = $8 AND user_id = $9
       RETURNING *`,
       [
-        foodData.name, foodData.is_custom, foodData.brand, foodData.barcode,
-        foodData.provider_external_id, foodData.shared_with_public, foodData.provider_type, id, userId
+        foodData.name,
+        foodData.is_custom,
+        foodData.brand,
+        foodData.barcode,
+        foodData.provider_external_id,
+        foodData.shared_with_public,
+        foodData.provider_type,
+        id,
+        userId,
       ]
     );
     return result.rows[0];
@@ -213,7 +244,7 @@ async function deleteFood(id, userId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'DELETE FROM foods WHERE id = $1 AND user_id = $2 RETURNING id',
+      "DELETE FROM foods WHERE id = $1 AND user_id = $2 RETURNING id",
       [id, userId]
     );
     return result.rowCount > 0;
@@ -222,7 +253,14 @@ async function deleteFood(id, userId) {
   }
 }
 
-async function getFoodsWithPagination(searchTerm, foodFilter, authenticatedUserId, limit, offset, sortBy) {
+async function getFoodsWithPagination(
+  searchTerm,
+  foodFilter,
+  authenticatedUserId,
+  limit,
+  offset,
+  sortBy
+) {
   const client = await pool.connect();
   try {
     let whereClauses = ["f.is_quick_food = FALSE"];
@@ -235,17 +273,19 @@ async function getFoodsWithPagination(searchTerm, foodFilter, authenticatedUserI
       paramIndex++;
     }
 
-    if (foodFilter === 'mine') {
+    if (foodFilter === "mine") {
       whereClauses.push(`user_id = $${paramIndex}`);
       queryParams.push(authenticatedUserId);
       paramIndex++;
-    } else if (foodFilter === 'family') {
-      whereClauses.push(`user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))`);
+    } else if (foodFilter === "family") {
+      whereClauses.push(
+        `user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))`
+      );
       queryParams.push(authenticatedUserId);
       paramIndex++;
-    } else if (foodFilter === 'public') {
+    } else if (foodFilter === "public") {
       whereClauses.push(`shared_with_public = TRUE`);
-    } else if (foodFilter === 'all') {
+    } else if (foodFilter === "all") {
       whereClauses.push(`(
         user_id IS NULL OR user_id = $${paramIndex} OR shared_with_public = TRUE OR
         user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))
@@ -282,19 +322,25 @@ async function getFoodsWithPagination(searchTerm, foodFilter, authenticatedUserI
         ) AS default_variant
       FROM foods f
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
-      WHERE ${whereClauses.join(' AND ')}
+      WHERE ${whereClauses.join(" AND ")}
     `;
 
-    let orderByClause = 'name ASC';
+    let orderByClause = "name ASC";
     if (sortBy) {
-      const [sortField, sortOrder] = sortBy.split(':');
-      const allowedSortFields = ['name', 'calories', 'protein', 'carbs', 'fat'];
-      const allowedSortOrders = ['asc', 'desc'];
+      const [sortField, sortOrder] = sortBy.split(":");
+      const allowedSortFields = ["name", "calories", "protein", "carbs", "fat"];
+      const allowedSortOrders = ["asc", "desc"];
 
-      if (allowedSortFields.includes(sortField) && allowedSortOrders.includes(sortOrder)) {
+      if (
+        allowedSortFields.includes(sortField) &&
+        allowedSortOrders.includes(sortOrder)
+      ) {
         orderByClause = `${sortField} ${sortOrder.toUpperCase()}`;
       } else {
-        log('warn', `Invalid sortBy parameter received: ${sortBy}. Using default sort.`);
+        log(
+          "warn",
+          `Invalid sortBy parameter received: ${sortBy}. Using default sort.`
+        );
       }
     }
     query += ` ORDER BY ${orderByClause}`;
@@ -322,17 +368,19 @@ async function countFoods(searchTerm, foodFilter, authenticatedUserId) {
       paramIndex++;
     }
 
-    if (foodFilter === 'mine') {
+    if (foodFilter === "mine") {
       whereClauses.push(`user_id = $${paramIndex}`);
       countQueryParams.push(authenticatedUserId);
       paramIndex++;
-    } else if (foodFilter === 'family') {
-      whereClauses.push(`user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))`);
+    } else if (foodFilter === "family") {
+      whereClauses.push(
+        `user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))`
+      );
       countQueryParams.push(authenticatedUserId);
       paramIndex++;
-    } else if (foodFilter === 'public') {
+    } else if (foodFilter === "public") {
       whereClauses.push(`shared_with_public = TRUE`);
-    } else if (foodFilter === 'all') {
+    } else if (foodFilter === "all") {
       whereClauses.push(`(
         user_id IS NULL OR user_id = $${paramIndex} OR shared_with_public = TRUE OR
         user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW()))
@@ -344,7 +392,7 @@ async function countFoods(searchTerm, foodFilter, authenticatedUserId) {
     const countQuery = `
       SELECT COUNT(*)
       FROM foods
-      WHERE ${whereClauses.join(' AND ')}
+      WHERE ${whereClauses.join(" AND ")}
     `;
     const countResult = await client.query(countQuery, countQueryParams);
     return parseInt(countResult.rows[0].count, 10);
@@ -364,10 +412,27 @@ async function createFoodVariant(variantData) {
         vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now(), now()) RETURNING id`,
       [
-        variantData.food_id, variantData.serving_size, variantData.serving_unit, variantData.calories, variantData.protein, variantData.carbs, variantData.fat,
-        variantData.saturated_fat, variantData.polyunsaturated_fat, variantData.monounsaturated_fat, variantData.trans_fat,
-        variantData.cholesterol, variantData.sodium, variantData.potassium, variantData.dietary_fiber, variantData.sugars,
-        variantData.vitamin_a, variantData.vitamin_c, variantData.calcium, variantData.iron, variantData.is_default || false
+        variantData.food_id,
+        variantData.serving_size,
+        variantData.serving_unit,
+        variantData.calories,
+        variantData.protein,
+        variantData.carbs,
+        variantData.fat,
+        variantData.saturated_fat,
+        variantData.polyunsaturated_fat,
+        variantData.monounsaturated_fat,
+        variantData.trans_fat,
+        variantData.cholesterol,
+        variantData.sodium,
+        variantData.potassium,
+        variantData.dietary_fiber,
+        variantData.sugars,
+        variantData.vitamin_a,
+        variantData.vitamin_c,
+        variantData.calcium,
+        variantData.iron,
+        variantData.is_default || false,
       ]
     );
     return result.rows[0];
@@ -380,7 +445,7 @@ async function getFoodVariantById(id) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT * FROM food_variants WHERE id = $1',
+      "SELECT * FROM food_variants WHERE id = $1",
       [id]
     );
     return result.rows[0];
@@ -399,7 +464,10 @@ async function getFoodVariantOwnerId(variantId) {
       [variantId]
     );
     const ownerId = result.rows[0]?.user_id;
-    log('info', `getFoodVariantOwnerId: Variant ID ${variantId} owner: ${ownerId}`);
+    log(
+      "info",
+      `getFoodVariantOwnerId: Variant ID ${variantId} owner: ${ownerId}`
+    );
     return ownerId;
   } finally {
     client.release();
@@ -410,7 +478,7 @@ async function getFoodVariantsByFoodId(foodId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT * FROM food_variants WHERE food_id = $1',
+      "SELECT * FROM food_variants WHERE food_id = $1",
       [foodId]
     );
     return result.rows;
@@ -449,10 +517,28 @@ async function updateFoodVariant(id, variantData) {
       WHERE id = $22
       RETURNING *`,
       [
-        variantData.food_id, variantData.serving_size, variantData.serving_unit, variantData.calories, variantData.protein, variantData.carbs, variantData.fat,
-        variantData.saturated_fat, variantData.polyunsaturated_fat, variantData.monounsaturated_fat, variantData.trans_fat,
-        variantData.cholesterol, variantData.sodium, variantData.potassium, variantData.dietary_fiber, variantData.sugars,
-        variantData.vitamin_a, variantData.vitamin_c, variantData.calcium, variantData.iron, variantData.is_default, id
+        variantData.food_id,
+        variantData.serving_size,
+        variantData.serving_unit,
+        variantData.calories,
+        variantData.protein,
+        variantData.carbs,
+        variantData.fat,
+        variantData.saturated_fat,
+        variantData.polyunsaturated_fat,
+        variantData.monounsaturated_fat,
+        variantData.trans_fat,
+        variantData.cholesterol,
+        variantData.sodium,
+        variantData.potassium,
+        variantData.dietary_fiber,
+        variantData.sugars,
+        variantData.vitamin_a,
+        variantData.vitamin_c,
+        variantData.calcium,
+        variantData.iron,
+        variantData.is_default,
+        id,
       ]
     );
 
@@ -474,7 +560,7 @@ async function deleteFoodVariant(id) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'DELETE FROM food_variants WHERE id = $1 RETURNING id',
+      "DELETE FROM food_variants WHERE id = $1 RETURNING id",
       [id]
     );
     return result.rowCount > 0;
@@ -484,24 +570,33 @@ async function deleteFoodVariant(id) {
 }
 
 async function createFoodEntry(entryData) {
-    const client = await pool.connect();
-    try {
-        const result = await client.query(
-            `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [entryData.user_id, entryData.food_id, entryData.meal_type, entryData.quantity, entryData.unit, entryData.entry_date, entryData.variant_id, entryData.meal_plan_template_id]
-        );
-        return result.rows[0];
-    } finally {
-        client.release();
-    }
+      [
+        entryData.user_id,
+        entryData.food_id,
+        entryData.meal_type,
+        entryData.quantity,
+        entryData.unit,
+        entryData.entry_date,
+        entryData.variant_id,
+        entryData.meal_plan_template_id,
+      ]
+    );
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
 }
- 
+
 async function getFoodEntryOwnerId(entryId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT user_id FROM food_entries WHERE id = $1',
+      "SELECT user_id FROM food_entries WHERE id = $1",
       [entryId]
     );
     return result.rows[0]?.user_id;
@@ -514,7 +609,7 @@ async function deleteFoodEntry(entryId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'DELETE FROM food_entries WHERE id = $1 RETURNING id',
+      "DELETE FROM food_entries WHERE id = $1 RETURNING id",
       [entryId]
     );
     return result.rowCount > 0;
@@ -541,7 +636,7 @@ async function updateFoodEntry(entryId, userId, entryData) {
         entryData.entry_date,
         entryData.variant_id,
         entryId,
-        userId
+        userId,
       ]
     );
     return result.rows[0];
@@ -723,11 +818,30 @@ async function bulkCreateFoodVariants(variantsData) {
         vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
       ) VALUES %L RETURNING id`;
 
-    const values = variantsData.map(variant => [
-      variant.food_id, variant.serving_size, variant.serving_unit, variant.calories, variant.protein, variant.carbs, variant.fat,
-      variant.saturated_fat, variant.polyunsaturated_fat, variant.monounsaturated_fat, variant.trans_fat,
-      variant.cholesterol, variant.sodium, variant.potassium, variant.dietary_fiber, variant.sugars,
-      variant.vitamin_a, variant.vitamin_c, variant.calcium, variant.iron, variant.is_default || false, 'now()', 'now()'
+    const values = variantsData.map((variant) => [
+      variant.food_id,
+      variant.serving_size,
+      variant.serving_unit,
+      variant.calories,
+      variant.protein,
+      variant.carbs,
+      variant.fat,
+      variant.saturated_fat,
+      variant.polyunsaturated_fat,
+      variant.monounsaturated_fat,
+      variant.trans_fat,
+      variant.cholesterol,
+      variant.sodium,
+      variant.potassium,
+      variant.dietary_fiber,
+      variant.sugars,
+      variant.vitamin_a,
+      variant.vitamin_c,
+      variant.calcium,
+      variant.iron,
+      variant.is_default || false,
+      "now()",
+      "now()",
     ]);
 
     const formattedQuery = format(query, values);
@@ -739,50 +853,69 @@ async function bulkCreateFoodVariants(variantsData) {
 }
 
 async function deleteFoodEntriesByMealPlanId(mealPlanId, userId) {
-    const client = await pool.connect();
-    try {
-        const result = await client.query(
-            'DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2 RETURNING id',
-            [mealPlanId, userId]
-        );
-        return result.rowCount;
-    } catch (error) {
-        log('error', `Error deleting food entries for meal plan ${mealPlanId}:`, error);
-        throw error;
-    } finally {
-        client.release();
-    }
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      "DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2 RETURNING id",
+      [mealPlanId, userId]
+    );
+    return result.rowCount;
+  } catch (error) {
+    log(
+      "error",
+      `Error deleting food entries for meal plan ${mealPlanId}:`,
+      error
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
-async function deleteFoodEntriesByTemplateId(templateId, userId, currentClientDate = null) {
-    const client = await pool.connect();
-    try {
-        let query = `DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2`;
-        const params = [templateId, userId];
+async function deleteFoodEntriesByTemplateId(
+  templateId,
+  userId,
+  currentClientDate = null
+) {
+  const client = await pool.connect();
+  try {
+    let query = `DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2`;
+    const params = [templateId, userId];
 
-        if (currentClientDate) {
-            // Only delete from currentClientDate onwards
-            query += ` AND entry_date >= $3`;
-            params.push(currentClientDate);
-        }
-
-        const result = await client.query(query, params);
-        return result.rowCount;
-    } catch (error) {
-        log('error', `Error deleting food entries for template ${templateId}:`, error);
-        throw error;
-    } finally {
-        client.release();
+    if (currentClientDate) {
+      // Only delete from currentClientDate onwards
+      query += ` AND entry_date >= $3`;
+      params.push(currentClientDate);
     }
+
+    const result = await client.query(query, params);
+    return result.rowCount;
+  } catch (error) {
+    log(
+      "error",
+      `Error deleting food entries for template ${templateId}:`,
+      error
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
-async function createFoodEntriesFromTemplate(templateId, userId, currentClientDate = null) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        log('info', `Creating food entries from template ${templateId} for user ${userId}`);
+async function createFoodEntriesFromTemplate(
+  templateId,
+  userId,
+  currentClientDate = null
+) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    log(
+      "info",
+      `Creating food entries from template ${templateId} for user ${userId}`
+    );
 
-        const templateQuery = `
+    const templateQuery = `
             SELECT
                 t.start_date,
                 t.end_date,
@@ -808,101 +941,134 @@ async function createFoodEntriesFromTemplate(templateId, userId, currentClientDa
             FROM meal_plan_templates t
             WHERE t.id = $1 AND t.user_id = $2
         `;
-        const templateResult = await client.query(templateQuery, [templateId, userId]);
-        if (templateResult.rows.length === 0) {
-            throw new Error('Meal plan template not found or access denied.');
+    const templateResult = await client.query(templateQuery, [
+      templateId,
+      userId,
+    ]);
+    if (templateResult.rows.length === 0) {
+      throw new Error("Meal plan template not found or access denied.");
+    }
+
+    const { start_date, end_date, assignments } = templateResult.rows[0];
+    if (!assignments || assignments.length === 0) {
+      log(
+        "info",
+        `No assignments for template ${templateId}, skipping food entry creation.`
+      );
+      await client.query("COMMIT");
+      return;
+    }
+
+    // Determine the effective "today" based on currentClientDate or server's local date
+    const today = currentClientDate ? new Date(currentClientDate) : new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    let currentDate = new Date(start_date);
+    currentDate.setHours(0, 0, 0, 0); // Normalize template start_date to start of day
+
+    // Start from today if template start_date is in the past
+    if (currentDate < today) {
+      currentDate = today;
+    }
+
+    const lastDate = new Date(end_date);
+    lastDate.setHours(0, 0, 0, 0); // Normalize template end_date to start of day
+
+    while (currentDate <= lastDate) {
+      const dayOfWeek = currentDate.getDay();
+      const assignmentsForDay = assignments.filter(
+        (a) => a.day_of_week === dayOfWeek
+      );
+
+      for (const assignment of assignmentsForDay) {
+        let foodsToProcess = [];
+
+        if (assignment.item_type === "meal") {
+          const mealFoodsResult = await client.query(
+            `SELECT food_id, variant_id, quantity, unit FROM meal_foods WHERE meal_id = $1`,
+            [assignment.meal_id]
+          );
+          foodsToProcess = mealFoodsResult.rows;
+        } else if (assignment.item_type === "food") {
+          foodsToProcess.push({
+            food_id: assignment.food_id,
+            variant_id: assignment.variant_id,
+            quantity: assignment.quantity,
+            unit: assignment.unit,
+          });
         }
 
-        const { start_date, end_date, assignments } = templateResult.rows[0];
-        if (!assignments || assignments.length === 0) {
-            log('info', `No assignments for template ${templateId}, skipping food entry creation.`);
-            await client.query('COMMIT');
-            return;
-        }
-
-        // Determine the effective "today" based on currentClientDate or server's local date
-        const today = currentClientDate ? new Date(currentClientDate) : new Date();
-        today.setHours(0, 0, 0, 0); // Normalize to start of day
-
-        let currentDate = new Date(start_date);
-        currentDate.setHours(0, 0, 0, 0); // Normalize template start_date to start of day
-
-        // Start from today if template start_date is in the past
-        if (currentDate < today) {
-            currentDate = today;
-        }
-
-        const lastDate = new Date(end_date);
-        lastDate.setHours(0, 0, 0, 0); // Normalize template end_date to start of day
-
-        while (currentDate <= lastDate) {
-            const dayOfWeek = currentDate.getDay();
-            const assignmentsForDay = assignments.filter(a => a.day_of_week === dayOfWeek);
-
-            for (const assignment of assignmentsForDay) {
-                let foodsToProcess = [];
-
-                if (assignment.item_type === 'meal') {
-                    const mealFoodsResult = await client.query(
-                        `SELECT food_id, variant_id, quantity, unit FROM meal_foods WHERE meal_id = $1`,
-                        [assignment.meal_id]
-                    );
-                    foodsToProcess = mealFoodsResult.rows;
-                } else if (assignment.item_type === 'food') {
-                    foodsToProcess.push({
-                        food_id: assignment.food_id,
-                        variant_id: assignment.variant_id,
-                        quantity: assignment.quantity,
-                        unit: assignment.unit,
-                    });
-                }
-
-                for (const foodItem of foodsToProcess) {
-                    // Check for existing entry to prevent duplicates
-                    const existingEntry = await client.query(
-                        `SELECT id FROM food_entries
+        for (const foodItem of foodsToProcess) {
+          // Check for existing entry to prevent duplicates
+          const existingEntry = await client.query(
+            `SELECT id FROM food_entries
                          WHERE user_id = $1
                             AND food_id = $2
                             AND meal_type = $3
                             AND entry_date = $4
                             AND variant_id = $5`,
-                        [userId, foodItem.food_id, assignment.meal_type, currentDate, foodItem.variant_id]
-                    );
+            [
+              userId,
+              foodItem.food_id,
+              assignment.meal_type,
+              currentDate,
+              foodItem.variant_id,
+            ]
+          );
 
-                    if (existingEntry.rows.length === 0) {
-                        // Only insert if no duplicate exists
-                        const foodEntryData = [
-                            userId,
-                            foodItem.food_id,
-                            assignment.meal_type,
-                            foodItem.quantity,
-                            foodItem.unit,
-                            currentDate,
-                            foodItem.variant_id,
-                            templateId // Still link to the template if it's a template-generated entry
-                        ];
-                        log('info', `Inserting food entry for template ${templateId}, day ${currentDate.toISOString().split('T')[0]}:`, foodEntryData);
-                        await client.query(
-                            `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
+          if (existingEntry.rows.length === 0) {
+            // Only insert if no duplicate exists
+            const foodEntryData = [
+              userId,
+              foodItem.food_id,
+              assignment.meal_type,
+              foodItem.quantity,
+              foodItem.unit,
+              currentDate,
+              foodItem.variant_id,
+              templateId, // Still link to the template if it's a template-generated entry
+            ];
+            log(
+              "info",
+              `Inserting food entry for template ${templateId}, day ${
+                currentDate.toISOString().split("T")[0]
+              }:`,
+              foodEntryData
+            );
+            await client.query(
+              `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                            foodEntryData
-                        );
-                    } else {
-                        log('info', `Skipping duplicate food entry for template ${templateId}, day ${currentDate.toISOString().split('T')[0]}:`, existingEntry.rows[0].id);
-                    }
-                }
-            }
-            currentDate.setDate(currentDate.getDate() + 1);
+              foodEntryData
+            );
+          } else {
+            log(
+              "info",
+              `Skipping duplicate food entry for template ${templateId}, day ${
+                currentDate.toISOString().split("T")[0]
+              }:`,
+              existingEntry.rows[0].id
+            );
+          }
         }
-        await client.query('COMMIT');
-        log('info', `Successfully created food entries from template ${templateId}`);
-    } catch (error) {
-        await client.query('ROLLBACK');
-        log('error', `Error creating food entries from template ${templateId}: ${error.message}`, error);
-        throw error;
-    } finally {
-        client.release();
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
+    await client.query("COMMIT");
+    log(
+      "info",
+      `Successfully created food entries from template ${templateId}`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    log(
+      "error",
+      `Error creating food entries from template ${templateId}: ${error.message}`,
+      error
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function bulkCreateFoodEntries(entriesData) {
@@ -912,7 +1078,7 @@ async function bulkCreateFoodEntries(entriesData) {
       INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
       VALUES %L RETURNING *`;
 
-    const values = entriesData.map(entry => [
+    const values = entriesData.map((entry) => [
       entry.user_id,
       entry.food_id,
       entry.meal_type,
@@ -920,7 +1086,7 @@ async function bulkCreateFoodEntries(entriesData) {
       entry.unit,
       entry.entry_date,
       entry.variant_id,
-      entry.meal_plan_template_id || null // meal_plan_template_id can be null
+      entry.meal_plan_template_id || null, // meal_plan_template_id can be null
     ]);
 
     const formattedQuery = format(query, values);
@@ -935,7 +1101,7 @@ async function getFoodDataProviderById(providerId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT * FROM external_data_providers WHERE id = $1',
+      "SELECT * FROM external_data_providers WHERE id = $1",
       [providerId]
     );
     return result.rows[0];
@@ -1066,7 +1232,7 @@ module.exports = {
   getDailyNutritionSummary,
   getFoodDeletionImpact,
   getRecentFoods, // New export
-  getTopFoods,    // New export
+  getTopFoods, // New export
 };
 
 async function getDailyNutritionSummary(userId, date) {
@@ -1093,10 +1259,19 @@ async function getFoodDeletionImpact(foodId) {
   const client = await pool.connect();
   try {
     const queries = [
-      client.query('SELECT COUNT(*) FROM food_entries WHERE food_id = $1', [foodId]),
-      client.query('SELECT COUNT(*) FROM meal_foods WHERE food_id = $1', [foodId]),
-      client.query('SELECT COUNT(*) FROM meal_plans WHERE food_id = $1', [foodId]),
-      client.query('SELECT COUNT(*) FROM meal_plan_template_assignments WHERE food_id = $1', [foodId]),
+      client.query("SELECT COUNT(*) FROM food_entries WHERE food_id = $1", [
+        foodId,
+      ]),
+      client.query("SELECT COUNT(*) FROM meal_foods WHERE food_id = $1", [
+        foodId,
+      ]),
+      client.query("SELECT COUNT(*) FROM meal_plans WHERE food_id = $1", [
+        foodId,
+      ]),
+      client.query(
+        "SELECT COUNT(*) FROM meal_plan_template_assignments WHERE food_id = $1",
+        [foodId]
+      ),
     ];
 
     const results = await Promise.all(queries);
@@ -1112,7 +1287,13 @@ async function getFoodDeletionImpact(foodId) {
   }
 }
 
-async function getFoodEntryByDetails(userId, foodId, mealType, entryDate, variantId) {
+async function getFoodEntryByDetails(
+  userId,
+  foodId,
+  mealType,
+  entryDate,
+  variantId
+) {
   const client = await pool.connect();
   try {
     const result = await client.query(
