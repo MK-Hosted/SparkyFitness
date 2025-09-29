@@ -8,7 +8,7 @@ async function handleAiServiceSettings(action, serviceData, authenticatedUserId)
   try {
     if (action === 'save_ai_service_settings') {
       serviceData.user_id = authenticatedUserId; // Ensure user_id is set from authenticated user
-      if (!serviceData.id && !serviceData.api_key) {
+      if (!serviceData.id && serviceData.service_type !== 'ollama' && !serviceData.api_key) {
         throw new Error('API key is required for adding a new AI service.');
       }
       const result = await chatRepository.upsertAiServiceSetting(serviceData);
@@ -168,8 +168,8 @@ async function processChatMessage(messages, serviceConfig, authenticatedUserId) 
     // Use the serviceConfig passed from the frontend directly
     const aiService = serviceConfig;
     
-    // Ensure API key is present
-    if (!aiService.api_key) {
+    // Ensure API key is present, unless it's Ollama
+    if (aiService.service_type !== 'ollama' && !aiService.api_key) {
       throw new Error('API key missing for selected AI service.');
     }
 
@@ -334,8 +334,8 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
                               aiService.custom_url, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${aiService.api_key}`,
             'Content-Type': 'application/json',
+            ...(aiService.api_key && { 'Authorization': `Bearer ${aiService.api_key}` }),
           },
           body: JSON.stringify({
             model: model,
@@ -349,9 +349,9 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
         response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
-            'x-api-key': aiService.api_key,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
+            ...(aiService.api_key && { 'x-api-key': aiService.api_key }),
           },
           body: JSON.stringify({
             model: model,
@@ -423,6 +423,9 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           };
         }
 
+        if (!aiService.api_key) {
+          throw new Error('API key missing for Google AI service.');
+        }
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${aiService.api_key}`, {
           method: 'POST',
           headers: {
@@ -513,8 +516,8 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
     // Use the serviceConfig passed from the frontend directly
     const aiService = serviceConfig;
     
-    // Ensure API key is present
-    if (!aiService.api_key) {
+    // Ensure API key is present, unless it's Ollama
+    if (aiService.service_type !== 'ollama' && !aiService.api_key) {
       throw new Error('API key missing for selected AI service.');
     }
 
@@ -542,8 +545,8 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
                                aiService.custom_url, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${aiService.api_key}`,
             'Content-Type': 'application/json',
+            ...(aiService.api_key && { 'Authorization': `Bearer ${aiService.api_key}` }),
           },
           body: JSON.stringify({
             model: model,
@@ -557,9 +560,9 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
         response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
-            'x-api-key': aiService.api_key,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
+            ...(aiService.api_key && { 'x-api-key': aiService.api_key }),
           },
           body: JSON.stringify({
             model: model,
@@ -597,6 +600,9 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           };
         }
 
+        if (!aiService.api_key) {
+          throw new Error('API key missing for Google AI service.');
+        }
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${aiService.api_key}`, {
           method: 'POST',
           headers: {

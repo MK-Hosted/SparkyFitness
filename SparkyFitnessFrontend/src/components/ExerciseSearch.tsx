@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // New import
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { debug, info, warn, error } from '@/utils/logging';
-import { searchExercises as searchExercisesService, searchExternalExercises, addExternalExerciseToUserExercises, addNutritionixExercise, Exercise } from '@/services/exerciseSearchService';
+import { searchExercises as searchExercisesService, searchExternalExercises, addExternalExerciseToUserExercises, addNutritionixExercise, addFreeExerciseDBExercise, Exercise } from '@/services/exerciseSearchService'; // Added addFreeExerciseDBExercise
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Loader2, Search } from "lucide-react"; // Added Loader2 and Search
+import { Plus, Loader2, Search, ChevronLeft, ChevronRight, Volume2 } from "lucide-react"; // Added Loader2, Search, ChevronLeft, ChevronRight, Volume2
 import { useToast } from "@/hooks/use-toast";
 import { getExternalDataProviders, DataProvider, getProviderCategory } from '@/services/externalProviderService'; // New import
 
@@ -17,7 +17,7 @@ interface ExerciseSearchProps {
 }
 
 const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSearchProps) => {
-  const { loggingLevel } = usePreferences();
+  const { loggingLevel, itemDisplayLimit } = usePreferences(); // Get itemDisplayLimit from preferences
   const { toast } = useToast();
   debug(loggingLevel, "ExerciseSearch: Component rendered.");
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,6 +27,7 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
   const [providers, setProviders] = useState<DataProvider[]>([]); // New state for providers
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null); // Stores the provider's database ID
   const [selectedProviderType, setSelectedProviderType] = useState<string | null>(null); // Stores the provider's type (e.g., 'nutritionix', 'wger')
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // For image carousel
 
   const handleSearch = async (query: string) => {
     debug(loggingLevel, `ExerciseSearch: Searching exercises with query: "${query}" from source: "${searchSource}" and provider ID: "${selectedProviderId}", type: "${selectedProviderType}"`);
@@ -47,7 +48,7 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
           setLoading(false);
           return;
         }
-        data = await searchExternalExercises(query, selectedProviderId, selectedProviderType); // Pass ID and Type
+        data = await searchExternalExercises(query, selectedProviderId, selectedProviderType, itemDisplayLimit); // Pass ID, Type, and itemDisplayLimit
       }
       info(loggingLevel, "ExerciseSearch: Exercises search results:", data);
       setExercises(data || []);
@@ -72,7 +73,10 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
         newExercise = await addExternalExerciseToUserExercises(exercise.id);
       } else if (selectedProviderType === 'nutritionix') {
         newExercise = await addNutritionixExercise(exercise); // Call new function to add Nutritionix exercise
-      } else {
+      } else if (selectedProviderType === 'free-exercise-db') { // Handle free-exercise-db
+        newExercise = await addFreeExerciseDBExercise(exercise.id);
+      }
+      else {
         warn(loggingLevel, "ExerciseSearch: Unknown provider for adding external exercise:", selectedProviderType);
         return undefined;
       }
@@ -144,6 +148,27 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
       fetchProviders();
     }
   }, [searchSource, loggingLevel, toast]);
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prevIndex) => (prevIndex + 1) % (exercises[0]?.images?.length || 1));
+  };
+
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prevIndex) => (prevIndex - 1 + (exercises[0]?.images?.length || 1)) % (exercises[0]?.images?.length || 1));
+  };
+
+  const handleSpeakInstructions = (instructions: string[]) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(instructions.join('. '));
+      window.speechSynthesis.speak(utterance);
+    } else {
+      toast({
+        title: "Text-to-Speech Not Supported",
+        description: "Your browser does not support the Web Speech API.",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -232,13 +257,80 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
               {exercises.map((exercise) => (
                 <div key={exercise.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
-                    <div className="font-medium">{exercise.name}</div>
+                    <div className="font-medium flex items-center gap-2">
+                      {exercise.name}
+                      {exercise.source === 'wger' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                          Wger
+                        </span>
+                      )}
+                      {exercise.source === 'free-exercise-db' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                          Free Exercise DB
+                        </span>
+                      )}
+                      {exercise.source === 'nutritionix' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                          Nutritionix
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-500">
                       {exercise.category}
                       {exercise.calories_per_hour && ` • ${exercise.calories_per_hour} cal/hour`}
+                      {exercise.level && ` • Level: ${exercise.level}`}
+                      {exercise.force && ` • Force: ${exercise.force}`}
+                      {exercise.mechanic && ` • Mechanic: ${exercise.mechanic}`}
                     </div>
+                    {exercise.equipment && exercise.equipment.length > 0 && (
+                      <div className="text-xs text-gray-400">Equipment: {exercise.equipment.join(', ')}</div>
+                    )}
+                    {exercise.primary_muscles && exercise.primary_muscles.length > 0 && (
+                      <div className="text-xs text-gray-400">Primary Muscles: {exercise.primary_muscles.join(', ')}</div>
+                    )}
+                    {exercise.secondary_muscles && exercise.secondary_muscles.length > 0 && (
+                      <div className="text-xs text-gray-400">Secondary Muscles: {exercise.secondary_muscles.join(', ')}</div>
+                    )}
+                    {exercise.instructions && exercise.instructions.length > 0 && (
+                      <div className="text-xs text-gray-400 flex items-center">
+                        Instructions: {exercise.instructions[0]}...
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSpeakInstructions(exercise.instructions || [])}
+                          className="ml-2"
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                     {exercise.description && (
                       <div className="text-xs text-gray-400">{exercise.description}</div>
+                    )}
+                    {exercise.images && exercise.images.length > 0 && (
+                      <div className="relative w-32 h-32 mt-2">
+                        <img src={exercise.images[currentImageIndex]} alt={exercise.name} className="w-full h-full object-contain" />
+                        {exercise.images.length > 1 && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute left-0 top-1/2 -translate-y-1/2"
+                              onClick={handlePrevImage}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-1/2 -translate-y-1/2"
+                              onClick={handleNextImage}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                   <Button onClick={() => {
@@ -302,14 +394,81 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true }: ExerciseSe
             {exercises.map((exercise) => (
               <div key={exercise.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
-                  <div className="font-medium">{exercise.name}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {exercise.name}
+                    {exercise.source === 'wger' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                        Wger
+                      </span>
+                    )}
+                    {exercise.source === 'free-exercise-db' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                        Free Exercise DB
+                      </span>
+                    )}
+                    {exercise.source === 'nutritionix' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                        Nutritionix
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-500">
                     {exercise.category}
                     {exercise.calories_per_hour && ` • ${exercise.calories_per_hour} cal/hour`}
+                    {exercise.level && ` • Level: ${exercise.level}`}
+                    {exercise.force && ` • Force: ${exercise.force}`}
+                    {exercise.mechanic && ` • Mechanic: ${exercise.mechanic}`}
                   </div>
+                  {exercise.equipment && exercise.equipment.length > 0 && (
+                    <div className="text-xs text-gray-400">Equipment: {exercise.equipment.join(', ')}</div>
+                  )}
+                  {exercise.primary_muscles && exercise.primary_muscles.length > 0 && (
+                    <div className="text-xs text-gray-400">Primary Muscles: {exercise.primary_muscles.join(', ')}</div>
+                  )}
+                  {exercise.secondary_muscles && exercise.secondary_muscles.length > 0 && (
+                    <div className="text-xs text-gray-400">Secondary Muscles: {exercise.secondary_muscles.join(', ')}</div>
+                  )}
+                  {exercise.instructions && exercise.instructions.length > 0 && (
+                    <div className="text-xs text-gray-400 flex items-center">
+                      Instructions: {exercise.instructions[0]}...
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleSpeakInstructions(exercise.instructions || [])}
+                        className="ml-2"
+                      >
+                        <Volume2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                   {exercise.description && (
                     <div className="text-xs text-gray-400">{exercise.description}</div>
                   )}
+                  {exercise.images && exercise.images.length > 0 && (
+                      <div className="relative w-32 h-32 mt-2">
+                        <img src={exercise.images[currentImageIndex]} alt={exercise.name} className="w-full h-full object-contain" />
+                        {exercise.images.length > 1 && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute left-0 top-1/2 -translate-y-1/2"
+                              onClick={handlePrevImage}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-1/2 -translate-y-1/2"
+                              onClick={handleNextImage}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                 </div>
                 <Button onClick={() => {
                   debug(loggingLevel, "ExerciseSearch: Add/Select button clicked for external exercise:", exercise.name);

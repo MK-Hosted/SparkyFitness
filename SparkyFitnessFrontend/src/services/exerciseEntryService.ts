@@ -1,5 +1,7 @@
 import { apiCall } from './api';
 import { getExerciseEntriesForDate as getDailyExerciseEntries } from './dailyProgressService';
+import { Exercise } from './exerciseSearchService'; // Import the comprehensive Exercise interface
+import { parseJsonArray } from './exerciseService'; // Import parseJsonArray
 
 export interface ExerciseEntry {
   id: string;
@@ -8,26 +10,25 @@ export interface ExerciseEntry {
   calories_burned: number;
   entry_date: string;
   notes?: string;
-  exercises: {
-    id: string;
-    name: string;
-    user_id?: string;
-    category: string;
-    calories_per_hour: number;
-  };
-}
-
-export interface Exercise {
-  id: string;
-  name: string;
-  category: string;
-  calories_per_hour: number;
-  description?: string;
-  user_id?: string;
+  exercises: Exercise; // Use the comprehensive Exercise interface
 }
 
 export const fetchExerciseEntries = async (selectedDate: string): Promise<ExerciseEntry[]> => {
-  return getDailyExerciseEntries(selectedDate);
+  const response = await getDailyExerciseEntries(selectedDate);
+  
+  const parsedEntries = response.map((entry: ExerciseEntry) => ({
+    ...entry,
+    exercises: {
+      ...entry.exercises,
+      equipment: parseJsonArray(entry.exercises.equipment),
+      primary_muscles: parseJsonArray(entry.exercises.primary_muscles),
+      secondary_muscles: parseJsonArray(entry.exercises.secondary_muscles),
+      instructions: parseJsonArray(entry.exercises.instructions),
+      images: parseJsonArray(entry.exercises.images),
+    }
+  }));
+
+  return parsedEntries;
 };
 
 export const addExerciseEntry = async (payload: {

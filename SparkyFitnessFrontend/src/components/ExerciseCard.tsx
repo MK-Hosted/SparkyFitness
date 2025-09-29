@@ -17,10 +17,11 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Dumbbell, Edit, Trash2, Settings } from "lucide-react";
+import { Plus, Dumbbell, Edit, Trash2, Settings, Play } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import EditExerciseEntryDialog from "./EditExerciseEntryDialog";
+import ExercisePlaybackModal from "./ExercisePlaybackModal"; // Import the new modal
 import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePreferences
 import { debug, info, warn, error } from "@/utils/logging"; // Import logging utility
 import { parseISO, addDays } from "date-fns"; // Import parseISO and addDays
@@ -86,6 +87,8 @@ const ExerciseCard = ({
   const [newExerciseCalories, setNewExerciseCalories] = useState(300);
   const [newExerciseDescription, setNewExerciseDescription] = useState("");
   const [showDurationDialog, setShowDurationDialog] = useState(false);
+  const [isPlaybackModalOpen, setIsPlaybackModalOpen] = useState(false); // State for playback modal
+  const [exerciseToPlay, setExerciseToPlay] = useState<Exercise | null>(null); // State for exercise to play
 
   const currentUserId = activeUserId || user?.id;
   debug(loggingLevel, "Current user ID:", currentUserId);
@@ -359,21 +362,72 @@ const ExerciseCard = ({
                 <div className="flex items-center">
                   <Dumbbell className="w-5 h-5 mr-2" />
                   <div>
-                    <span className="font-medium">
+                    <span className="font-medium flex items-center gap-2">
                       {entry.exercises?.name || "Unknown Exercise"}
+                      {entry.exercises?.source === 'wger' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                          Wger
+                        </span>
+                      )}
+                      {entry.exercises?.source === 'free-exercise-db' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                          Free Exercise DB
+                        </span>
+                      )}
+                      {entry.exercises?.source === 'nutritionix' && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                          Nutritionix
+                        </span>
+                      )}
+                      {entry.exercises?.is_custom && !entry.exercises?.source && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                          Custom
+                        </span>
+                      )}
                     </span>
                     <div className="text-sm text-gray-500">
-                      {entry.exercises?.name ===
-                      "Active Calories (Apple Health)"
+                      {entry.exercises?.name === "Active Calories"
                         ? `${Math.round(entry.calories_burned)} active calories`
                         : `${entry.duration_minutes} minutes • ${Math.round(entry.calories_burned)} calories`}
+                      {entry.exercises?.level && ` • Level: ${entry.exercises.level}`}
+                      {entry.exercises?.force && ` • Force: ${entry.exercises.force}`}
+                      {entry.exercises?.mechanic && ` • Mechanic: ${entry.exercises.mechanic}`}
                     </div>
+                    {entry.exercises?.equipment && Array.isArray(entry.exercises.equipment) && entry.exercises.equipment.length > 0 && (
+                      <div className="text-xs text-gray-400">Equipment: {entry.exercises.equipment.join(', ')}</div>
+                    )}
+                    {entry.exercises?.primary_muscles && Array.isArray(entry.exercises.primary_muscles) && entry.exercises.primary_muscles.length > 0 && (
+                      <div className="text-xs text-gray-400">Primary Muscles: {entry.exercises.primary_muscles.join(', ')}</div>
+                    )}
+                    {entry.exercises?.secondary_muscles && Array.isArray(entry.exercises.secondary_muscles) && entry.exercises.secondary_muscles.length > 0 && (
+                      <div className="text-xs text-gray-400">Secondary Muscles: {entry.exercises.secondary_muscles.join(', ')}</div>
+                    )}
                     {entry.notes && (
                       <div className="text-xs text-gray-400">{entry.notes}</div>
+                    )}
+                    {entry.exercises?.images && entry.exercises.images.length > 0 && (
+                      <img
+                        src={entry.exercises.source ? `/uploads/exercises/${entry.exercises.images[0]}` : entry.exercises.images[0]}
+                        alt={entry.exercises.name}
+                        className="w-16 h-16 object-contain mt-2"
+                      />
                     )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-1">
+                  {entry.exercises?.instructions && entry.exercises.instructions.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setExerciseToPlay(entry.exercises);
+                        setIsPlaybackModalOpen(true);
+                      }}
+                      className="h-8 w-8"
+                    >
+                      <Play className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -726,6 +780,13 @@ const ExerciseCard = ({
             onSave={handleEditComplete}
           />
         )}
+
+        {/* Exercise Playback Modal */}
+        <ExercisePlaybackModal
+          isOpen={isPlaybackModalOpen}
+          onClose={() => setIsPlaybackModalOpen(false)}
+          exercise={exerciseToPlay}
+        />
       </CardContent>
     </Card>
   );

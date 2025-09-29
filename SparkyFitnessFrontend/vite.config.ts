@@ -25,6 +25,10 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/openid/, "/openid"), // Keep the /openid prefix
       },
+      "/uploads": {
+        target: "http://localhost:3010",
+        changeOrigin: true,
+      },
     },
   },
   envDir: "./private", // Specify the directory for .env files

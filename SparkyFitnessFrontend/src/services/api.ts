@@ -7,6 +7,7 @@ interface ApiCallOptions extends RequestInit {
   params?: Record<string, any>;
   suppress404Toast?: boolean; // New option to suppress toast for 404 errors
   externalApi?: boolean;
+  isFormData?: boolean; // New option to indicate if the body is FormData
 }
 
 export const API_BASE_URL = "/api";
@@ -21,9 +22,12 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
     url = `${url}?${queryParams}`;
   }
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
     ...options?.headers,
   };
+
+  if (!options?.isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   // Only add Authorization header for internal API calls
   if (!options?.externalApi) {
@@ -41,9 +45,13 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
     credentials: 'include', // Send cookies with all API requests
   };
 
-  if (options?.body && typeof options.body === 'object') {
+  if (options?.body) {
     debug(userLoggingLevel, `API Call: Request body for ${endpoint}:`, options.body);
-    config.body = JSON.stringify(options.body);
+    if (!options.isFormData && typeof options.body === 'object') {
+      config.body = JSON.stringify(options.body);
+    } else {
+      config.body = options.body;
+    }
   }
 
   try {

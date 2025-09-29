@@ -47,14 +47,15 @@ services:
     restart: always
     depends_on:
       - sparkyfitness-server # Frontend depends on the server
-      - sparkyfitness-garmin # Frontend depends on Garmin microservice
+      #- sparkyfitness-garmin # Frontend depends on Garmin microservice. Enable if you are using Garmin Connect features.
   
   # Garmin integration is still work in progress. Enable once table is ready.
   # sparkyfitness-garmin:
   #   image: codewithcj/sparkyfitness_garmin:latest
   #   container_name: sparkyfitness-garmin
   #   environment:
-  #     GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000
+  #     GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:${GARMIN_SERVICE_PORT}
+  #     GARMIN_SERVICE_PORT: ${GARMIN_SERVICE_PORT}
   #   networks:
   #     - sparkyfitness-network
   #   restart: unless-stopped

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import AddExerciseDialog from "./AddExerciseDialog";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Plus, Edit, Trash2, Share2, Lock, Settings } from "lucide-react";
+import { Plus, Edit, Trash2, Share2, Lock, Settings, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,14 +21,14 @@ import {
   deleteExercise,
   updateExerciseShareStatus,
   getExerciseDeletionImpact,
-  Exercise,
   ExerciseDeletionImpact,
 } from '@/services/exerciseService';
+import { Exercise as ExerciseInterface } from '@/services/exerciseSearchService'; // Import the comprehensive Exercise interface
 
 
 const ExerciseDatabaseManager = () => {
   const { user } = useAuth();
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [exercises, setExercises] = useState<ExerciseInterface[]>([]);
   const [totalExercisesCount, setTotalExercisesCount] = useState(0); // New state for total count
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -37,14 +37,25 @@ const ExerciseDatabaseManager = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isAddExerciseDialogOpen, setIsAddExerciseDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseInterface | null>(null);
   const [editExerciseName, setEditExerciseName] = useState("");
   const [editExerciseCategory, setEditExerciseCategory] = useState("general");
   const [editExerciseCalories, setEditExerciseCalories] = useState(300);
   const [editExerciseDescription, setEditExerciseDescription] = useState("");
+  const [editExerciseLevel, setEditExerciseLevel] = useState("");
+  const [editExerciseForce, setEditExerciseForce] = useState("");
+  const [editExerciseMechanic, setEditExerciseMechanic] = useState("");
+  const [editExerciseEquipment, setEditExerciseEquipment] = useState<string[]>([]);
+  const [editExercisePrimaryMuscles, setEditExercisePrimaryMuscles] = useState<string[]>([]);
+  const [editExerciseSecondaryMuscles, setEditExerciseSecondaryMuscles] = useState<string[]>([]);
+  const [editExerciseInstructions, setEditExerciseInstructions] = useState<string[]>([]);
+  const [editExerciseImages, setEditExerciseImages] = useState<string[]>([]); // Existing image URLs
+  const [newExerciseImageFiles, setNewExerciseImageFiles] = useState<File[]>([]); // New image files to upload
+  const [newExerciseImageUrls, setNewExerciseImageUrls] = useState<string[]>([]); // URLs for new image previews
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null); // For reordering
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletionImpact, setDeletionImpact] = useState<ExerciseDeletionImpact | null>(null);
-  const [exerciseToDelete, setExerciseToDelete] = useState<Exercise | null>(null);
+  const [exerciseToDelete, setExerciseToDelete] = useState<ExerciseInterface | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -95,13 +106,28 @@ const ExerciseDatabaseManager = () => {
     if (!selectedExercise) return;
 
     try {
-      const updatedExercise = {
+      const formData = new FormData();
+      const updatedExerciseData: Partial<ExerciseInterface> = {
         name: editExerciseName,
         category: editExerciseCategory,
         calories_per_hour: editExerciseCalories,
         description: editExerciseDescription,
+        level: editExerciseLevel,
+        force: editExerciseForce,
+        mechanic: editExerciseMechanic,
+        equipment: editExerciseEquipment,
+        primary_muscles: editExercisePrimaryMuscles,
+        secondary_muscles: editExerciseSecondaryMuscles,
+        instructions: editExerciseInstructions,
+        images: editExerciseImages, // Send existing image URLs
       };
-      await updateExercise(selectedExercise.id, updatedExercise);
+
+      formData.append('exerciseData', JSON.stringify(updatedExerciseData));
+      newExerciseImageFiles.forEach((file) => {
+        formData.append('images', file); // Append new image files
+      });
+
+      await updateExercise(selectedExercise.id, formData);
       toast({
         title: "Success",
         description: "Exercise edited successfully",
@@ -109,6 +135,8 @@ const ExerciseDatabaseManager = () => {
       loadExercisesData();
       setIsEditDialogOpen(false);
       setSelectedExercise(null);
+      setNewExerciseImageFiles([]); // Clear new image files
+      setNewExerciseImageUrls([]); // Clear new image URLs
     } catch (error) {
       console.error("Error editing exercise:", error);
       toast({
@@ -119,7 +147,7 @@ const ExerciseDatabaseManager = () => {
     }
   };
 
-  const handleDeleteRequest = async (exercise: Exercise) => {
+  const handleDeleteRequest = async (exercise: ExerciseInterface) => {
     if (!user) return;
     try {
       const impact = await getExerciseDeletionImpact(exercise.id);
@@ -249,27 +277,57 @@ const ExerciseDatabaseManager = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium">{exercise.name}</h4>
-                    {exercise.user_id && (
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        Your Exercise
+                    {exercise.source === 'wger' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                        Wger
                       </span>
                     )}
-                    {exercise.user_id && (
-                      <div className="flex items-center gap-1">
-                        {exercise.shared_with_public ? (
-                          <Share2 className="w-4 h-4 text-blue-500" />
-                        ) : (
-                          <Lock className="w-4 h-4 text-gray-500" />
-                        )}
-                      </div>
+                    {exercise.source === 'free-exercise-db' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                        Free Exercise DB
+                      </span>
+                    )}
+                    {exercise.source === 'nutritionix' && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                        Nutritionix
+                      </span>
+                    )}
+                    {exercise.is_custom && !exercise.source && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                        Custom
+                      </span>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600 mb-1">{exercise.category}</div>
+                  <div className="text-sm text-gray-600 mb-1">
+                    {exercise.category}
+                    {exercise.level && ` • Level: ${exercise.level}`}
+                    {exercise.force && ` • Force: ${exercise.force}`}
+                    {exercise.mechanic && ` • Mechanic: ${exercise.mechanic}`}
+                  </div>
+                  {exercise.equipment && Array.isArray(exercise.equipment) && exercise.equipment.length > 0 && (
+                    <div className="text-xs text-gray-400">Equipment: {exercise.equipment.join(', ')}</div>
+                  )}
+                  {exercise.primary_muscles && Array.isArray(exercise.primary_muscles) && exercise.primary_muscles.length > 0 && (
+                    <div className="text-xs text-gray-400">Primary Muscles: {exercise.primary_muscles.join(', ')}</div>
+                  )}
+                  {exercise.secondary_muscles && Array.isArray(exercise.secondary_muscles) && exercise.secondary_muscles.length > 0 && (
+                    <div className="text-xs text-gray-400">Secondary Muscles: {exercise.secondary_muscles.join(', ')}</div>
+                  )}
+                  {exercise.instructions && Array.isArray(exercise.instructions) && exercise.instructions.length > 0 && (
+                    <div className="text-xs text-gray-400">Instructions: {exercise.instructions[0]}...</div>
+                  )}
                   <div className="text-sm text-gray-500">
                     Calories/Hour: {exercise.calories_per_hour}
                   </div>
                   {exercise.description && (
                     <div className="text-sm text-gray-400 mt-1">{exercise.description}</div>
+                  )}
+                  {exercise.images && exercise.images.length > 0 && (
+                    <img
+                      src={exercise.source ? `/uploads/exercises/${exercise.images[0]}` : exercise.images[0]}
+                      alt={exercise.name}
+                      className="w-16 h-16 object-contain mt-2"
+                    />
                   )}
                 </div>
                 <div className="flex items-center space-x-1">
@@ -282,6 +340,16 @@ const ExerciseDatabaseManager = () => {
                       setEditExerciseCategory(exercise.category);
                       setEditExerciseCalories(exercise.calories_per_hour);
                       setEditExerciseDescription(exercise.description || "");
+                      setEditExerciseLevel(exercise.level || "");
+                      setEditExerciseForce(exercise.force || "");
+                      setEditExerciseMechanic(exercise.mechanic || "");
+                      setEditExerciseEquipment(Array.isArray(exercise.equipment) ? exercise.equipment : []);
+                      setEditExercisePrimaryMuscles(Array.isArray(exercise.primary_muscles) ? exercise.primary_muscles : []);
+                      setEditExerciseSecondaryMuscles(Array.isArray(exercise.secondary_muscles) ? exercise.secondary_muscles : []);
+                      setEditExerciseInstructions(Array.isArray(exercise.instructions) ? exercise.instructions : []);
+                      setEditExerciseImages(Array.isArray(exercise.images) ? exercise.images : []);
+                      setNewExerciseImageFiles([]); // Clear any previous new files
+                      setNewExerciseImageUrls([]); // Clear any previous new file URLs
                       setIsEditDialogOpen(true);
                     }}
                     className="h-8 w-8"
@@ -371,7 +439,7 @@ const ExerciseDatabaseManager = () => {
       />
       {/* Edit Exercise Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[625px] overflow-y-auto max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Edit Exercise</DialogTitle>
             <DialogDescription>
@@ -404,6 +472,11 @@ const ExerciseDatabaseManager = () => {
                     <SelectItem value="strength">Strength</SelectItem>
                     <SelectItem value="cardio">Cardio</SelectItem>
                     <SelectItem value="yoga">Yoga</SelectItem>
+                    <SelectItem value="powerlifting">Powerlifting</SelectItem>
+                    <SelectItem value="olympic weightlifting">Olympic Weightlifting</SelectItem>
+                    <SelectItem value="strongman">Strongman</SelectItem>
+                    <SelectItem value="plyometrics">Plyometrics</SelectItem>
+                    <SelectItem value="stretching">Stretching</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -418,6 +491,206 @@ const ExerciseDatabaseManager = () => {
                   onChange={(e) => setEditExerciseCalories(Number(e.target.value))}
                   className="col-span-3"
                 />
+              </div>
+              {/* New fields for editing */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-level" className="text-right">
+                  Level
+                </Label>
+                <Select onValueChange={setEditExerciseLevel} defaultValue={editExerciseLevel}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="expert">Expert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-force" className="text-right">
+                  Force
+                </Label>
+                <Select onValueChange={setEditExerciseForce} defaultValue={editExerciseForce}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select force" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pull">Pull</SelectItem>
+                    <SelectItem value="push">Push</SelectItem>
+                    <SelectItem value="static">Static</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-mechanic" className="text-right">
+                  Mechanic
+                </Label>
+                <Select onValueChange={setEditExerciseMechanic} defaultValue={editExerciseMechanic}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select mechanic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="isolation">Isolation</SelectItem>
+                    <SelectItem value="compound">Compound</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-equipment" className="text-right mt-1">
+                  Equipment (comma-separated)
+                </Label>
+                <Input
+                  id="edit-equipment"
+                  value={editExerciseEquipment.join(', ')}
+                  onChange={(e) => setEditExerciseEquipment(e.target.value.split(',').map(s => s.trim()))}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-primary-muscles" className="text-right mt-1">
+                  Primary Muscles (comma-separated)
+                </Label>
+                <Input
+                  id="edit-primary-muscles"
+                  value={editExercisePrimaryMuscles.join(', ')}
+                  onChange={(e) => setEditExercisePrimaryMuscles(e.target.value.split(',').map(s => s.trim()))}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-secondary-muscles" className="text-right mt-1">
+                  Secondary Muscles (comma-separated)
+                </Label>
+                <Input
+                  id="edit-secondary-muscles"
+                  value={editExerciseSecondaryMuscles.join(', ')}
+                  onChange={(e) => setEditExerciseSecondaryMuscles(e.target.value.split(',').map(s => s.trim()))}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-instructions" className="text-right mt-1">
+                  Instructions (one per line)
+                </Label>
+                <Textarea
+                  id="edit-instructions"
+                  value={editExerciseInstructions.join('\n')}
+                  onChange={(e) => setEditExerciseInstructions(e.target.value.split('\n').map(s => s.trim()))}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-images" className="text-right mt-1">
+                  Images
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="edit-images"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        const filesArray = Array.from(e.target.files);
+                        setNewExerciseImageFiles((prev) => [...prev, ...filesArray]);
+                        filesArray.forEach((file) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setNewExerciseImageUrls((prev) => [...prev, reader.result as string]);
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                      }
+                    }}
+                    className="col-span-3"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {editExerciseImages.map((url, index) => (
+                      <div
+                        key={`existing-${index}`}
+                        draggable
+                        onDragStart={() => setDraggedImageIndex(index)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedImageIndex === null) return;
+                          const newImages = [...editExerciseImages];
+                          const [draggedItem] = newImages.splice(draggedImageIndex, 1);
+                          newImages.splice(index, 0, draggedItem);
+                          setEditExerciseImages(newImages);
+                          setDraggedImageIndex(null);
+                        }}
+                        className="relative w-24 h-24 cursor-grab"
+                      >
+                        <img src={url.startsWith('http') ? url : `/uploads/exercises/${url}`} alt={`existing ${index}`} className="w-full h-full object-cover rounded" />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          onClick={() => setEditExerciseImages((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {newExerciseImageUrls.map((url, index) => (
+                      <div
+                        key={`new-${index}`}
+                        draggable
+                        onDragStart={() => setDraggedImageIndex(editExerciseImages.length + index)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedImageIndex === null) return;
+
+                          const allImages = [...editExerciseImages, ...newExerciseImageUrls];
+                          const allFiles = [...newExerciseImageFiles];
+
+                          const targetIndex = index + editExerciseImages.length;
+
+                          if (draggedImageIndex < editExerciseImages.length) { // Dragging an existing image
+                            const newExistingImages = [...editExerciseImages];
+                            const [draggedItem] = newExistingImages.splice(draggedImageIndex, 1);
+                            newExistingImages.splice(targetIndex, 0, draggedItem);
+                            setEditExerciseImages(newExistingImages);
+                          } else { // Dragging a new image
+                            const newNewImageFiles = [...newExerciseImageFiles];
+                            const newNewImageUrls = [...newExerciseImageUrls];
+
+                            const draggedNewImageIndex = draggedImageIndex - editExerciseImages.length;
+                            const [draggedFile] = newNewImageFiles.splice(draggedNewImageIndex, 1);
+                            const [draggedUrl] = newNewImageUrls.splice(draggedNewImageIndex, 1);
+
+                            newNewImageFiles.splice(targetIndex - editExerciseImages.length, 0, draggedFile);
+                            newNewImageUrls.splice(targetIndex - editExerciseImages.length, 0, draggedUrl);
+
+                            setNewExerciseImageFiles(newNewImageFiles);
+                            setNewExerciseImageUrls(newNewImageUrls);
+                          }
+                          setDraggedImageIndex(null);
+                        }}
+                        className="relative w-24 h-24 cursor-grab"
+                      >
+                        <img src={url} alt={`preview ${index}`} className="w-full h-full object-cover rounded" />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          onClick={() => {
+                            setNewExerciseImageFiles((prev) => prev.filter((_, i) => i !== index));
+                            setNewExerciseImageUrls((prev) => prev.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="edit-description" className="text-right mt-1">

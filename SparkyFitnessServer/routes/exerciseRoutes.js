@@ -2,6 +2,23 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeAccess } = require('../middleware/authMiddleware');
 const exerciseService = require('../services/exerciseService');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Setup Multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const exerciseName = req.body.exerciseData ? JSON.parse(req.body.exerciseData).name : 'unknown-exercise';
+    const uploadPath = path.join(__dirname, '../uploads/exercises', exerciseName.replace(/[^a-zA-Z0-9]/g, '_'));
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+const upload = multer({ storage: storage });
 
 
 // Endpoint to fetch exercises with search, filter, and pagination
@@ -119,28 +136,41 @@ router.get('/:id', authenticateToken, authorizeAccess('exercise_list'), async (r
 });
 
 // Endpoint to create a new exercise
-router.post('/', authenticateToken, authorizeAccess('exercise_list'), express.json(), async (req, res, next) => {
+router.post('/', authenticateToken, authorizeAccess('exercise_list'), upload.array('images', 10), async (req, res, next) => {
   try {
-    const newExercise = await exerciseService.createExercise(req.userId, { ...req.body, user_id: req.userId });
+    const exerciseData = JSON.parse(req.body.exerciseData);
+    const imagePaths = req.files ? req.files.map(file => `${exerciseData.name.replace(/[^a-zA-Z0-9]/g, '_')}/${file.filename}`) : [];
+
+    const newExercise = await exerciseService.createExercise(req.userId, {
+      ...exerciseData,
+      user_id: req.userId,
+      images: imagePaths,
+    });
     res.status(201).json(newExercise);
   } catch (error) {
-    if (error.message.startsWith('Forbidden')) {
-      return res.status(403).json({ error: error.message });
-    }
     next(error);
   }
 });
 
 // Endpoint to update an exercise
-router.put('/:id', authenticateToken, authorizeAccess('exercise_list'), express.json(), async (req, res, next) => {
+router.put('/:id', authenticateToken, authorizeAccess('exercise_list'), upload.array('images', 10), async (req, res, next) => {
   const { id } = req.params;
-  const updateData = req.body;
   const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   if (!id || !uuidRegex.test(id)) {
     return res.status(400).json({ error: 'Exercise ID is required and must be a valid UUID.' });
   }
+
   try {
-    const updatedExercise = await exerciseService.updateExercise(req.userId, id, updateData);
+    const exerciseData = JSON.parse(req.body.exerciseData);
+    const newImagePaths = req.files ? req.files.map(file => `${exerciseData.name.replace(/[^a-zA-Z0-9]/g, '_')}/${file.filename}`) : [];
+    
+    // Combine existing images with new images
+    const allImages = [...(exerciseData.images || []), ...newImagePaths];
+
+    const updatedExercise = await exerciseService.updateExercise(req.userId, id, {
+      ...exerciseData,
+      images: allImages,
+    });
     res.status(200).json(updatedExercise);
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {

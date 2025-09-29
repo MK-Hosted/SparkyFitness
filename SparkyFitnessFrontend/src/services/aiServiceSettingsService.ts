@@ -4,7 +4,7 @@ export interface AIService {
   id: string;
   service_name: string;
   service_type: string;
-  api_key: string; // This will temporarily hold the plain text key from the user
+  api_key?: string; // This will temporarily hold the plain text key from the user, optional for Ollama
   custom_url: string | null;
   system_prompt: string | null;
   is_active: boolean;

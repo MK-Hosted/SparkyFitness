@@ -249,13 +249,13 @@ const GarminConnectSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-3 rounded">
-        <strong>Note:</strong> Garmin Connect integration is partially tested with Steps metric alone. Other metrics may not work properly, report if you into issues via github.
+        <strong>Note:</strong> Garmin Connect integration is tested with few metrics only. Ensure your Docker Compose is updated to include Garmin section.
       </div>
       <p className="text-sm text-muted-foreground">
         Sparky Fitness does not store your Garmin email or password. They are used only during login to obtain secure tokens.
       </p>
       {!garminStatus.isLinked && !showGarminMfaInput && ( // Show login form if not linked and not in MFA
-        <>
+        <form onSubmit={(e) => { e.preventDefault(); handleGarminLogin(); }} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="garmin-email">Garmin Email</Label>
@@ -266,6 +266,7 @@ const GarminConnectSettings: React.FC = () => {
                 value={garminEmail}
                 onChange={(e) => setGarminEmail(e.target.value)}
                 disabled={loading}
+                autoComplete="username"
               />
             </div>
             <div>
@@ -277,13 +278,14 @@ const GarminConnectSettings: React.FC = () => {
                 value={garminPassword}
                 onChange={(e) => setGarminPassword(e.target.value)}
                 disabled={loading}
+                autoComplete="current-password"
               />
             </div>
           </div>
-          <Button onClick={handleGarminLogin} disabled={loading}>
+          <Button type="submit" disabled={loading}>
             {loading ? 'Connecting...' : 'Connect to Garmin Connect'}
           </Button>
-        </>
+        </form>
       )}
 
       {!garminStatus.isLinked && showGarminMfaInput && ( // Show MFA input if not linked and MFA is required

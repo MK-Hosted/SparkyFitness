@@ -720,29 +720,30 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="food-data-providers" className="border rounded-lg mb-4">
+        <AccordionItem value="food-and-exercise-data-providers" className="border rounded-lg mb-4">
           <AccordionTrigger
             className="flex items-center gap-2 p-4 hover:no-underline"
-            description="Configure external food data sources like Mealie and Nutritionix"
+            description="Configure external food and exercise data sources and synchronize data with Garmin Connect"
           >
             <Cloud className="h-5 w-5" />
-            Food Data Providers
+            Food & Exercise Data Providers
           </AccordionTrigger>
-          <AccordionContent className="p-4 pt-0">
+          <AccordionContent className="p-4 pt-0 space-y-4">
+            <p className="text-sm text-muted-foreground bg-yellow-100 p-2 rounded-md">
+              Note: If you encounter an "Invalid key length" error, ensure your encryption and JWT authentication keys in the server's env variables are 64 hex.
+            </p>
             <ExternalProviderSettings />
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="garmin-connect" className="border rounded-lg mb-4">
-          <AccordionTrigger
-            className="flex items-center gap-2 p-4 hover:no-underline"
-            description="Connect and synchronize data with Garmin Connect"
-          >
-            <Cloud className="h-5 w-5" /> {/* Using Cloud icon for now, consider a specific Garmin icon if available */}
-            Garmin Connect
-          </AccordionTrigger>
-          <AccordionContent className="p-4 pt-0">
-            <GarminConnectSettings />
+            <Separator />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cloud className="h-5 w-5" /> Garmin Connect
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GarminConnectSettings />
+              </CardContent>
+            </Card>
           </AccordionContent>
         </AccordionItem>
 
@@ -755,6 +756,9 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
             AI Service
           </AccordionTrigger>
           <AccordionContent className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground mb-4 bg-yellow-100 p-2 rounded-md">
+              Note: If you encounter an "Invalid key length" error, ensure your encryption and JWT authentication keys in the server's env variables are 64 hex.
+            </p>
             <AIServiceSettings />
           </AccordionContent>
         </AccordionItem>
@@ -768,9 +772,13 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
             API Key Management
           </AccordionTrigger>
           <AccordionContent className="p-4 pt-0 space-y-4">
+            
             <p className="text-sm text-muted-foreground">
               Generate API keys to securely submit data from external applications like iPhone Shortcuts.
               These keys are tied to your account and can be revoked at any time.
+            </p>
+            <p className="text-sm text-muted-foreground bg-blue-100 p-2 rounded-md">
+              Note: Refer to the Wiki page in Github for sample setup instructions for iPhone and Android.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Input

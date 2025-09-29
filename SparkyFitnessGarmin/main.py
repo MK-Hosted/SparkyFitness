@@ -1,17 +1,22 @@
 import logging
+import os
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from urllib.parse import urlencode, parse_qs
 from pydantic import BaseModel
-
+import uvicorn
 from garminconnect import Garmin
 from garth.exc import GarthHTTPError, GarthException
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Get port from environment variable or use default
+PORT = int(os.getenv("GARMIN_SERVICE_PORT", 8000))
+logger.info(f"Garmin service configured to run on port: {PORT}")
 
 # Define a Pydantic model for login credentials
 class GarminLoginRequest(BaseModel):
@@ -42,9 +47,6 @@ async def garmin_login(request_data: GarminLoginRequest):
         else:
             tokens = garmin.garth.dumps() # Base64 encoded string of tokens
             logger.info(f"Successfully obtained Garmin tokens for user {request_data.user_id}.")
-            logger.debug(f"Garmin tokens (suppressed): {tokens}") # Log suppressed tokens
-            logger.debug(f"OAuth1 Token: {garmin.garth.oauth1_token}")
-            logger.debug(f"OAuth2 Token: {garmin.garth.oauth2_token}")
             return {"status": "success", "tokens": tokens}
 
     except GarthHTTPError as e:
@@ -75,7 +77,6 @@ async def garmin_resume_login(request: Request):
         garmin.resume_login(client_state, mfa_code)
         tokens = garmin.garth.dumps()
         logger.info(f"Successfully resumed Garmin login for user {user_id}.")
-        logger.debug(f"Garmin tokens (suppressed): {tokens}") # Log suppressed tokens
         return {"status": "success", "tokens": tokens}
 
     except GarthHTTPError as e:
@@ -106,12 +107,6 @@ async def get_daily_summary(request: Request):
         garmin = Garmin()
         garmin.garth.loads(tokens_b64) # Load tokens from base64 string
         garmin.display_name = garmin.garth.profile["displayName"] # Set display_name after loading tokens
-        logger.debug(f"Loaded tokens into garth. Username (external_user_id): {garmin.garth.username}")
-        logger.debug(f"Garth profile: {garmin.garth.profile}")
-        logger.debug(f"Garth oauth1_token: {garmin.garth.oauth1_token}")
-        logger.debug(f"Garth oauth2_token: {garmin.garth.oauth2_token}")
-        logger.debug(f"OAuth2 Token Expires At: {garmin.garth.oauth2_token.expires_at}")
-        logger.debug(f"OAuth2 Token Scopes: {garmin.garth.oauth2_token.scope}")
 
         # The garminconnect library's get_user_summary expects only the date argument.
         # The display_name is handled internally by the garth session.
@@ -149,7 +144,6 @@ async def get_body_composition(request: Request):
         garmin.garth.loads(tokens_b64) # Load tokens from base64 string
 
         # The garminconnect library's get_body_composition expects start_date and optionally end_date.
-        logger.debug(f"Calling get_body_composition with start_date: {start_date} and end_date: {end_date}")
         body_comp_data = garmin.get_body_composition(start_date, end_date)
         logger.info(f"Successfully retrieved body composition for user {user_id} from {start_date} to {end_date}.")
         return {"user_id": user_id, "start_date": start_date, "end_date": end_date, "data": body_comp_data}
@@ -180,3 +174,7 @@ async def get_body_composition(request: Request):
     except Exception as e:
         logger.error(f"Unexpected error during Garmin auth callback: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
+

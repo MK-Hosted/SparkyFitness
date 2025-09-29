@@ -119,6 +119,7 @@ const OidcSettings: React.FC = () => {
             <AccordionTrigger>OAuth</AccordionTrigger>
             <AccordionContent>
               <form onSubmit={handleSave} className="grid grid-cols-4 gap-4 py-4">
+                
                 {/* Enable OIDC Login and Auto Register Switches */}
                 <div className="flex items-center justify-between col-span-4">
                   <div className="flex items-center space-x-2">
@@ -252,6 +253,10 @@ const OidcSettings: React.FC = () => {
                     autoComplete="off"
                   />
                 </div>
+
+                <p id="oidc-key-length-note" className="text-base font-semibold text-red-700 bg-red-100 p-3 rounded-lg mb-4 border border-red-300 col-span-4">
+                  IMPORTANT NOTE: If you encounter an "Invalid key length" error when configuring OIDC providers, ensure your encryption and JWT authentication keys in the server's environment variables are 64 hex characters or 44 Base64 characters.
+                </p>
 
                 {/* Redirect URI Information */}
                 <div className="col-span-4 text-sm text-muted-foreground mt-2">
