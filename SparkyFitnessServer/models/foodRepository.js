@@ -1199,42 +1199,6 @@ async function getTopFoods(userId, limit) {
   }
 }
 
-module.exports = {
-  searchFoods,
-  createFood,
-  getFoodById,
-  getFoodOwnerId,
-  updateFood,
-  deleteFood,
-  getFoodsWithPagination,
-  countFoods,
-  createFoodVariant,
-  getFoodVariantById,
-  getFoodVariantOwnerId,
-  getFoodVariantsByFoodId,
-  updateFoodVariant,
-  deleteFoodVariant,
-  createFoodEntry,
-  getFoodEntryOwnerId,
-  updateFoodEntry,
-  deleteFoodEntry,
-  getFoodEntriesByDate,
-  getFoodEntriesByDateAndMealType,
-  getFoodEntriesByDateRange,
-  findFoodByNameAndBrand,
-  bulkCreateFoodVariants,
-  bulkCreateFoodEntries,
-  deleteFoodEntriesByMealPlanId,
-  deleteFoodEntriesByTemplateId,
-  createFoodEntriesFromTemplate,
-  getFoodDataProviderById,
-  getFoodEntryByDetails,
-  getDailyNutritionSummary,
-  getFoodDeletionImpact,
-  getRecentFoods, // New export
-  getTopFoods, // New export
-};
-
 async function getDailyNutritionSummary(userId, date) {
   const client = await pool.connect();
   try {
@@ -1287,6 +1251,19 @@ async function getFoodDeletionImpact(foodId) {
   }
 }
 
+/**
+ * Creates multiple foods and their variants from a JSON array in a single transaction.
+ *
+ *  This function is used by frontend component ImportFromCSV.tsx
+ * 
+ * @param {Array<Object>} foodDataArray - The array of food variant data from the frontend.
+ * @param {string} userId - The ID of the user performing the import.
+ * @returns {Promise<Object>} result message with totalFoodsCreated & totalVariantsCreated.
+    };
+ * @throws {Error} An instance of the internal DuplicateFoodError class if duplicates are found.
+ * @throws {Error} If any other database error occurs.
+ */
+
 async function getFoodEntryByDetails(
   userId,
   foodId,
@@ -1310,3 +1287,196 @@ async function getFoodEntryByDetails(
     client.release();
   }
 }
+
+async function createFoodsInBulk(userId, foodDataArray) {
+  class DuplicateFoodError extends Error {
+    constructor(message, duplicates) {
+      super(message);
+      this.name = "DuplicateFoodError";
+      this.duplicates = duplicates;
+    }
+  }
+
+  // 1. --- Grouping incoming Variants by Food (name + brand)
+  const groupedFoods = foodDataArray.reduce((acc, variant) => {
+    const key = `${variant.name}|${variant.brand}`;
+    if (!acc[key]) {
+      acc[key] = {
+        name: variant.name,
+        brand: variant.brand,
+        is_custom: true,
+        user_id: userId,
+        shared_with_public: variant.shared_with_public || false,
+        is_quick_food: variant.is_quick_food || false,
+        variants: [],
+      };
+    }
+    acc[key].variants.push(variant);
+    return acc;
+  }, {});
+
+  const foodsToCreate = Object.values(groupedFoods);
+  if (foodsToCreate.length === 0) {
+    return {
+      message: "No food data provided to import.",
+      createdFoods: 0,
+      createdVariants: 0,
+    };
+  }
+
+  // 2. Pre-flight Duplicate Check before starting the db transaction
+  const potentialDuplicates = foodsToCreate.map((food) => [
+    userId,
+    food.name,
+    food.brand,
+  ]);
+
+  const flatValues = potentialDuplicates.flat();
+
+  let placeholderIndex = 1;
+  const placeholderString = potentialDuplicates
+    .map(
+      () =>
+        `($${placeholderIndex++}::uuid, $${placeholderIndex++}, $${placeholderIndex++})`
+    )
+    .join(", ");
+
+  const duplicateCheckQuery = `
+    SELECT name, brand FROM foods
+    WHERE (user_id, name, brand) IN (VALUES ${placeholderString})
+  `;
+
+  const { rows: existingFoods } = await pool.query(
+    duplicateCheckQuery,
+    flatValues
+  );
+
+  if (existingFoods.length > 0) {
+    // If duplicates are found, throw an error.
+    throw new DuplicateFoodError(
+      `The import was terminated because duplicate entries were found in your food list.`,
+      existingFoods
+    );
+  }
+
+  // 3. Database Transaction starts here for Bulk Insert
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    let totalFoodsCreated = 0;
+    let totalVariantsCreated = 0;
+
+    for (const food of foodsToCreate) {
+      const foodResult = await client.query(
+        `INSERT INTO foods (name, brand, is_custom, user_id, shared_with_public, is_quick_food,barcode,provider_external_id,provider_type, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
+         RETURNING id`,
+        [
+          food.name,
+          food.brand,
+          food.is_custom,
+          food.user_id,
+          food.shared_with_public,
+          food.is_quick_food,
+          food.barcode || null,
+          food.provider_external_id || null,
+          food.provider_type || null,
+        ]
+      );
+      const newFoodId = foodResult.rows[0].id;
+      totalFoodsCreated++;
+
+      for (const variant of food.variants) {
+        await client.query(
+          `INSERT INTO food_variants (
+            food_id, serving_size, serving_unit, is_default, calories, protein, carbs, fat,
+            saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
+            cholesterol, sodium, potassium, dietary_fiber, sugars,
+            vitamin_a, vitamin_c, calcium, iron, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
+            $14, $15, $16, $17, $18, $19, $20, $21, now(), now()
+          )`,
+          [
+            newFoodId,
+            variant.serving_size,
+            variant.serving_unit,
+            variant.is_default || true,
+            variant.calories || 0,
+            variant.protein || 0,
+            variant.carbs || 0,
+            variant.fat || 0,
+            variant.saturated_fat || 0,
+            variant.polyunsaturated_fat || 0,
+            variant.monounsaturated_fat || 0,
+            variant.trans_fat || 0,
+            variant.cholesterol || 0,
+            variant.sodium || 0,
+            variant.potassium || 0,
+            variant.dietary_fiber || 0,
+            variant.sugars || 0,
+            variant.vitamin_a || 0,
+            variant.vitamin_c || 0,
+            variant.calcium || 0,
+            variant.iron || 0,
+          ]
+        );
+        totalVariantsCreated++;
+      }
+    }
+
+    await client.query("COMMIT");
+
+    // commit the transaction if there is no error
+
+    return {
+      message: "Food data imported successfully.",
+      createdFoods: totalFoodsCreated,
+      createdVariants: totalVariantsCreated,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during bulk food import:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = {
+  searchFoods,
+  createFood,
+  getFoodById,
+  getFoodOwnerId,
+  updateFood,
+  deleteFood,
+  getFoodsWithPagination,
+  countFoods,
+  createFoodVariant,
+  getFoodVariantById,
+  getFoodVariantOwnerId,
+  getFoodVariantsByFoodId,
+  updateFoodVariant,
+  deleteFoodVariant,
+  createFoodEntry,
+  getFoodEntryOwnerId,
+  updateFoodEntry,
+  deleteFoodEntry,
+  getFoodEntriesByDate,
+  getFoodEntriesByDateAndMealType,
+  getFoodEntriesByDateRange,
+  findFoodByNameAndBrand,
+  bulkCreateFoodVariants,
+  bulkCreateFoodEntries,
+  deleteFoodEntriesByMealPlanId,
+  deleteFoodEntriesByTemplateId,
+  createFoodEntriesFromTemplate,
+  getFoodDataProviderById,
+  getFoodEntryByDetails,
+  getDailyNutritionSummary,
+  getFoodDeletionImpact,
+  getRecentFoods, // New export
+  getTopFoods, // New export
+  createFoodsInBulk,
+};

@@ -44,9 +44,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import { apiCall } from "@/services/api";
 import { getProviderCategory } from "@/services/externalProviderService"; // New import
-import { Food, FoodVariant } from "@/types/food";
+import { Food, FoodVariant, CSVData } from "@/types/food";
 import { Meal } from "@/types/meal"; // Import Meal type
-
 interface OpenFoodFactsProduct {
   product_name: string;
   brands?: string;
@@ -67,6 +66,8 @@ interface EnhancedFoodSearchProps {
   onFoodSelect: (food: Food) => void;
   hideDatabaseTab?: boolean;
 }
+
+type FoodDataForBackend = Omit<CSVData, "id">;
 
 const EnhancedFoodSearch = ({
   onFoodSelect,
@@ -313,6 +314,50 @@ const EnhancedFoodSearch = ({
         description: "Failed to process the edited food",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleImportFromCSV = async (foodDataArray: FoodDataForBackend[]) => {
+    setLoading(true);
+
+    const payload = {
+      foods: foodDataArray,
+    };
+
+    try {
+      const res = await apiCall(`/foods/import-from-csv`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      toast({
+        title: "Success",
+        description: "Food data imported successfully",
+      });
+      setShowImportFromCsvDialog(false);
+      setLoading(false);
+    } catch (error) {
+      if (error?.status === 409 && error.data?.duplicates) {
+        const duplicateList = error.data.duplicates
+          .map(
+            (d: { name: string; brand: string }) => `"${d.name} - ${d.brand}"`
+          )
+          .join(", ");
+
+        toast({
+          title: "Import Failed: Duplicate Items Found",
+          description: `The following items already exist: ${duplicateList}. Please remove them from your file and try again.`,
+          variant: "destructive",
+          duration: 10000, 
+        });
+      } else {
+        toast({
+          title: "An Error Occurred",
+          description:
+            error.message || "Failed to import food data. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -1254,7 +1299,7 @@ const EnhancedFoodSearch = ({
               Import a CSV file to add multiple foods at once.
             </DialogDescription>
           </DialogHeader>
-          <ImportFromCSV onSave={handleSaveEditedFood} />
+          <ImportFromCSV onSave={handleImportFromCSV} />
         </DialogContent>
       </Dialog>
     </div>

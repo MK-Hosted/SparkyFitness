@@ -1101,6 +1101,47 @@ async function getMealieFoodDetails(slug, baseUrl, apiKey, userId, providerId) {
     throw error;
   }
 }
+async function getFoodDeletionImpact(authenticatedUserId, foodId) {
+  try {
+    const foodOwnerId = await foodRepository.getFoodOwnerId(foodId);
+    if (!foodOwnerId) {
+      throw new Error("Food not found.");
+    }
+    if (foodOwnerId !== authenticatedUserId) {
+      throw new Error(
+        "Forbidden: You do not have permission to view this food."
+      );
+    }
+    return await foodRepository.getFoodDeletionImpact(foodId);
+  } catch (error) {
+    log(
+      "error",
+      `Error getting food deletion impact for food ${foodId} by user ${authenticatedUserId} in foodService:`,
+      error
+    );
+    throw error;
+  }
+}
+
+async function importFoodsInBulk(authenticatedUserId, foodDataArray) {
+  try {
+    if (!foodDataArray) {
+      log("error", `importFoodsInBulk: No food data provided.`);
+      throw new Error("No food data provided.");
+    }
+    return await foodRepository.createFoodsInBulk(
+      authenticatedUserId,
+      foodDataArray
+    );
+  } catch (error) {
+    log(
+      "error",
+      `Error importing foods in bulk for user ${authenticatedUserId}:`,
+      error
+    );
+    throw error;
+  }
+}
 
 module.exports = {
   getFoodDataProviders,
@@ -1136,26 +1177,5 @@ module.exports = {
   getFoodDeletionImpact,
   searchMealieFoods, // New export
   getMealieFoodDetails, // New export
+  importFoodsInBulk,
 };
-
-async function getFoodDeletionImpact(authenticatedUserId, foodId) {
-  try {
-    const foodOwnerId = await foodRepository.getFoodOwnerId(foodId);
-    if (!foodOwnerId) {
-      throw new Error("Food not found.");
-    }
-    if (foodOwnerId !== authenticatedUserId) {
-      throw new Error(
-        "Forbidden: You do not have permission to view this food."
-      );
-    }
-    return await foodRepository.getFoodDeletionImpact(foodId);
-  } catch (error) {
-    log(
-      "error",
-      `Error getting food deletion impact for food ${foodId} by user ${authenticatedUserId} in foodService:`,
-      error
-    );
-    throw error;
-  }
-}

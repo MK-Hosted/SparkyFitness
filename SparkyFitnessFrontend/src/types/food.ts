@@ -38,10 +38,10 @@ export interface Food {
 }
 
 export interface FoodDeletionImpact {
-    foodEntriesCount: number;
-    mealFoodsCount: number;
-    mealPlansCount: number;
-    mealPlanTemplateAssignmentsCount: number;
+  foodEntriesCount: number;
+  mealFoodsCount: number;
+  mealPlansCount: number;
+  mealPlanTemplateAssignmentsCount: number;
 }
 
 export interface FoodSearchResult {
@@ -62,4 +62,35 @@ export interface FoodEntry {
   meal_plan_template_id?: string;
   // Add water_ml to FoodEntry if it's a water entry
   water_ml?: number;
+}
+
+export interface CSVData {
+  id: string;
+
+  name: string;
+  brand?: string;
+  is_custom: boolean;
+  shared_with_public?: boolean;
+  is_quick_food?: boolean;
+
+  serving_size: number;
+  serving_unit: string;
+  is_default?: boolean;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  saturated_fat?: number;
+  polyunsaturated_fat?: number;
+  monounsaturated_fat?: number;
+  trans_fat?: number;
+  cholesterol?: number;
+  sodium?: number;
+  potassium?: number;
+  dietary_fiber?: number;
+  sugars?: number;
+  vitamin_a?: number;
+  vitamin_c?: number;
+  calcium?: number;
+  iron?: number;
 }

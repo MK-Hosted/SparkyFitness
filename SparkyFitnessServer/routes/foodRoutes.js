@@ -414,12 +414,10 @@ router.post(
       const { sourceDate, sourceMealType, targetDate, targetMealType } =
         req.body;
       if (!sourceDate || !sourceMealType || !targetDate || !targetMealType) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "sourceDate, sourceMealType, targetDate, and targetMealType are required.",
-          });
+        return res.status(400).json({
+          error:
+            "sourceDate, sourceMealType, targetDate, and targetMealType are required.",
+        });
       }
       const copiedEntries = await foodService.copyFoodEntries(
         req.userId,
@@ -917,4 +915,23 @@ router.delete(
     }
   }
 );
+
+router.post(
+  "/import-from-csv",
+  authenticateToken,
+  authorizeAccess("food_list"),
+  async (req, res, next) => {
+    const { foods } = req.body;
+    if (!foods) {
+      return res.status(400).json({ error: "Food data is required." });
+    }
+    try {
+      await foodService.importFoodsInBulk(req.userId, foods);
+      res.status(200).json({ message: "Food data imported successfully." });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

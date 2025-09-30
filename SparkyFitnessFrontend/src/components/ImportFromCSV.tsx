@@ -9,17 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Upload, Trash2 } from "lucide-react";
+import { Plus, Download, Upload, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { Food, FoodVariant } from "@/types/food";
-import { isUUID } from "@/services/enhancedCustomFoodFormService";
 
 interface ImportFromCSVProps {
-  onSave: (foodData: any) => void;
-  food?: Food;
-  initialVariants?: FoodVariant[];
-  visibleNutrients?: string[];
+  onSave: (foodData: Omit<CSVData, "id">[]) => Promise<void>;
 }
 
 export interface CSVData {
@@ -27,30 +22,52 @@ export interface CSVData {
   [key: string]: string | number | boolean;
 }
 
-const generateUniqueId = () => `new_${Math.random().toString(36).substr(2, 9)}`;
+const generateUniqueId = () =>
+  `temp_${Math.random().toString(36).substr(2, 9)}`;
 
-const ImportFromCSV = ({
-  onSave,
-  food,
-  initialVariants,
-  visibleNutrients: passedVisibleNutrients,
-}: ImportFromCSVProps) => {
+const servingUnitOptions = [
+  "g",
+  "kg",
+  "mg",
+  "oz",
+  "lb",
+  "ml",
+  "l",
+  "cup",
+  "tbsp",
+  "tsp",
+  "piece",
+  "slice",
+  "serving",
+  "can",
+  "bottle",
+  "packet",
+  "bag",
+  "bowl",
+  "plate",
+  "handful",
+  "scoop",
+  "bar",
+  "stick",
+];
+
+const ImportFromCSV = ({ onSave }: ImportFromCSVProps) => {
   const { user } = useAuth();
+
   const [loading, setLoading] = useState(false);
   const [csvData, setCsvData] = useState<CSVData[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Define field types for conditional rendering
-  const textFields = new Set(["name", "brand", "serving_unit"]);
+  const textFields = new Set(["name", "brand"]);
   const booleanFields = new Set([
     "shared_with_public",
     "is_quick_food",
     "is_default",
+    "is_custom",
   ]);
 
-  // Define the default structure for new rows or an empty table
-  const defaultHeaders = [
+  const requiredHeaders = [
     "name",
     "brand",
     "is_custom",
@@ -62,6 +79,19 @@ const ImportFromCSV = ({
     "protein",
     "carbs",
     "fat",
+    "saturated_fat",
+    "polyunsaturated_fat",
+    "monounsaturated_fat",
+    "trans_fat",
+    "cholesterol",
+    "sodium",
+    "potassium",
+    "dietary_fiber",
+    "sugars",
+    "vitamin_a",
+    "vitamin_c",
+    "calcium",
+    "iron",
     "is_default",
   ];
 
@@ -74,7 +104,7 @@ const ImportFromCSV = ({
 
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(",").map((value) => value.trim());
-      const row: CSVData = { id: isUUID() };
+      const row: CSVData = { id: generateUniqueId() };
 
       parsedHeaders.forEach((header, index) => {
         const value = values[index] || "";
@@ -82,7 +112,7 @@ const ImportFromCSV = ({
           row[header] = value.toLowerCase() === "true";
         } else if (
           !textFields.has(header) &&
-          header !== "is_custom" &&
+          header !== "serving_unit" &&
           !isNaN(parseFloat(value))
         ) {
           row[header] = parseFloat(value);
@@ -102,14 +132,98 @@ const ImportFromCSV = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const parsedData = parseCSV(text);
 
+      if (!text || text.trim() === "") {
+        toast({
+          title: "Import Error",
+          description: "The selected file is empty.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const lines = text.split("\n");
+      const fileHeaders = lines[0].split(",").map((h) => h.trim());
+      const areHeadersValid =
+        requiredHeaders.length === fileHeaders.length &&
+        requiredHeaders.every((value, index) => value === fileHeaders[index]);
+
+      if (!areHeadersValid) {
+        toast({
+          title: "Invalid CSV Format",
+          description:
+            "The CSV headers do not match the required format or order. Please download the template.",
+          variant: "destructive",
+        });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      const parsedData = parseCSV(text);
       if (parsedData.length > 0) {
         setHeaders(Object.keys(parsedData[0]).filter((key) => key !== "id"));
         setCsvData(parsedData);
+      } else {
+        toast({
+          title: "No Data Found",
+          description: "The CSV file contains headers but no data rows.",
+          variant: "destructive",
+        });
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        name: "Sparky Sample Food",
+        brand: "Sparky Sample Brand",
+        is_custom: "TRUE",
+        shared_with_public: "",
+        is_quick_food: "FALSE",
+        serving_size: 231,
+        serving_unit: "slice",
+        calories: 431,
+        protein: 379,
+        carbs: 204,
+        fat: 610,
+        saturated_fat: 554,
+        polyunsaturated_fat: 0,
+        monounsaturated_fat: 0,
+        trans_fat: 436,
+        cholesterol: 81,
+        sodium: 317,
+        potassium: 64,
+        dietary_fiber: 618,
+        sugars: 595,
+        vitamin_a: 563,
+        vitamin_c: 635,
+        calcium: 360,
+        iron: 366,
+        is_default: "TRUE",
+      },
+    ];
+
+    const headerString = requiredHeaders.join(",");
+    const rowsString = sampleData
+      .map((row) =>
+        requiredHeaders
+          .map((header) => row[header as keyof typeof row])
+          .join(",")
+      )
+      .join("\n");
+    const csvContent = `${headerString}\n${rowsString}`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "food_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleEditCell = (
@@ -128,10 +242,10 @@ const ImportFromCSV = ({
 
   const handleAddNewRow = () => {
     const newRow: CSVData = {
-      id: isUUID(),
-      name: "", // Required, user must fill this
+      id: generateUniqueId(),
+      name: "",
       brand: "",
-      is_custom: true, // Defaulted to true, not editable
+      is_custom: true,
       shared_with_public: false,
       is_quick_food: false,
       serving_size: 100,
@@ -140,47 +254,59 @@ const ImportFromCSV = ({
       protein: 0,
       carbs: 0,
       fat: 0,
-      is_default: csvData.length === 0, // Make the first variant the default
+      saturated_fat: 0,
+      polyunsaturated_fat: 0,
+      monounsaturated_fat: 0,
+      trans_fat: 0,
+      cholesterol: 0,
+      sodium: 0,
+      potassium: 0,
+      dietary_fiber: 0,
+      sugars: 0,
+      vitamin_a: 0,
+      vitamin_c: 0,
+      calcium: 0,
+      iron: 0,
+      is_default: csvData.length === 0,
     };
-
     if (headers.length === 0) {
-      setHeaders(defaultHeaders);
+      setHeaders(requiredHeaders);
     }
-
     setCsvData((prev) => [...prev, newRow]);
   };
 
   const clearData = () => {
     setCsvData([]);
     setHeaders([]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const invalidRow = csvData.find(
       (row) => !row.name || String(row.name).trim() === ""
     );
     if (invalidRow) {
       toast({
         title: "Validation Error",
-        description:
-          "The 'name' field cannot be empty. Please fill it in for all records.",
+        description: "The 'name' field cannot be empty.",
         variant: "destructive",
       });
       return;
     }
-
     setLoading(true);
-    console.log("Submitting data:", csvData);
-    // onSave(csvData);
-    setTimeout(() => {
+    const dataForBackend = csvData.map(({ id, ...rest }) => rest);
+    // console.log(dataForBackend);
+    try {
+      await onSave(dataForBackend);
+    } catch (error) {
+      console.error(
+        "An error occurred while the parent was handling the save operation:",
+        error
+      );
+    } finally {
       setLoading(false);
-      toast({ title: "Success!", description: "Data submitted successfully." });
-    }, 1000); // Mock async operation
+    }
   };
 
   return (
@@ -191,7 +317,6 @@ const ImportFromCSV = ({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            {/* RESPONSIVE CHANGE: Buttons stack on mobile, row on larger screens */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
               <Button
                 type="button"
@@ -199,8 +324,7 @@ const ImportFromCSV = ({
                 variant="outline"
                 className="flex items-center justify-center gap-2"
               >
-                <Plus size={16} />
-                Add Row
+                <Plus size={16} /> Add Row
               </Button>
               <Button
                 type="button"
@@ -208,10 +332,16 @@ const ImportFromCSV = ({
                 variant="outline"
                 className="flex items-center justify-center gap-2"
               >
-                <Upload size={16} />
-                Upload CSV
+                <Upload size={16} /> Upload CSV
               </Button>
-
+              <Button
+                type="button"
+                onClick={handleDownloadSample}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+              >
+                <Download size={16} /> Download Template
+              </Button>
               {csvData.length > 0 && (
                 <Button
                   type="button"
@@ -219,12 +349,10 @@ const ImportFromCSV = ({
                   variant="destructive"
                   className="flex items-center justify-center gap-2"
                 >
-                  <Trash2 size={16} />
-                  Clear Data
+                  <Trash2 size={16} /> Clear Data
                 </Button>
               )}
             </div>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -240,12 +368,9 @@ const ImportFromCSV = ({
           </div>
 
           {csvData.length > 0 && (
-            // RESPONSIVE CHANGE: On mobile, this will contain "cards". On desktop, a table.
             <div className="overflow-hidden">
-              {/* This overflow is a fallback for medium-sized screens where the table might still be too wide */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  {/* RESPONSIVE CHANGE: Hide the traditional table header on mobile */}
                   <thead className="hidden md:table-header-group">
                     <tr>
                       {headers.map((header) => (
@@ -263,29 +388,37 @@ const ImportFromCSV = ({
                   </thead>
                   <tbody>
                     {csvData.map((row) => (
-                      // RESPONSIVE CHANGE: Each row becomes a block-level card on mobile
                       <tr
                         key={row.id}
                         className="block md:table-row mb-4 md:mb-0 border rounded-lg overflow-hidden md:border-0 md:rounded-none md:border-t hover:bg-muted/50"
                       >
                         {headers.map((header) => (
-                          // RESPONSIVE CHANGE: Each cell is a block with its label
                           <td
                             key={header}
                             className="block md:table-cell px-4 py-3 md:py-2 md:whitespace-nowrap border-b md:border-0 last:border-b-0"
                           >
-                            {/* Mobile-only label */}
                             <span className="font-medium capitalize text-muted-foreground md:hidden mb-1 block">
                               {header.replace(/_/g, " ")}
                             </span>
-                            {/* Input fields now have responsive widths */}
-                            {header === "is_custom" ? (
-                              <Input
-                                type="text"
-                                value="true"
-                                disabled
-                                className="bg-muted text-muted-foreground border-none w-full"
-                              />
+
+                            {header === "serving_unit" ? (
+                              <Select
+                                value={String(row[header]) || "g"}
+                                onValueChange={(value) =>
+                                  handleEditCell(row.id, header, value)
+                                }
+                              >
+                                <SelectTrigger className="w-full md:w-[100px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {servingUnitOptions.map((unit) => (
+                                    <SelectItem key={unit} value={unit}>
+                                      {unit}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             ) : booleanFields.has(header) ? (
                               <Select
                                 value={String(row[header])}
@@ -333,7 +466,6 @@ const ImportFromCSV = ({
                             )}
                           </td>
                         ))}
-                        {/* Actions cell, also responsive */}
                         <td className="block md:table-cell px-4 py-3 md:py-2">
                           <span className="font-medium capitalize text-muted-foreground md:hidden mb-1 block">
                             Actions
@@ -343,7 +475,7 @@ const ImportFromCSV = ({
                             onClick={() => handleDeleteRow(row.id)}
                             variant="destructive"
                             size="sm"
-                            className="w-full md:w-auto" // Full width on mobile
+                            className="w-full md:w-auto"
                           >
                             <Trash2 size={14} className="md:mr-0" />
                             <span className="ml-2 md:hidden">Delete Row</span>
@@ -369,8 +501,7 @@ const ImportFromCSV = ({
               </>
             ) : (
               <>
-                <Upload size={16} />
-                Import{" "}
+                <Upload size={16} /> Import
                 {csvData.length > 0 ? `${csvData.length} Records` : "Data"}
               </>
             )}
