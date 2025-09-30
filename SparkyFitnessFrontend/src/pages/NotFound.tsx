@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { usePreferences } from "@/contexts/PreferencesContext";
-import { error } from '@/utils/logging';
+import { error } from "@/utils/logging";
 
 const NotFound = () => {
   const location = useLocation();
