@@ -69,7 +69,8 @@ services:
       context: ../SparkyFitnessGarmin
       dockerfile: ../docker/Dockerfile.garmin_microservice
     environment:
-      GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:8000
+      GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:${GARMIN_SERVICE_PORT:-8000}
+      GARMIN_SERVICE_PORT: ${GARMIN_SERVICE_PORT:-8000}
     networks:
       - sparkyfitness-network
     restart: unless-stopped

@@ -1,4 +1,5 @@
 import { apiCall } from './api';
+import { Exercise } from './exerciseSearchService'; // Import Exercise interface
 
 export interface NutritionData {
   date: string;
@@ -81,6 +82,27 @@ export interface DailyFoodEntry {
   };
 }
 
+export interface DailyExerciseEntry {
+  id: string;
+  entry_date: string;
+  duration_minutes: number;
+  calories_burned: number;
+  notes?: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
+  exercises: Exercise; // Use the comprehensive Exercise interface
+}
+
+export interface ExerciseProgressData {
+  entry_date: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
+  calories_burned: number;
+  duration_minutes: number;
+}
+
 export interface CustomCategory {
   id: string;
   name: string;
@@ -103,6 +125,7 @@ export const loadReportsData = async (
 ): Promise<{
   nutritionData: NutritionData[];
   tabularData: DailyFoodEntry[];
+  exerciseEntries: DailyExerciseEntry[];
   measurementData: MeasurementData[];
   customCategories: CustomCategory[];
   customMeasurementsData: Record<string, CustomMeasurementData[]>;

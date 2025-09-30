@@ -1,16 +1,56 @@
 import { apiCall } from './api';
+import { Exercise as ExerciseInterface } from './exerciseSearchService';
 
-export interface Exercise {
-  id: string;
-  name: string;
-  category: string;
-  calories_per_hour: number;
-  description: string | null;
-  user_id: string | null;
-  is_custom: boolean;
-  shared_with_public: boolean;
-  created_at: string;
-  updated_at: string;
+// Helper function to safely parse JSON strings that might be arrays
+export const parseJsonArray = (value: string | string[] | undefined): string[] | undefined => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    let currentString = value;
+    let changed = true;
+
+    // Attempt to parse as JSON and strip quotes repeatedly
+    while (changed) {
+      changed = false;
+      try {
+        const tempParsed = JSON.parse(currentString);
+        if (typeof tempParsed === 'string') {
+          // If JSON.parse results in a string, update currentString and try again
+          if (tempParsed !== currentString) { // Only change if actual parsing happened
+            currentString = tempParsed;
+            changed = true;
+          }
+        } else if (Array.isArray(tempParsed)) {
+          return tempParsed; // Found an array, return it
+        } else {
+          // Not a string or array after parsing, stop
+          break;
+        }
+      } catch (e) {
+        // JSON.parse failed, try stripping outer quotes
+        const stripped = currentString.replace(/^"|"$/g, '');
+        if (stripped !== currentString) {
+          currentString = stripped;
+          changed = true;
+        } else {
+          // No more outer quotes to strip, stop
+          break;
+        }
+      }
+    }
+
+    // After all attempts, if it's a string, treat it as a single element array
+    if (typeof currentString === 'string') {
+      return [currentString];
+    }
+  }
+  return undefined;
+};
+
+export interface Exercise extends ExerciseInterface {
+  // No additional fields needed here, as ExerciseInterface is comprehensive
 }
 
 export interface ExerciseDeletionImpact {
@@ -25,6 +65,15 @@ interface ExercisePayload {
   user_id?: string | null;
   is_custom?: boolean;
   shared_with_public?: boolean;
+  source?: string;
+  force?: string;
+  level?: string;
+  mechanic?: string;
+  equipment?: string[];
+  primary_muscles?: string[];
+  secondary_muscles?: string[];
+  instructions?: string[];
+  images?: string[];
 }
 
 export const loadExercises = async (
@@ -44,23 +93,53 @@ export const loadExercises = async (
     itemsPerPage: itemsPerPage.toString(),
   }).toString();
 
-  return apiCall(`/exercises?${queryParams}`, {
+  const response = await apiCall(`/exercises?${queryParams}`, {
     method: 'GET',
   });
+
+  const parsedExercises = response.exercises.map((exercise: any) => ({
+    ...exercise,
+    equipment: parseJsonArray(exercise.equipment),
+    primary_muscles: parseJsonArray(exercise.primary_muscles),
+    secondary_muscles: parseJsonArray(exercise.secondary_muscles),
+    instructions: parseJsonArray(exercise.instructions),
+    images: parseJsonArray(exercise.images),
+  }));
+
+  return {
+    exercises: parsedExercises,
+    totalCount: response.totalCount,
+  };
 };
 
-export const createExercise = async (payload: ExercisePayload): Promise<Exercise> => {
-  return apiCall('/exercises', {
-    method: 'POST',
-    body: payload,
-  });
+export const createExercise = async (payload: ExercisePayload | FormData): Promise<Exercise> => {
+  if (payload instanceof FormData) {
+    return apiCall('/exercises', {
+      method: 'POST',
+      body: payload,
+      isFormData: true, // Custom flag to indicate FormData
+    });
+  } else {
+    return apiCall('/exercises', {
+      method: 'POST',
+      body: payload,
+    });
+  }
 };
 
-export const updateExercise = async (id: string, payload: Partial<ExercisePayload>): Promise<Exercise> => {
-  return apiCall(`/exercises/${id}`, {
-    method: 'PUT',
-    body: payload,
-  });
+export const updateExercise = async (id: string, payload: Partial<ExercisePayload> | FormData): Promise<Exercise> => {
+  if (payload instanceof FormData) {
+    return apiCall(`/exercises/${id}`, {
+      method: 'PUT',
+      body: payload,
+      isFormData: true,
+    });
+  } else {
+    return apiCall(`/exercises/${id}`, {
+      method: 'PUT',
+      body: payload,
+    });
+  }
 };
 
 export const deleteExercise = async (id: string, userId: string): Promise<void> => {

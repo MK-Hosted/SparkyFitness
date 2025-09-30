@@ -155,76 +155,68 @@ const NutrientDisplaySettings: React.FC = () => {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Nutrient Display Settings</CardTitle>
-                <p className="text-sm text-muted-foreground pt-2">
-                    Choose which nutrients to display. Changes are saved automatically.
-                </p>
-            </CardHeader>
-            <CardContent>
-                <Tabs value={activePlatformTab} onValueChange={(value) => setActivePlatformTab(value as 'desktop' | 'mobile')}>
-                    <TabsList>
-                        <TabsTrigger value="desktop">Desktop</TabsTrigger>
-                        <TabsTrigger value="mobile">Mobile</TabsTrigger>
-                    </TabsList>
-                    {['desktop', 'mobile'].map(platform => (
-                        <TabsContent key={platform} value={platform}>
-                            <Tabs value={activeViewGroupTab} onValueChange={setActiveViewGroupTab}>
-                                <TabsList>
-                                    {viewGroups.map(group => (
-                                        <TabsTrigger key={group.id} value={group.id}>{group.name}</TabsTrigger>
-                                    ))}
-                                </TabsList>
+        <div className="space-y-4">
+            <Tabs value={activePlatformTab} onValueChange={(value) => setActivePlatformTab(value as 'desktop' | 'mobile')}>
+                <TabsList>
+                    <TabsTrigger value="desktop">Desktop</TabsTrigger>
+                    <TabsTrigger value="mobile">Mobile</TabsTrigger>
+                </TabsList>
+                {['desktop', 'mobile'].map(platform => (
+                    <TabsContent key={platform} value={platform}>
+                        <Tabs value={activeViewGroupTab} onValueChange={setActiveViewGroupTab}>
+                            <TabsList>
                                 {viewGroups.map(group => (
-                                    <TabsContent key={group.id} value={group.id}>
-                                        <p className="text-sm text-muted-foreground mb-4">
-                                            {
-                                                group.id === 'summary' ? 'Controls the Nutrition Summary and 14-Day Trends on the Diary page.' :
-                                                group.id === 'quick_info' ? 'Controls nutrients shown for individual food entries, meal totals, food search results, and the food database.' :
-                                                group.id === 'food_database' ? 'Controls nutrients shown when editing foods in your database.' :
-                                                group.id === 'goal' ? 'Controls nutrients shown when setting or editing your goals.' :
-                                                group.id === 'report_tabular' ? 'Controls nutrient columns in the Reports table view.' :
-                                                'Controls which nutrients are available for charts in the Reports section.'
-                                            }
-                                        </p>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
-                                            {allNutrients.map(nutrient => {
-                                                const preference = preferences.find(p => p.view_group === group.id && p.platform === platform);
-                                                const isChecked = preference?.visible_nutrients.includes(nutrient) || false;
-                                                return (
-                                                    <div key={nutrient} className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`${group.id}-${platform}-${nutrient}`}
-                                                            checked={isChecked}
-                                                            onCheckedChange={(checked) => handleCheckboxChange(group.id, platform as 'desktop' | 'mobile', nutrient, !!checked)}
-                                                        />
-                                                        <Label htmlFor={`${group.id}-${platform}-${nutrient}`} className="capitalize">{nutrient.replace(/_/g, ' ')}</Label>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        <div className="flex items-center gap-4 mt-6 pt-4 border-t">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`sync-${group.id}-${platform}`}
-                                                    checked={syncState[group.id] || false}
-                                                    onCheckedChange={() => handleSyncToggle(group.id, platform as 'desktop' | 'mobile')}
-                                                />
-                                                <Label htmlFor={`sync-${group.id}-${platform}`}>Sync with {platform === 'desktop' ? 'Mobile' : 'Desktop'}</Label>
-                                            </div>
-                                            <Button variant="outline" onClick={() => handleSelectAll(group.id, platform as 'desktop' | 'mobile')}>Select All</Button>
-                                            <Button variant="outline" onClick={() => handleClearAll(group.id, platform as 'desktop' | 'mobile')}>Clear All</Button>
-                                            <Button variant="outline" onClick={() => handleReset(group.id, platform as 'desktop' | 'mobile')}>Reset to Default</Button>
-                                        </div>
-                                    </TabsContent>
+                                    <TabsTrigger key={group.id} value={group.id}>{group.name}</TabsTrigger>
                                 ))}
-                            </Tabs>
-                        </TabsContent>
-                    ))}
-                </Tabs>
-            </CardContent>
-        </Card>
+                            </TabsList>
+                            {viewGroups.map(group => (
+                                <TabsContent key={group.id} value={group.id}>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        {
+                                            group.id === 'summary' ? 'Controls the Nutrition Summary and 14-Day Trends on the Diary page.' :
+                                            group.id === 'quick_info' ? 'Controls nutrients shown for individual food entries, meal totals, food search results, and the food database.' :
+                                            group.id === 'food_database' ? 'Controls nutrients shown when editing foods in your database.' :
+                                            group.id === 'goal' ? 'Controls nutrients shown when setting or editing your goals.' :
+                                            group.id === 'report_tabular' ? 'Controls nutrient columns in the Reports table view.' :
+                                            'Controls which nutrients are available for charts in the Reports section.'
+                                        }
+                                    </p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
+                                        {allNutrients.map(nutrient => {
+                                            const preference = preferences.find(p => p.view_group === group.id && p.platform === platform);
+                                            const isChecked = preference?.visible_nutrients.includes(nutrient) || false;
+                                            return (
+                                                <div key={nutrient} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`${group.id}-${platform}-${nutrient}`}
+                                                        checked={isChecked}
+                                                        onCheckedChange={(checked) => handleCheckboxChange(group.id, platform as 'desktop' | 'mobile', nutrient, !!checked)}
+                                                    />
+                                                    <Label htmlFor={`${group.id}-${platform}-${nutrient}`} className="capitalize">{nutrient.replace(/_/g, ' ')}</Label>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex items-center gap-4 mt-6 pt-4 border-t">
+                                        <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`sync-${group.id}-${platform}`}
+                                                checked={syncState[group.id] || false}
+                                                onCheckedChange={() => handleSyncToggle(group.id, platform as 'desktop' | 'mobile')}
+                                            />
+                                            <Label htmlFor={`sync-${group.id}-${platform}`}>Sync with {platform === 'desktop' ? 'Mobile' : 'Desktop'}</Label>
+                                        </div>
+                                        <Button variant="outline" onClick={() => handleSelectAll(group.id, platform as 'desktop' | 'mobile')}>Select All</Button>
+                                        <Button variant="outline" onClick={() => handleClearAll(group.id, platform as 'desktop' | 'mobile')}>Clear All</Button>
+                                        <Button variant="outline" onClick={() => handleReset(group.id, platform as 'desktop' | 'mobile')}>Reset to Default</Button>
+                                    </div>
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+                    </TabsContent>
+                ))}
+            </Tabs>
+        </div>
     );
 };
 

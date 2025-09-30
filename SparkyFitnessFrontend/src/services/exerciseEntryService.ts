@@ -1,5 +1,8 @@
 import { apiCall } from './api';
 import { getExerciseEntriesForDate as getDailyExerciseEntries } from './dailyProgressService';
+import { Exercise } from './exerciseSearchService'; // Import the comprehensive Exercise interface
+import { parseJsonArray } from './exerciseService'; // Import parseJsonArray
+import { ExerciseProgressData } from './reportsService'; // Import ExerciseProgressData
 
 export interface ExerciseEntry {
   id: string;
@@ -8,34 +11,39 @@ export interface ExerciseEntry {
   calories_burned: number;
   entry_date: string;
   notes?: string;
-  exercises: {
-    id: string;
-    name: string;
-    user_id?: string;
-    category: string;
-    calories_per_hour: number;
-  };
-}
-
-export interface Exercise {
-  id: string;
-  name: string;
-  category: string;
-  calories_per_hour: number;
-  description?: string;
-  user_id?: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
+  exercises: Exercise; // Use the comprehensive Exercise interface
 }
 
 export const fetchExerciseEntries = async (selectedDate: string): Promise<ExerciseEntry[]> => {
-  return getDailyExerciseEntries(selectedDate);
+  const response = await getDailyExerciseEntries(selectedDate);
+  
+  const parsedEntries = response.map((entry: ExerciseEntry) => ({
+    ...entry,
+    exercises: {
+      ...entry.exercises,
+      equipment: parseJsonArray(entry.exercises.equipment),
+      primary_muscles: parseJsonArray(entry.exercises.primary_muscles),
+      secondary_muscles: parseJsonArray(entry.exercises.secondary_muscles),
+      instructions: parseJsonArray(entry.exercises.instructions),
+      images: parseJsonArray(entry.exercises.images),
+    }
+  }));
+
+  return parsedEntries;
 };
 
-export const addExerciseEntry = async (payload: {
+export const createExerciseEntry = async (payload: {
   exercise_id: string;
   duration_minutes: number;
   calories_burned: number;
   entry_date: string;
   notes?: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
 }): Promise<ExerciseEntry> => {
   return apiCall('/exercise-entries', {
     method: 'POST',
@@ -47,6 +55,17 @@ export const deleteExerciseEntry = async (entryId: string): Promise<void> => {
   return apiCall(`/exercise-entries/${entryId}`, {
     method: 'DELETE',
   });
+};
+
+export const getExerciseProgressData = async (exerciseId: string, startDate: string, endDate: string): Promise<ExerciseProgressData[]> => {
+  const params = new URLSearchParams({
+    startDate,
+    endDate,
+  });
+  const response = await apiCall(`/exercise-entries/progress/${exerciseId}?${params.toString()}`, {
+    method: 'GET',
+  });
+  return response;
 };
 
 export const searchExercises = async (query: string, filterType: string): Promise<Exercise[]> => {

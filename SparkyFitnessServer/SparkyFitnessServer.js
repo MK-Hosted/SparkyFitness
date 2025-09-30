@@ -20,6 +20,7 @@ const weeklyGoalPlanRoutes = require('./routes/weeklyGoalPlanRoutes');
 const mealPlanTemplateRoutes = require('./routes/mealPlanTemplateRoutes');
 const exerciseRoutes = require('./routes/exerciseRoutes');
 const exerciseEntryRoutes = require('./routes/exerciseEntryRoutes');
+const freeExerciseDBRoutes = require('./routes/freeExerciseDBRoutes'); // Import freeExerciseDB routes
 const healthDataRoutes = require('./integrations/healthData/healthDataRoutes');
 const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
@@ -48,6 +49,70 @@ app.use(cors({
 
 // Middleware to parse JSON bodies for all incoming requests
 app.use(express.json());
+
+// Serve static files from the 'uploads' directory
+// This middleware will first try to serve the file if it exists locally.
+// If the file is not found, it will fall through to the next middleware,
+// which will handle on-demand downloading.
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// On-demand image serving route
+app.get('/uploads/exercises/:exerciseId/:imageFileName', async (req, res, next) => {
+  const { exerciseId, imageFileName } = req.params;
+  const localImagePath = path.join(__dirname, 'uploads/exercises', exerciseId, imageFileName);
+
+  // Check if the file already exists locally
+  if (fs.existsSync(localImagePath)) {
+    return res.sendFile(localImagePath);
+  }
+
+  // If not found, attempt to re-download
+  try {
+    const exerciseRepository = require('./models/exerciseRepository');
+    const freeExerciseDBService = require('./integrations/freeexercisedb/FreeExerciseDBService'); // Import service
+
+    // Use getExerciseBySourceAndSourceId since exerciseId in the URL is actually the source_id
+    const exercise = await exerciseRepository.getExerciseBySourceAndSourceId('free-exercise-db', exerciseId);
+
+    if (!exercise) {
+      return res.status(404).send('Exercise not found.');
+    }
+
+    // Find the original image path from the exercise's images array
+    // The imageFileName is expected to be the last part of the originalRelativeImagePath
+    const originalRelativeImagePath = exercise.images.find(img => img.endsWith(imageFileName));
+    log('debug', `[SparkyFitnessServer] Original relative image path from DB: ${originalRelativeImagePath}`);
+
+    if (!originalRelativeImagePath) {
+      return res.status(404).send('Image not found for this exercise.');
+    }
+
+    let externalImageUrl;
+    // Determine the external image URL based on the source
+    if (exercise.source === 'free-exercise-db') {
+      // Use the originalRelativeImagePath directly as it contains the full path needed by getExerciseImageUrl
+      externalImageUrl = freeExerciseDBService.getExerciseImageUrl(originalRelativeImagePath);
+      log('debug', `[SparkyFitnessServer] External image URL constructed: ${externalImageUrl}`);
+    } else {
+      // Handle other sources here if needed
+      return res.status(404).send('Unsupported exercise source for image download.');
+    }
+
+    // Download the image
+    const { downloadImage } = require('./utils/imageDownloader');
+    const downloadedLocalPath = await downloadImage(externalImageUrl, exerciseId);
+
+    // Serve the newly downloaded image
+    // downloadedLocalPath already starts with /uploads/exercises/..., so we just need to resolve it from the base directory
+    const finalImagePath = path.join(__dirname, downloadedLocalPath);
+    log('info', `Serving image from: ${finalImagePath}`);
+    res.sendFile(finalImagePath);
+
+  } catch (error) {
+    log('error', `Error serving or re-downloading image for exercise ${exerciseId}, image ${imageFileName}:`, error);
+    res.status(500).send('Error serving image.');
+  }
+});
 
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
@@ -126,6 +191,7 @@ app.use('/weekly-goal-plans', weeklyGoalPlanRoutes);
 app.use('/meal-plan-templates', mealPlanTemplateRoutes);
 app.use('/exercises', exerciseRoutes);
 app.use('/exercise-entries', exerciseEntryRoutes);
+app.use('/freeexercisedb', freeExerciseDBRoutes); // Add freeExerciseDB routes
 app.use('/api/health-data', healthDataRoutes);
 app.use('/auth', authRoutes);
 app.use('/user', authRoutes);
@@ -138,6 +204,12 @@ app.use('/version', versionRoutes); // Version routes
 log('debug', 'Registering /openid routes');
 app.use('/openid', openidRoutes); // Import OpenID routes
 app.use('/water-containers', waterContainerRoutes);
+
+// Temporary debug route to log incoming requests for meal plan templates
+app.use('/meal-plan-templates', (req, res, next) => {
+  log('debug', `[DEBUG ROUTE] Original URL: ${req.originalUrl}, Path: ${req.path}`);
+  next();
+}, mealPlanTemplateRoutes);
 
 console.log('DEBUG: Attempting to start server...');
 applyMigrations().then(async () => {

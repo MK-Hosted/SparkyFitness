@@ -92,7 +92,7 @@ const AIServiceSettings = () => {
   };
 
   const handleAddService = async () => {
-    if (!user || !newService.service_name || !newService.api_key) {
+    if (!user || !newService.service_name || (newService.service_type !== 'ollama' && !newService.api_key)) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -455,17 +455,19 @@ const AIServiceSettings = () => {
               </div>
 
               <div>
-                <Label htmlFor="new_api_key">API Key</Label>
+                <Label htmlFor="new_api_key">API Key {newService.service_type === 'ollama' ? '(Optional)' : ''}</Label>
                 <Input
                   id="new_api_key"
                   type="password"
                   value={newService.api_key}
                   onChange={(e) => setNewService(prev => ({ ...prev, api_key: e.target.value }))}
-                  placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  placeholder={newService.service_type === 'ollama' ? 'Not required for Ollama' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
                   autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Your API key for the selected service. This will be stored encrypted.
+                  {newService.service_type === 'ollama'
+                    ? 'API key is optional for Ollama. If provided, it will be stored encrypted.'
+                    : 'Your API key for the selected service. This will be stored encrypted.'}
                 </p>
               </div>
 
@@ -608,16 +610,18 @@ const AIServiceSettings = () => {
                         </div>
 
                         <div>
-                          <Label>API Key</Label>
+                          <Label>API Key {editData.service_type === 'ollama' ? '(Optional)' : ''}</Label>
                           <Input
                             type="password"
                             value={editData.api_key || ''}
                             onChange={(e) => setEditData(prev => ({ ...prev, api_key: e.target.value }))}
-                            placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            placeholder={editData.service_type === 'ollama' ? 'Not required for Ollama' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
                             autoComplete="off"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Enter your API key if you wish to update it. It will be stored encrypted.
+                            {editData.service_type === 'ollama'
+                              ? 'API key is optional for Ollama. If provided, it will be stored encrypted.'
+                              : 'Enter your API key if you wish to update it. It will be stored encrypted.'}
                           </p>
                         </div>
 

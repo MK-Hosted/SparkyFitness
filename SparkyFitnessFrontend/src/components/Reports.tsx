@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { BarChart3, TrendingUp, Activity } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'; // Added Legend
+import { BarChart3, TrendingUp, Activity, Dumbbell } from "lucide-react"; // Added Dumbbell
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,13 @@ import ReportsTables from "./reports/ReportsTables";
 import { log, debug, info, warn, error, UserLoggingLevel } from "@/utils/logging";
 import { format, parseISO, addDays } from 'date-fns'; // Import format, parseISO, addDays from date-fns
 import { calculateFoodEntryNutrition } from '@/utils/nutritionCalculations'; // Import the new utility function
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
 
 import {
   loadReportsData,
@@ -23,18 +30,19 @@ import {
   DailyFoodEntry,
   CustomCategory,
   CustomMeasurementData,
+  DailyExerciseEntry, // Import DailyExerciseEntry
+  ExerciseProgressData, // Import ExerciseProgressData
 } from '@/services/reportsService';
+import { getExerciseProgressData } from '@/services/exerciseEntryService'; // Import getExerciseProgressData
 
-// At the very top of Reports.tsx, before the functional component definition
 const Reports = () => {
-  // At the very top of Reports.tsx, before the functional component definition
-  // These console.log statements were moved inside the component to access loggingLevel
   const { user } = useAuth();
   const { activeUserId } = useActiveUser();
   const { weightUnit: defaultWeightUnit, measurementUnit: defaultMeasurementUnit, convertWeight, convertMeasurement, formatDateInUserTimezone, parseDateInUserTimezone, loggingLevel, timezone } = usePreferences();
   const [nutritionData, setNutritionData] = useState<NutritionData[]>([]);
   const [measurementData, setMeasurementData] = useState<ReportsMeasurementData[]>([]);
   const [tabularData, setTabularData] = useState<DailyFoodEntry[]>([]);
+  const [exerciseEntries, setExerciseEntries] = useState<DailyExerciseEntry[]>([]); // New state for exercise entries
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [customMeasurementsData, setCustomMeasurementsData] = useState<Record<string, CustomMeasurementData[]>>({});
   const [loading, setLoading] = useState(true);
@@ -42,6 +50,8 @@ const Reports = () => {
   const [endDate, setEndDate] = useState<string | null>(null);
   const [showWeightInKg, setShowWeightInKg] = useState(defaultWeightUnit === 'kg');
   const [showMeasurementsInCm, setShowMeasurementsInCm] = useState(defaultMeasurementUnit === 'cm');
+  const [selectedExerciseForChart, setSelectedExerciseForChart] = useState<string | null>(null); // New state for exercise chart selection
+  const [exerciseProgressData, setExerciseProgressData] = useState<ExerciseProgressData[]>([]); // New state for exercise progress data
 
   // Effect to re-initialize startDate and endDate when timezone preference changes
   useEffect(() => {
@@ -85,10 +95,12 @@ const Reports = () => {
 
     window.addEventListener('foodDiaryRefresh', handleRefresh);
     window.addEventListener('measurementsRefresh', handleRefresh);
+    window.addEventListener('exerciseRefresh', handleRefresh); // Listen for exercise refresh
 
     return () => {
       window.removeEventListener('foodDiaryRefresh', handleRefresh);
       window.removeEventListener('measurementsRefresh', handleRefresh);
+      window.removeEventListener('exerciseRefresh', handleRefresh); // Clean up exercise refresh listener
       };
     }, [user, activeUserId, startDate, endDate, loggingLevel, formatDateInUserTimezone, parseDateInUserTimezone, showWeightInKg, showMeasurementsInCm, defaultWeightUnit, defaultMeasurementUnit]); // Added showWeightInKg, showMeasurementsInCm, defaultWeightUnit, defaultMeasurementUnit to dependencies
 
@@ -100,6 +112,7 @@ const Reports = () => {
       const {
         nutritionData: fetchedNutritionData,
         tabularData: fetchedTabularData,
+        exerciseEntries: fetchedExerciseEntries, // Fetch exercise entries
         measurementData: fetchedMeasurementData,
         customCategories: fetchedCustomCategories,
         customMeasurementsData: fetchedCustomMeasurementsData,
@@ -107,6 +120,7 @@ const Reports = () => {
 
       setNutritionData(fetchedNutritionData);
       setTabularData(fetchedTabularData);
+      setExerciseEntries(fetchedExerciseEntries); // Set exercise entries
       
       // Apply unit conversions to fetchedMeasurementData
       const measurementDataFormatted = fetchedMeasurementData.map(m => ({
@@ -134,6 +148,27 @@ const Reports = () => {
       debug(loggingLevel, 'Reports: Loading state set to false.');
     }
   };
+
+  const fetchExerciseChartData = useCallback(async () => {
+    if (!selectedExerciseForChart || !startDate || !endDate) return;
+
+    try {
+      const data = await getExerciseProgressData(selectedExerciseForChart, startDate, endDate);
+      setExerciseProgressData(data);
+      info(loggingLevel, `Reports: Fetched exercise progress data for ${selectedExerciseForChart}:`, data);
+    } catch (err) {
+      error(loggingLevel, `Reports: Error fetching exercise progress data for ${selectedExerciseForChart}:`, err);
+      toast({
+        title: "Error",
+        description: "Failed to load exercise progress data.",
+        variant: "destructive",
+      });
+    }
+  }, [selectedExerciseForChart, startDate, endDate, loggingLevel, toast]);
+
+  useEffect(() => {
+    fetchExerciseChartData();
+  }, [fetchExerciseChartData]);
 
   const exportFoodDiary = async () => {
     info(loggingLevel, 'Reports: Attempting to export food diary.');
@@ -166,7 +201,7 @@ const Reports = () => {
         return acc;
       }, {} as Record<string, DailyFoodEntry[]>);
 
-      const calculateDayTotal = (entries: DailyFoodEntry[]) => {
+      const calculateFoodDayTotal = (entries: DailyFoodEntry[]) => {
         return entries.reduce((total, entry) => {
           const calculatedNutrition = calculateFoodEntryNutrition(entry as any); // Cast to any for now
 
@@ -237,7 +272,7 @@ const Reports = () => {
           });
           
           // Add total row
-          const totals = calculateDayTotal(entries);
+          const totals = calculateFoodDayTotal(entries);
           csvRows.push([
             formatDateInUserTimezone(date, 'MMM dd, yyyy'), // Format date for display
             'Total',
@@ -289,6 +324,69 @@ const Reports = () => {
       toast({
         title: "Error",
         description: "Failed to export food diary",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportExerciseEntries = async () => {
+    info(loggingLevel, 'Reports: Attempting to export exercise entries.');
+    try {
+      if (!exerciseEntries.length) {
+        warn(loggingLevel, 'Reports: No exercise entries to export.');
+        toast({
+          title: "No Data",
+          description: "No exercise entries to export",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const csvHeaders = [
+        'Date', 'Exercise Name', 'Duration (minutes)', 'Calories Burned',
+        'Sets', 'Reps', 'Weight', 'Notes', 'Category', 'Equipment',
+        'Primary Muscles', 'Secondary Muscles'
+      ];
+
+      const csvRows = exerciseEntries.map(entry => [
+        formatDateInUserTimezone(entry.entry_date, 'MMM dd, yyyy'),
+        entry.exercises.name,
+        entry.duration_minutes.toString(),
+        Math.round(entry.calories_burned).toString(),
+        entry.sets?.toString() || '',
+        entry.reps?.toString() || '',
+        entry.weight?.toString() || '',
+        entry.notes || '',
+        entry.exercises.category,
+        entry.exercises.equipment?.join(', ') || '',
+        entry.exercises.primary_muscles?.join(', ') || '',
+        entry.exercises.secondary_muscles?.join(', ') || '',
+      ]);
+
+      const csvContent = [csvHeaders, ...csvRows].map(row =>
+        row.map(cell => `"${cell}"`).join(',')
+      ).join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `exercise-entries-${startDate}-to-${endDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      info(loggingLevel, 'Reports: Exercise entries exported successfully.');
+      toast({
+        title: "Success",
+        description: "Exercise entries exported successfully",
+      });
+    } catch (err) {
+      error(loggingLevel, 'Reports: Error exporting exercise entries:', err);
+      toast({
+        title: "Error",
+        description: "Failed to export exercise entries",
         variant: "destructive",
       });
     }
@@ -540,10 +638,14 @@ const Reports = () => {
         <div>Loading reports...</div>
       ) : (
         <Tabs defaultValue="charts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3"> {/* Changed to 3 columns */}
             <TabsTrigger value="charts" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Charts
+            </TabsTrigger>
+            <TabsTrigger value="exercise-charts" className="flex items-center gap-2"> {/* New tab for exercise charts */}
+              <Dumbbell className="w-4 h-4" />
+              Exercise Progress
             </TabsTrigger>
             <TabsTrigger value="table" className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
@@ -611,7 +713,7 @@ const Reports = () => {
                             </ResponsiveContainer>
                           </div>
                         </CardContent>
-                      </Card>
+                        </Card>
                       </ZoomableChart>
                     );
                   })}
@@ -620,9 +722,85 @@ const Reports = () => {
             )}
           </TabsContent>
 
+          <TabsContent value="exercise-charts" className="space-y-6"> {/* New tab content */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Dumbbell className="w-5 h-5 mr-2" /> Exercise Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Select
+                  value={selectedExerciseForChart || ''}
+                  onValueChange={(value) => setSelectedExerciseForChart(value)}
+                >
+                  <SelectTrigger className="w-full mb-4">
+                    <SelectValue placeholder="Select an exercise" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(exerciseEntries || [])
+                      .filter((entry, index, self) =>
+                        index === self.findIndex((e) => e.exercises.id === entry.exercises.id)
+                      ) // Get unique exercises
+                      .map((entry) => (
+                        <SelectItem key={entry.exercises.id} value={entry.exercises.id}>
+                          {entry.exercises.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+
+                {selectedExerciseForChart && exerciseProgressData.length > 0 ? (
+                  <div className="space-y-4">
+                    <ZoomableChart title="Volume Trend">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={exerciseProgressData.map(d => ({
+                          ...d,
+                          date: formatDateInUserTimezone(d.entry_date, 'MMM dd, yyyy'),
+                          volume: (d.sets || 0) * (d.reps || 0) * (d.weight || 0)
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis label={{ value: 'Volume', angle: -90, position: 'insideLeft', offset: 10 }} />
+                          <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))' }} />
+                          <Legend />
+                          <Line type="monotone" dataKey="volume" stroke="#8884d8" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ZoomableChart>
+
+                    <ZoomableChart title="Max Weight Trend">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={exerciseProgressData.map(d => ({
+                          ...d,
+                          date: formatDateInUserTimezone(d.entry_date, 'MMM dd, yyyy'),
+                          maxWeight: d.weight || 0
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis label={{ value: 'Max Weight', angle: -90, position: 'insideLeft', offset: 10 }} />
+                          <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))' }} />
+                          <Legend />
+                          <Line type="monotone" dataKey="maxWeight" stroke="#82ca9d" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ZoomableChart>
+
+                    {/* Add 1RM chart here if desired */}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">
+                    {selectedExerciseForChart ? "No progress data available for this exercise in the selected date range." : "Select an exercise to view progress charts."}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="table" className="space-y-6">
             <ReportsTables
               tabularData={tabularData}
+              exerciseEntries={exerciseEntries} // Pass exerciseEntries
               measurementData={measurementData}
               customCategories={customCategories}
               customMeasurementsData={customMeasurementsData}
@@ -631,6 +809,7 @@ const Reports = () => {
               onExportFoodDiary={exportFoodDiary}
               onExportBodyMeasurements={exportBodyMeasurements}
               onExportCustomMeasurements={exportCustomMeasurements}
+              onExportExerciseEntries={exportExerciseEntries} // Pass export function
             />
           </TabsContent>
         </Tabs>

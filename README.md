@@ -100,7 +100,7 @@ Docs: https://codewithcj.github.io/SparkyFitness
 
 ![image](https://github.com/user-attachments/assets/ccc7f34e-a663-405f-a4d4-a9888c3197bc)
 
-## 🚀 Quick Start
+## � Quick Start
 
 Get SparkyFitness running in minutes:
 

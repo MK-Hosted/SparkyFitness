@@ -15,7 +15,7 @@ import { usePreferences } from "@/contexts/PreferencesContext";
 interface ExternalDataProvider { // Renamed interface
   id: string;
   provider_name: string;
-  provider_type: 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie'; // Added mealie
+  provider_type: 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' | 'free-exercise-db'; // Added free-exercise-db
   app_id: string | null; // Keep app_id for other providers
   app_key: string | null;
   is_active: boolean;
@@ -29,7 +29,7 @@ const ExternalProviderSettings = () => { // Renamed component
   const [providers, setProviders] = useState<ExternalDataProvider[]>([]);
   const [newProvider, setNewProvider] = useState({
     provider_name: '',
-    provider_type: 'openfoodfacts' as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', // Added mealie
+    provider_type: 'openfoodfacts' as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' | 'free-exercise-db', // Added free-exercise-db
     app_id: '',
     app_key: '',
     is_active: false,
@@ -57,7 +57,7 @@ const ExternalProviderSettings = () => { // Renamed component
       });
       setProviders(data.map((provider: any) => ({
         ...provider,
-        provider_type: provider.provider_type as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' // Added mealie
+        provider_type: provider.provider_type as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' | 'free-exercise-db' // Added free-exercise-db
       })) || []);
     } catch (error: any) {
       console.error('Error loading external data providers:', error);
@@ -108,10 +108,10 @@ const ExternalProviderSettings = () => { // Renamed component
           user_id: user.id, // user_id will be handled by backend from JWT
           provider_name: newProvider.provider_name,
           provider_type: newProvider.provider_type,
-          app_id: newProvider.provider_type === 'mealie' ? null : newProvider.app_id || null, // Only set app_id for non-mealie
+          app_id: (newProvider.provider_type === 'mealie' || newProvider.provider_type === 'free-exercise-db' || newProvider.provider_type === 'wger') ? null : newProvider.app_id || null, // Only set app_id for non-mealie, free-exercise-db, wger
           app_key: newProvider.app_key || null,
           is_active: newProvider.is_active,
-          base_url: newProvider.provider_type === 'mealie' ? newProvider.base_url || null : null, // Set base_url for mealie
+          base_url: (newProvider.provider_type === 'mealie' || newProvider.provider_type === 'free-exercise-db') ? newProvider.base_url || null : null, // Set base_url for mealie and free-exercise-db
         }),
       });
 
@@ -149,10 +149,10 @@ const ExternalProviderSettings = () => { // Renamed component
     const providerUpdateData: Partial<ExternalDataProvider> = { // Renamed interface
       provider_name: editData.provider_name,
       provider_type: editData.provider_type,
-      app_id: editData.provider_type === 'mealie' ? null : editData.app_id || null, // Only set app_id for non-mealie
+      app_id: (editData.provider_type === 'mealie' || editData.provider_type === 'free-exercise-db' || editData.provider_type === 'wger') ? null : editData.app_id || null, // Only set app_id for non-mealie, free-exercise-db, wger
       app_key: editData.app_key || null,
       is_active: editData.is_active,
-      base_url: editData.provider_type === 'mealie' ? editData.base_url || null : null, // Set base_url for mealie
+      base_url: (editData.provider_type === 'mealie' || editData.provider_type === 'free-exercise-db') ? editData.base_url || null : null, // Set base_url for mealie and free-exercise-db
     };
 
     try {
@@ -266,8 +266,9 @@ const ExternalProviderSettings = () => { // Renamed component
     { value: "openfoodfacts", label: "OpenFoodFacts" },
     { value: "nutritionix", label: "Nutritionix" },
     { value: "fatsecret", label: "FatSecret" },
-    { value: "wger", label: "Wger (Exercise)" }, // Added wger
-    { value: "mealie", label: "Mealie" }, // Added Mealie
+    { value: "wger", label: "Wger (Exercise)" },
+    { value: "free-exercise-db", label: "Free Exercise DB" }, // Added Free Exercise DB
+    { value: "mealie", label: "Mealie" },
   ];
 
   return (
@@ -276,20 +277,20 @@ const ExternalProviderSettings = () => { // Renamed component
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" /> {/* Changed icon */}
-            External Data Providers {/* Changed title */}
+            Food & Exercise Data Providers
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!showAddForm && (
             <Button onClick={() => setShowAddForm(true)} variant="outline">
               <Plus className="h-4 w-4 mr-2" />
-              Add New External Data Provider {/* Changed button text */}
+              Add New Data Provider {/* Changed button text */}
             </Button>
           )}
 
           {showAddForm && (
             <form onSubmit={(e) => { e.preventDefault(); handleAddProvider(); }} className="border rounded-lg p-4 space-y-4">
-              <h3 className="text-lg font-medium">Add New External Data Provider</h3> {/* Changed title */}
+              <h3 className="text-lg font-medium">Add New Data Provider</h3> {/* Changed title */}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -298,14 +299,14 @@ const ExternalProviderSettings = () => { // Renamed component
                     id="new_provider_name"
                     value={newProvider.provider_name}
                     onChange={(e) => setNewProvider(prev => ({ ...prev, provider_name: e.target.value }))}
-                    placeholder="My Proivider name" // Fixed placeholder text
+                    placeholder="My Provider name" // Fixed placeholder text
                   />
                 </div>
                 <div>
                   <Label htmlFor="new_provider_type">Provider Type</Label>
                   <Select
                     value={newProvider.provider_type}
-                    onValueChange={(value) => setNewProvider(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', app_id: '', app_key: '', base_url: '' }))} // Added mealie, reset base_url
+                    onValueChange={(value) => setNewProvider(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' | 'free-exercise-db', app_id: '', app_key: '', base_url: '' }))} // Added free-exercise-db, reset base_url
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -371,7 +372,22 @@ const ExternalProviderSettings = () => { // Renamed component
                       autoComplete="off"
                     />
                   </div>
+                  {newProvider.provider_type === 'fatsecret' && (
+                    <p className="text-sm text-muted-foreground col-span-2">
+                      Note: For Fatsecret, you need to set up **your public IP** whitelisting in your Fatsecret developer account. This process can take up to 24 hours.
+                    </p>
+                  )}
                 </>
+              )}
+              {newProvider.provider_type === 'nutritionix' && (
+                <p className="text-sm text-muted-foreground col-span-2">
+                  Get your App ID and App Key from the <a href="https://developer.nutritionix.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Nutritionix Developer Portal</a>.
+                </p>
+              )}
+              {newProvider.provider_type === 'fatsecret' && (
+                <p className="text-sm text-muted-foreground col-span-2">
+                  Get your App ID and App Key from the <a href="https://platform.fatsecret.com/my-account/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Fatsecret Platform Dashboard</a>.
+                </p>
               )}
 
               <div className="flex items-center space-x-2">
@@ -399,7 +415,7 @@ const ExternalProviderSettings = () => { // Renamed component
           {providers.length > 0 && (
             <>
               <Separator />
-              <h3 className="text-lg font-medium">Configured External Data Providers</h3> {/* Changed title */}
+              <h3 className="text-lg font-medium">Configured Food & Exercise Data Providers</h3>
               
               <div className="space-y-4">
                 {providers.map((provider) => (
@@ -419,7 +435,7 @@ const ExternalProviderSettings = () => { // Renamed component
                             <Label>Provider Type</Label>
                             <Select
                               value={editData.provider_type || ''}
-                              onValueChange={(value) => setEditData(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie', app_id: '', app_key: '', base_url: '' }))} // Added mealie, reset base_url
+                              onValueChange={(value) => setEditData(prev => ({ ...prev, provider_type: value as 'openfoodfacts' | 'nutritionix' | 'fatsecret' | 'wger' | 'mealie' | 'free-exercise-db', app_id: '', app_key: '', base_url: '' }))} // Added free-exercise-db, reset base_url
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -480,7 +496,22 @@ const ExternalProviderSettings = () => { // Renamed component
                                 autoComplete="off"
                               />
                             </div>
+                            {editData.provider_type === 'fatsecret' && (
+                              <p className="text-sm text-muted-foreground col-span-2">
+                                Note: For Fatsecret, you need to set up **your public IP** whitelisting in your Fatsecret developer account. This process can take up to 24 hours.
+                              </p>
+                            )}
                           </>
+                        )}
+                        {editData.provider_type === 'nutritionix' && (
+                          <p className="text-sm text-muted-foreground col-span-2">
+                            Get your App ID and App Key from the <a href="https://developer.nutritionix.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Nutritionix Developer Portal</a>.
+                          </p>
+                        )}
+                        {editData.provider_type === 'fatsecret' && (
+                          <p className="text-sm text-muted-foreground col-span-2">
+                            Get your App ID and App Key from the <a href="https://platform.fatsecret.com/my-account/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Fatsecret Platform Dashboard</a>.
+                          </p>
                         )}
                         <div className="flex items-center space-x-2">
                           <Switch
@@ -509,8 +540,8 @@ const ExternalProviderSettings = () => { // Renamed component
                             <p className="text-sm text-muted-foreground">
                               {getProviderTypes().find(t => t.value === provider.provider_type)?.label || provider.provider_type}
                               {provider.provider_type === 'mealie' && provider.base_url && ` - URL: ${provider.base_url}`}
-                              {provider.provider_type !== 'mealie' && provider.app_id && ` - App ID: ${provider.app_id.substring(0, 4)}...`}
-                              {provider.app_key && ` - App Key: ${provider.app_key.substring(0, 4)}...`}
+                              {(provider.provider_type !== 'mealie' && provider.provider_type !== 'free-exercise-db' && provider.provider_type !== 'wger') && provider.app_id && ` - App ID: ${provider.app_id.substring(0, 4)}...`}
+                              {(provider.provider_type === 'mealie' || provider.provider_type === 'nutritionix' || provider.provider_type === 'fatsecret') && provider.app_key && ` - App Key: ${provider.app_key.substring(0, 4)}...`}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -541,14 +572,22 @@ const ExternalProviderSettings = () => { // Renamed component
                   </div>
                 ))}
               </div>
+
+              {providers.length === 0 && !showAddForm && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Database className="h-12 w-12 mx-auto mb-4 opacity-50" /> {/* Changed icon */}
+                  <p>No data providers configured yet.</p> {/* Changed message */}
+                  <p className="text-sm">Add your first data provider to enable search from external sources.</p> {/* Changed message */}
+                </div>
+              )}
             </>
           )}
 
           {providers.length === 0 && !showAddForm && (
             <div className="text-center py-8 text-muted-foreground">
               <Database className="h-12 w-12 mx-auto mb-4 opacity-50" /> {/* Changed icon */}
-              <p>No external data providers configured yet.</p> {/* Changed message */}
-              <p className="text-sm">Add your first external data provider to enable search from external sources.</p> {/* Changed message */}
+              <p>No data providers configured yet.</p> {/* Changed message */}
+              <p className="text-sm">Add your first data provider to enable search from external sources.</p> {/* Changed message */}
             </div>
           )}
         </CardContent>
