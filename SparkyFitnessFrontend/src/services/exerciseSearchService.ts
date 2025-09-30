@@ -24,19 +24,35 @@ export interface Exercise {
   updated_at?: string;
 }
 
-export const searchExercises = async (query: string): Promise<Exercise[]> => {
-  return apiCall(`/exercises/search/${encodeURIComponent(query)}`, {
+export const searchExercises = async (query: string, equipmentFilter: string[] = [], muscleGroupFilter: string[] = []): Promise<Exercise[]> => {
+  let url = `/exercises?searchTerm=${encodeURIComponent(query)}`;
+  if (equipmentFilter.length > 0) {
+    url += `&equipmentFilter=${equipmentFilter.join(',')}`;
+  }
+  if (muscleGroupFilter.length > 0) {
+    url += `&muscleGroupFilter=${muscleGroupFilter.join(',')}`;
+  }
+  return apiCall(url, {
     method: 'GET',
   });
 };
 
-export const searchExternalExercises = async (query: string, providerId: string, providerType: string, limit?: number): Promise<Exercise[]> => {
-  let url = `/exercises/search-external?query=${encodeURIComponent(query)}&providerId=${encodeURIComponent(providerId)}&providerType=${encodeURIComponent(providerType)}`;
+export const searchExternalExercises = async (query: string, providerId: string, providerType: string, equipmentFilter: string[] = [], muscleGroupFilter: string[] = [], limit?: number): Promise<Exercise[]> => {
+  const params: Record<string, any> = {
+    query: query,
+    providerId: providerId,
+    providerType: providerType,
+  };
+
+  params.equipmentFilter = equipmentFilter.join(',');
+  params.muscleGroupFilter = muscleGroupFilter.join(',');
   if (limit !== undefined) {
-    url += `&limit=${limit}`;
+    params.limit = limit;
   }
-  return apiCall(url, {
+
+  return apiCall('/exercises/search-external', {
     method: 'GET',
+    params: params,
   });
 };
 

@@ -10,11 +10,13 @@ async function getReportsData(authenticatedUserId, targetUserId, startDate, endD
     const [
       fetchedNutritionData,
       tabularDataRaw,
+      exerciseEntriesRaw, // New: Fetch exercise entries
       measurementData,
       customCategoriesResult
     ] = await Promise.all([
       reportRepository.getNutritionData(targetUserId, startDate, endDate),
       reportRepository.getTabularFoodData(targetUserId, startDate, endDate),
+      reportRepository.getExerciseEntries(targetUserId, startDate, endDate), // New: Fetch exercise entries
       reportRepository.getMeasurementData(targetUserId, startDate, endDate),
       measurementRepository.getCustomCategories(targetUserId) // Reusing from measurementRepository
     ]);
@@ -72,9 +74,32 @@ async function getReportsData(authenticatedUserId, targetUserId, startDate, endD
       iron: parseFloat(item.iron) || 0,
     }));
 
+    const exerciseEntries = exerciseEntriesRaw.map(entry => ({
+      ...entry,
+      exercises: {
+        id: entry.exercise_id,
+        name: entry.exercise_name,
+        category: entry.exercise_category,
+        calories_per_hour: entry.exercise_calories_per_hour,
+        equipment: JSON.parse(entry.exercise_equipment || '[]'),
+        primary_muscles: JSON.parse(entry.exercise_primary_muscles || '[]'),
+        secondary_muscles: JSON.parse(entry.exercise_secondary_muscles || '[]'),
+        instructions: JSON.parse(entry.exercise_instructions || '[]'),
+        images: JSON.parse(entry.exercise_images || '[]'),
+        source: entry.exercise_source,
+        source_id: entry.exercise_source_id,
+        user_id: entry.exercise_user_id,
+        is_custom: entry.exercise_is_custom,
+        level: entry.exercise_level,
+        force: entry.exercise_force,
+        mechanic: entry.exercise_mechanic,
+      }
+    }));
+
     return {
       nutritionData,
       tabularData,
+      exerciseEntries, // Include exercise entries
       measurementData,
       customCategories: customCategoriesResult,
       customMeasurementsData,

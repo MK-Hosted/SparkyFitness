@@ -23,7 +23,17 @@ router.get('/by-date', authenticateToken, authorizeAccess('exercise_log', (req) 
 // Endpoint to insert an exercise entry
 router.post('/', authenticateToken, authorizeAccess('exercise_log'), express.json(), async (req, res, next) => {
   try {
-    const newEntry = await exerciseService.createExerciseEntry(req.userId, req.body);
+    const { exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight } = req.body;
+    const newEntry = await exerciseService.createExerciseEntry(req.userId, {
+      exercise_id,
+      duration_minutes,
+      calories_burned,
+      entry_date,
+      notes,
+      sets,
+      reps,
+      weight,
+    });
     res.status(201).json(newEntry);
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
@@ -59,7 +69,8 @@ router.get('/:id', authenticateToken, authorizeAccess('exercise_log'), async (re
 // Endpoint to update an exercise entry
 router.put('/:id', authenticateToken, authorizeAccess('exercise_log'), express.json(), async (req, res, next) => {
   const { id } = req.params;
-  const updateData = req.body;
+  const { exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight } = req.body;
+  const updateData = { exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight };
   const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   if (!id || !uuidRegex.test(id)) {
     return res.status(400).json({ error: 'Exercise Entry ID is required and must be a valid UUID.' });
@@ -72,6 +83,31 @@ router.put('/:id', authenticateToken, authorizeAccess('exercise_log'), express.j
       return res.status(403).json({ error: error.message });
     }
     if (error.message === 'Exercise entry not found or not authorized to update.') {
+      return res.status(404).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+router.get('/progress/:exerciseId', authenticateToken, authorizeAccess('exercise_log'), async (req, res, next) => {
+  const { exerciseId } = req.params;
+  const { startDate, endDate } = req.query;
+
+  if (!exerciseId) {
+    return res.status(400).json({ error: 'Exercise ID is required.' });
+  }
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date are required for progress data.' });
+  }
+
+  try {
+    const progressData = await exerciseService.getExerciseProgressData(req.userId, exerciseId, startDate, endDate);
+    res.status(200).json(progressData);
+  } catch (error) {
+    if (error.message.startsWith('Forbidden')) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.message === 'Exercise not found.') {
       return res.status(404).json({ error: error.message });
     }
     next(error);

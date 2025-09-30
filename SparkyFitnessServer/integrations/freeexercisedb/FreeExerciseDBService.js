@@ -33,20 +33,21 @@ class FreeExerciseDBService {
             console.log(`[FreeExerciseDBService] Fetching exercise from: ${url}`);
             const response = await axios.get(url);
             exercise = response.data;
+            log('debug', `[FreeExerciseDBService] Fetched exercise ${exerciseId}:`, exercise);
             githubCache.set(cacheKey, exercise);
             return exercise;
         } catch (error) {
-            console.error(`[FreeExerciseDBService] Error fetching exercise ${exerciseId}:`, error.message);
+            log('error', `[FreeExerciseDBService] Error fetching exercise ${exerciseId}:`, error.message);
             return null;
         }
     }
 
-    async searchExercises(query, limit = 50) { // Added limit parameter
-        const cacheKey = `search_exercises_${query}_${limit}`; // Include limit in cache key
+    async searchExercises(query, equipmentFilter = [], muscleGroupFilter = [], limit = 50) {
+        const cacheKey = `search_exercises_${query}_${equipmentFilter.join(',')}_${muscleGroupFilter.join(',')}_${limit}`;
         let cachedResults = githubCache.get(cacheKey);
 
         if (cachedResults) {
-            console.log(`[FreeExerciseDBService] Cache hit for search query: ${query} with limit ${limit}`);
+            console.log(`[FreeExerciseDBService] Cache hit for search query: ${query}, equipment: ${equipmentFilter}, muscles: ${muscleGroupFilter}, limit: ${limit}`);
             return cachedResults;
         }
 
@@ -56,19 +57,28 @@ class FreeExerciseDBService {
             const response = await axios.get(directoryUrl);
             const files = response.data;
 
-            const matchingExerciseFiles = files.filter(file =>
-                file.name.toLowerCase().endsWith('.json') &&
-                file.name.toLowerCase().includes(query.toLowerCase())
-            );
-
-            const exercisesPromises = matchingExerciseFiles.slice(0, limit).map(async (file) => { // Apply limit here
+            const allExercisePromises = files.filter(file => file.name.toLowerCase().endsWith('.json')).map(async (file) => {
                 const exerciseId = file.name.replace('.json', '');
                 return this.getExerciseById(exerciseId);
             });
 
-            const exercises = (await Promise.all(exercisesPromises)).filter(Boolean);
-            githubCache.set(cacheKey, exercises);
-            return exercises;
+            const allExercises = (await Promise.all(allExercisePromises)).filter(Boolean);
+
+            let filteredExercises = allExercises.filter(exercise => {
+                const matchesQuery = !query || exercise.name.toLowerCase().includes(query.toLowerCase());
+                const matchesEquipment = equipmentFilter.length === 0 || (exercise.equipment && equipmentFilter.some(filter => exercise.equipment.includes(filter)));
+                const matchesMuscleGroup = muscleGroupFilter.length === 0 || (
+                    (exercise.primaryMuscles && muscleGroupFilter.some(filter => exercise.primaryMuscles.includes(filter))) ||
+                    (exercise.secondaryMuscles && muscleGroupFilter.some(filter => exercise.secondaryMuscles.includes(filter)))
+                );
+                return matchesQuery && matchesEquipment && matchesMuscleGroup;
+            });
+
+            // Apply limit after filtering
+            filteredExercises = filteredExercises.slice(0, limit);
+
+            githubCache.set(cacheKey, filteredExercises);
+            return filteredExercises;
         } catch (error) {
             console.error(`[FreeExerciseDBService] Error searching exercises for query "${query}" with limit ${limit}:`, error.message);
             return [];

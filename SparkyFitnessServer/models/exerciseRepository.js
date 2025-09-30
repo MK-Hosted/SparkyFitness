@@ -132,7 +132,7 @@ async function upsertExerciseEntryData(userId, exerciseId, caloriesBurned, date)
   return result;
 }
 
-async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilter, ownershipFilter, limit, offset) {
+async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter, limit, offset) {
   const client = await pool.connect();
   try {
     let whereClauses = ['1=1'];
@@ -165,6 +165,19 @@ async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilt
       whereClauses.push(`(user_id IS NULL OR user_id = $${paramIndex} OR shared_with_public = TRUE OR user_id IN (SELECT owner_user_id FROM family_access WHERE family_user_id = $${paramIndex} AND is_active = TRUE AND (access_end_date IS NULL OR access_end_date > NOW())))`);
       queryParams.push(targetUserId);
       paramIndex++;
+    }
+
+    if (equipmentFilter && equipmentFilter.length > 0) {
+      whereClauses.push(`equipment::jsonb ?| ARRAY[${equipmentFilter.map((_, i) => `$${paramIndex + i}`).join(',')}]`);
+      queryParams.push(...equipmentFilter);
+      paramIndex += equipmentFilter.length;
+    }
+
+    if (muscleGroupFilter && muscleGroupFilter.length > 0) {
+      whereClauses.push(`(primary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}] OR secondary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}])`);
+      queryParams.push(...muscleGroupFilter);
+      queryParams.push(...muscleGroupFilter); // Push twice for primary and secondary muscles
+      paramIndex += (muscleGroupFilter.length * 2);
     }
 
     let query = `
@@ -196,7 +209,7 @@ async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilt
   }
 }
 
-async function countExercises(targetUserId, searchTerm, categoryFilter, ownershipFilter) {
+async function countExercises(targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter) {
   const client = await pool.connect();
   try {
     let whereClauses = ['1=1'];
@@ -231,6 +244,19 @@ async function countExercises(targetUserId, searchTerm, categoryFilter, ownershi
       paramIndex++;
     }
 
+    if (equipmentFilter && equipmentFilter.length > 0) {
+      whereClauses.push(`equipment::jsonb ?| ARRAY[${equipmentFilter.map((_, i) => `$${paramIndex + i}`).join(',')}]`);
+      queryParams.push(...equipmentFilter);
+      paramIndex += equipmentFilter.length;
+    }
+
+    if (muscleGroupFilter && muscleGroupFilter.length > 0) {
+      whereClauses.push(`(primary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}] OR secondary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}])`);
+      queryParams.push(...muscleGroupFilter);
+      queryParams.push(...muscleGroupFilter); // Push twice for primary and secondary muscles
+      paramIndex += (muscleGroupFilter.length * 2);
+    }
+
     const countQuery = `
       SELECT COUNT(*)
       FROM exercises
@@ -243,16 +269,77 @@ async function countExercises(targetUserId, searchTerm, categoryFilter, ownershi
   }
 }
 
-async function searchExercises(name, userId) {
+async function getDistinctEquipment() {
   const client = await pool.connect();
   try {
+    const result = await client.query(
+      `SELECT DISTINCT jsonb_array_elements_text(equipment::jsonb) AS equipment_name
+       FROM exercises
+       WHERE equipment IS NOT NULL AND equipment::jsonb IS NOT NULL AND jsonb_array_length(equipment::jsonb) > 0`
+    );
+    return result.rows.map(row => row.equipment_name);
+  } finally {
+    client.release();
+  }
+}
+
+async function getDistinctMuscleGroups() {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT DISTINCT muscle_name FROM (
+         SELECT jsonb_array_elements_text(primary_muscles::jsonb) AS muscle_name
+         FROM exercises
+         WHERE primary_muscles IS NOT NULL AND primary_muscles::jsonb IS NOT NULL AND jsonb_array_length(primary_muscles::jsonb) > 0
+         UNION
+         SELECT jsonb_array_elements_text(secondary_muscles::jsonb) AS muscle_name
+         FROM exercises
+         WHERE secondary_muscles IS NOT NULL AND secondary_muscles::jsonb IS NOT NULL AND jsonb_array_length(secondary_muscles::jsonb) > 0
+       ) AS distinct_muscles`
+    );
+    return result.rows.map(row => row.muscle_name);
+  } finally {
+    client.release();
+  }
+}
+
+async function searchExercises(name, userId, equipmentFilter, muscleGroupFilter) {
+  const client = await pool.connect();
+  try {
+    let whereClauses = ['1=1'];
+    const queryParams = [];
+    let paramIndex = 1;
+
+    if (name) {
+      whereClauses.push(`name ILIKE $${paramIndex}`);
+      queryParams.push(`%${name}%`);
+      paramIndex++;
+    }
+
+    whereClauses.push(`(is_custom = false OR user_id = $${paramIndex} OR source IS NOT NULL)`);
+    queryParams.push(userId);
+    paramIndex++;
+
+    if (equipmentFilter && equipmentFilter.length > 0) {
+      whereClauses.push(`equipment::jsonb ?| ARRAY[${equipmentFilter.map((_, i) => `$${paramIndex + i}`).join(',')}]`);
+      queryParams.push(...equipmentFilter);
+      paramIndex += equipmentFilter.length;
+    }
+
+    if (muscleGroupFilter && muscleGroupFilter.length > 0) {
+      whereClauses.push(`(primary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}] OR secondary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}])`);
+      queryParams.push(...muscleGroupFilter);
+      queryParams.push(...muscleGroupFilter); // Push twice for primary and secondary muscles
+      paramIndex += (muscleGroupFilter.length * 2);
+    }
+
     const result = await client.query(
       `SELECT id, source, source_id, name, force, level, mechanic, equipment,
               primary_muscles, secondary_muscles, instructions, category, images,
               calories_per_hour, description, user_id, is_custom, shared_with_public
        FROM exercises
-       WHERE name ILIKE $1 AND (is_custom = false OR user_id = $2 OR source IS NOT NULL) LIMIT 1`,
-      [`%${name}%`, userId]
+       WHERE ${whereClauses.join(' AND ')} LIMIT 50`, // Added a limit to prevent too many results
+      queryParams
     );
     return result.rows.map(row => {
       if (row.images) {
@@ -312,9 +399,19 @@ async function createExerciseEntry(userId, entryData) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now(), now()) RETURNING *`,
-      [userId, entryData.exercise_id, entryData.duration_minutes, entryData.calories_burned, entryData.entry_date, entryData.notes]
+      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) RETURNING *`,
+      [
+        userId,
+        entryData.exercise_id,
+        entryData.duration_minutes,
+        entryData.calories_burned,
+        entryData.entry_date,
+        entryData.notes,
+        entryData.sets || null,
+        entryData.reps || null,
+        entryData.weight || null,
+      ]
     );
     return result.rows[0];
   } finally {
@@ -358,10 +455,24 @@ async function updateExerciseEntry(id, userId, updateData) {
         calories_burned = COALESCE($3, calories_burned),
         entry_date = COALESCE($4, entry_date),
         notes = COALESCE($5, notes),
+        sets = COALESCE($6, sets),
+        reps = COALESCE($7, reps),
+        weight = COALESCE($8, weight),
         updated_at = now()
-      WHERE id = $6 AND user_id = $7
+      WHERE id = $9 AND user_id = $10
       RETURNING *`,
-      [updateData.exercise_id, updateData.duration_minutes, updateData.calories_burned, updateData.entry_date, updateData.notes, id, userId]
+      [
+        updateData.exercise_id,
+        updateData.duration_minutes,
+        updateData.calories_burned,
+        updateData.entry_date,
+        updateData.notes,
+        updateData.sets || null,
+        updateData.reps || null,
+        updateData.weight || null,
+        id,
+        userId,
+      ]
     );
     return result.rows[0];
   } finally {
@@ -453,6 +564,9 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
          ee.calories_burned,
          ee.entry_date,
          ee.notes,
+         ee.sets,
+         ee.reps,
+         ee.weight,
          e.name AS exercise_name,
          e.category AS exercise_category,
          e.calories_per_hour AS exercise_calories_per_hour,
@@ -489,6 +603,9 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
         calories_burned: row.calories_burned,
         entry_date: row.entry_date,
         notes: row.notes,
+        sets: row.sets,
+        reps: row.reps,
+        weight: row.weight,
         exercises: {
           id: row.exercise_id,
           name: row.exercise_name,
@@ -585,6 +702,30 @@ async function getTopExercises(userId, limit) {
     client.release();
   }
 }
+async function getExerciseProgressData(userId, exerciseId, startDate, endDate) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         ee.entry_date,
+         ee.sets,
+         ee.reps,
+         ee.weight,
+         ee.calories_burned,
+         ee.duration_minutes
+       FROM exercise_entries ee
+       WHERE ee.user_id = $1
+         AND ee.exercise_id = $2
+         AND ee.entry_date BETWEEN $3 AND $4
+       ORDER BY ee.entry_date ASC`,
+      [userId, exerciseId, startDate, endDate]
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   getExerciseById,
   getExerciseOwnerId,
@@ -592,6 +733,8 @@ module.exports = {
   upsertExerciseEntryData,
   getExercisesWithPagination,
   countExercises,
+  getDistinctEquipment,
+  getDistinctMuscleGroups,
   searchExercises,
   createExercise,
   createExerciseEntry,
@@ -605,7 +748,8 @@ module.exports = {
   getExerciseDeletionImpact,
   getRecentExercises,
   getTopExercises,
-  getExerciseBySourceAndSourceId, // New export
+  getExerciseBySourceAndSourceId,
+  getExerciseProgressData, // New export
 };
 
 async function getExerciseBySourceAndSourceId(source, sourceId) {
