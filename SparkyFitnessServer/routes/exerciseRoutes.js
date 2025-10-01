@@ -23,10 +23,22 @@ const upload = multer({ storage: storage });
 
 // Endpoint to fetch exercises with search, filter, and pagination
 router.get('/', authenticateToken, authorizeAccess('exercise_list', (req) => req.userId), async (req, res, next) => {
-  const { searchTerm, categoryFilter, ownershipFilter, currentPage, itemsPerPage } = req.query;
+  const { searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter, currentPage, itemsPerPage } = req.query;
+  const equipmentFilterArray = equipmentFilter ? equipmentFilter.split(',') : [];
+  const muscleGroupFilterArray = muscleGroupFilter ? muscleGroupFilter.split(',') : [];
  
   try {
-    const { exercises, totalCount } = await exerciseService.getExercisesWithPagination(req.userId, req.userId, searchTerm, categoryFilter, ownershipFilter, currentPage, itemsPerPage);
+    const { exercises, totalCount } = await exerciseService.getExercisesWithPagination(
+      req.userId,
+      req.userId,
+      searchTerm,
+      categoryFilter,
+      ownershipFilter,
+      equipmentFilterArray,
+      muscleGroupFilterArray,
+      currentPage,
+      itemsPerPage
+    );
     res.status(200).json({ exercises, totalCount });
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
@@ -50,15 +62,17 @@ router.get('/suggested', authenticateToken, authorizeAccess('exercise_list', (re
   }
 });
 // Endpoint to search for exercises
-router.get('/search/:name', authenticateToken, authorizeAccess('exercise_list', (req) => req.userId), async (req, res, next) => {
-  const { name } = req.params;
- 
-  if (!name) {
-    return res.status(400).json({ error: 'Exercise name is required.' });
+router.get('/search', authenticateToken, authorizeAccess('exercise_list', (req) => req.userId), async (req, res, next) => {
+  const { searchTerm, equipmentFilter, muscleGroupFilter } = req.query;
+  const equipmentFilterArray = equipmentFilter ? equipmentFilter.split(',') : [];
+  const muscleGroupFilterArray = muscleGroupFilter ? muscleGroupFilter.split(',') : [];
+
+  if (!searchTerm && equipmentFilterArray.length === 0 && muscleGroupFilterArray.length === 0) {
+    return res.status(400).json({ error: 'Search term or filters are required.' });
   }
  
   try {
-    const exercises = await exerciseService.searchExercises(req.userId, name, req.userId);
+    const exercises = await exerciseService.searchExercises(req.userId, searchTerm, req.userId, equipmentFilterArray, muscleGroupFilterArray);
     res.status(200).json(exercises);
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
@@ -70,16 +84,40 @@ router.get('/search/:name', authenticateToken, authorizeAccess('exercise_list', 
 
 // Endpoint to search for exercises from Wger
 router.get('/search-external', authenticateToken, authorizeAccess('exercise_list', (req) => req.userId), async (req, res, next) => {
-  const { query, providerId, providerType } = req.query; // Get providerId and providerType from query
-  if (!query) {
-    return res.status(400).json({ error: 'Search query is required.' });
+  const { query, providerId, providerType, equipmentFilter, muscleGroupFilter } = req.query; // Get providerId and providerType from query
+  const equipmentFilterArray = equipmentFilter && equipmentFilter.length > 0 ? equipmentFilter.split(',') : [];
+  const muscleGroupFilterArray = muscleGroupFilter && muscleGroupFilter.length > 0 ? muscleGroupFilter.split(',') : [];
+
+  const hasQuery = query && query.trim().length > 0;
+  const hasFilters = equipmentFilterArray.length > 0 || muscleGroupFilterArray.length > 0;
+
+  if (!hasQuery && !hasFilters) {
+    return res.status(400).json({ error: 'Search query or filters are required.' });
   }
   if (!providerId || !providerType) {
     return res.status(400).json({ error: 'Provider ID and Type are required for external search.' });
   }
   try {
-    const exercises = await exerciseService.searchExternalExercises(req.userId, query, providerId, providerType); // Pass authenticatedUserId, query, providerId, and providerType
+    const exercises = await exerciseService.searchExternalExercises(req.userId, query, providerId, providerType, equipmentFilterArray, muscleGroupFilterArray); // Pass authenticatedUserId, query, providerId, and providerType
     res.status(200).json(exercises);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/equipment-types', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const equipmentTypes = await exerciseService.getAvailableEquipment();
+    res.status(200).json(equipmentTypes);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/muscle-groups', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const muscleGroups = await exerciseService.getAvailableMuscleGroups();
+    res.status(200).json(muscleGroups);
   } catch (error) {
     next(error);
   }
@@ -213,7 +251,7 @@ router.delete('/:id', authenticateToken, authorizeAccess('exercise_list'), async
   }
   try {
     const result = await exerciseService.deleteExercise(req.userId, id);
-    res.status(200).json(result);
+    res.status(200).json({ message: result.message });
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
       return res.status(403).json({ error: error.message });

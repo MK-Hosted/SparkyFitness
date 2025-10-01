@@ -120,10 +120,52 @@ async function getMiniNutritionTrends(userId, startDate, endDate) {
   }
 }
 
+async function getExerciseEntries(userId, startDate, endDate) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         ee.id,
+         TO_CHAR(ee.entry_date, 'YYYY-MM-DD') AS entry_date,
+         ee.duration_minutes,
+         ee.calories_burned,
+         ee.notes,
+         ee.sets,
+         ee.reps,
+         ee.weight,
+         e.id AS exercise_id,
+         e.name AS exercise_name,
+         e.category AS exercise_category,
+         e.calories_per_hour AS exercise_calories_per_hour,
+         e.equipment AS exercise_equipment,
+         e.primary_muscles AS exercise_primary_muscles,
+         e.secondary_muscles AS exercise_secondary_muscles,
+         e.instructions AS exercise_instructions,
+         e.images AS exercise_images,
+         e.source AS exercise_source,
+         e.source_id AS exercise_source_id,
+         e.user_id AS exercise_user_id,
+         e.is_custom AS exercise_is_custom,
+         e.level AS exercise_level,
+         e.force AS exercise_force,
+         e.mechanic AS exercise_mechanic
+       FROM exercise_entries ee
+       JOIN exercises e ON ee.exercise_id = e.id
+       WHERE ee.user_id = $1 AND ee.entry_date BETWEEN $2 AND $3
+       ORDER BY ee.entry_date DESC, ee.created_at DESC`,
+      [userId, startDate, endDate]
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   getNutritionData,
   getTabularFoodData,
   getMeasurementData,
   getCustomMeasurementsData,
   getMiniNutritionTrends,
+  getExerciseEntries,
 };

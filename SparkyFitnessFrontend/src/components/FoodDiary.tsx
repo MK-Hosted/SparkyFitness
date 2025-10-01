@@ -19,6 +19,7 @@ import EditFoodEntryDialog from "./EditFoodEntryDialog";
 import EnhancedCustomFoodForm from "./EnhancedCustomFoodForm";
 import FoodUnitSelector from "./FoodUnitSelector";
 import CopyFoodEntryDialog from "./CopyFoodEntryDialog"; // Import the new dialog component
+import ExerciseSearch from "./ExerciseSearch"; // Import ExerciseSearch
 import { debug, info, warn, error } from "@/utils/logging"; // Import logging utility
 import { calculateFoodEntryNutrition } from "@/utils/nutritionCalculations"; // Import the new utility function
 import { toast } from "@/hooks/use-toast"; // Import toast
@@ -33,6 +34,8 @@ import {
 import { Food, FoodVariant } from "@/types/food";
 import { FoodEntry } from "@/types/food";
 import { ExpandedGoals } from "@/types/goals";
+import { Exercise } from "@/services/exerciseSearchService"; // Import Exercise interface
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Import Dialog components
 
 import { Meal as MealType } from "@/types/meal"; // Import MealType from types/meal.d.ts
 
@@ -107,6 +110,7 @@ const FoodDiary = ({
   const [isUnitSelectorOpen, setIsUnitSelectorOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false); // State for copy dialog
   const [copySourceMealType, setCopySourceMealType] = useState<string>(""); // State to hold the meal type from which copy was initiated
+  const [isExerciseSearchOpen, setIsExerciseSearchOpen] = useState(false); // State for ExerciseSearch dialog
 
   const currentUserId = activeUserId;
   debug(loggingLevel, "Current user ID:", currentUserId);
