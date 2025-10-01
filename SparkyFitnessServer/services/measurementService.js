@@ -28,14 +28,21 @@ async function processHealthData(healthDataArray, userId) {
       }
       parsedDate = dateObj.toISOString().split('T')[0];
 
+      // If timestamp is not provided, default to the beginning of the day from the 'date' field.
       if (timestamp) {
         const timestampObj = new Date(timestamp);
         if (isNaN(timestampObj.getTime())) {
-          log('warn', `Invalid timestamp received for entry: ${JSON.stringify(dataEntry)}. Using date only.`);
+          log('warn', `Invalid timestamp received for entry: ${JSON.stringify(dataEntry)}. Defaulting to start of day from 'date' field.`);
+          entryTimestamp = dateObj.toISOString(); // Use start of day from parsed 'date'
+          entryHour = 0; // Default to hour 0
         } else {
           entryTimestamp = timestampObj.toISOString();
           entryHour = timestampObj.getHours();
         }
+      } else {
+        // If no timestamp is provided, use the start of the day from the 'date' field.
+        entryTimestamp = dateObj.toISOString();
+        entryHour = 0; // Default to hour 0
       }
     } catch (e) {
       log('error', "Date/Timestamp parsing error:", e);
