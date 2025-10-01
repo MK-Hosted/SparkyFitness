@@ -376,12 +376,12 @@ const ImportFromCSV = ({ onSave }: ImportFromCSVProps) => {
                       {headers.map((header) => (
                         <th
                           key={header}
-                          className="px-4 py-2 text-left bg-background font-medium text-white whitespace-nowrap capitalize"
+                          className="px-4 py-2 text-left bg-background font-medium whitespace-nowrap capitalize"
                         >
                           {header.replace(/_/g, " ")}
                         </th>
                       ))}
-                      <th className="px-4 py-2 text-left bg-background font-medium text-white whitespace-nowrap">
+                      <th className="px-4 py-2 text-left bg-background font-medium whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
