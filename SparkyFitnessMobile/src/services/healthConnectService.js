@@ -348,7 +348,7 @@ export const transformHealthRecords = (records, metricConfig) => {
           break;
         case 'BasalBodyTemperature':
           value = record.temperature?.inCelsius;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'BasalMetabolicRate':
           value = record.basalMetabolicRate?.inCalories;
@@ -356,15 +356,15 @@ export const transformHealthRecords = (records, metricConfig) => {
           break;
         case 'BloodGlucose':
           value = record.bloodGlucose?.inMillimolesPerLiter;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'BodyFat':
           value = record.percentage?.inPercent;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'BodyTemperature':
           value = record.temperature?.inCelsius;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'BoneMass':
           value = record.mass?.inKilograms;
@@ -391,7 +391,7 @@ export const transformHealthRecords = (records, metricConfig) => {
           break;
         case 'Height':
           value = record.height?.inMeters;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'Hydration':
           value = record.volume?.inLiters;
@@ -409,7 +409,7 @@ export const transformHealthRecords = (records, metricConfig) => {
           return;
         case 'OxygenSaturation':
           value = record.percentage?.inPercent;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'Power':
           value = record.power?.inWatts;
@@ -421,7 +421,7 @@ export const transformHealthRecords = (records, metricConfig) => {
           break;
         case 'RestingHeartRate':
           value = record.beatsPerMinute;
-          recordDate = record.startTime.split('T')[0];
+          recordDate = record.time.split('T')[0];
           break;
         case 'SexualActivity':
           addLog(`[HealthConnectService] Skipping SexualActivity record as it's qualitative: ${JSON.stringify(record)}`);
