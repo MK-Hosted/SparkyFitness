@@ -34,6 +34,7 @@ interface Profile {
   date_of_birth: string | null;
   bio: string | null;
   avatar_url: string | null;
+  gender: string | null; // Add gender to the Profile interface
 }
 
 interface UserPreferences {
@@ -68,13 +69,15 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
     water_display_unit, setWaterDisplayUnit
   } = usePreferences();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [avatarObjectURL, setAvatarObjectURL] = useState<string | null>(null); // State to hold the object URL for the avatar
   // Remove local preferences state as it's now managed by PreferencesContext
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     phone: '',
     date_of_birth: '',
-    bio: ''
+    bio: '',
+    gender: '' // Add gender to the profileForm state
   });
   const [passwordForm, setPasswordForm] = useState({
     current_password: '',
@@ -100,6 +103,39 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
       setNewEmail(user.email || ''); // Initialize newEmail here
     }
   }, [user]); // Removed loadUserPreferencesFromContext from dependency array
+
+  // Effect to fetch avatar image when profile.avatar_url changes
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      if (profile?.avatar_url) {
+        try {
+          // Fetch the image as a Blob
+          const response = await apiCall(profile.avatar_url, {
+            method: 'GET',
+            responseType: 'blob', // Indicate that we expect a blob response
+          });
+          const blob = new Blob([response], { type: 'image/jpeg' }); // Adjust type if needed
+          const url = URL.createObjectURL(blob);
+          setAvatarObjectURL(url);
+        } catch (error) {
+          console.error('Error fetching avatar:', error);
+          setAvatarObjectURL(null);
+        }
+      } else {
+        setAvatarObjectURL(null);
+      }
+    };
+
+    fetchAvatar();
+
+    // Cleanup object URL when component unmounts or avatar_url changes
+    return () => {
+      if (avatarObjectURL) {
+        URL.revokeObjectURL(avatarObjectURL);
+      }
+    };
+  }, [profile?.avatar_url]);
+
 
   const loadCustomCategories = async () => {
     if (!user) return;
@@ -205,7 +241,8 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
         full_name: data.full_name || '',
         phone: data.phone_number || '', // Use phone_number from backend
         date_of_birth: data.date_of_birth || '', // Store as YYYY-MM-DD string directly
-        bio: data.bio || ''
+        bio: data.bio || '',
+        gender: data.gender || '' // Set gender from fetched profile
       });
     } catch (error: any) {
       console.error('Error loading profile:', error);
@@ -230,7 +267,8 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
           full_name: profileForm.full_name,
           phone_number: profileForm.phone, // Changed to phone_number
           date_of_birth: profileForm.date_of_birth || null, // Send YYYY-MM-DD string directly
-          bio: profileForm.bio
+          bio: profileForm.bio,
+          gender: profileForm.gender || null // Send gender to the API
         }),
       });
 
@@ -385,28 +423,21 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
 
     setUploadingImage(true);
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/avatar.${fileExt}`;
+    const formData = new FormData();
+    formData.append('avatar', file);
 
     try {
-      // Image upload functionality will require a dedicated backend endpoint
-      // to handle file storage (e.g., S3, local filesystem) and return the public URL.
-      // The existing placeholder logic for updating the profile with a dummy URL remains.
-
-      // For now, simulate success and update profile with a dummy URL
-      const publicUrl = `/uploads/${fileName}`; // Dummy URL
-
-      // Update profile with new avatar URL
-      await apiCall(`/auth/profiles`, {
-        method: 'PUT',
-        body: JSON.stringify({ avatar_url: publicUrl }),
+      const response = await apiCall('/auth/profiles/avatar', {
+        method: 'POST',
+        body: formData,
+        isFormData: true, // Indicate that the body is FormData
       });
 
       toast({
         title: "Success",
         description: "Profile picture updated successfully",
       });
-      loadProfile();
+      loadProfile(); // Reload profile to display the new avatar
     } catch (error: any) {
       console.error('Error uploading image:', error);
       toast({
@@ -441,10 +472,13 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
             {/* Profile Picture */}
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name || 'User'} />
-                <AvatarFallback className="text-lg">
-                  {getInitials(profile?.full_name)}
-                </AvatarFallback>
+                {avatarObjectURL ? ( // Use avatarObjectURL for display
+                  <AvatarImage src={avatarObjectURL} alt={profile?.full_name || 'User'} />
+                ) : (
+                  <AvatarFallback className="text-lg">
+                    {getInitials(profile?.full_name)}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <Label htmlFor="avatar-upload" className="cursor-pointer">
@@ -519,6 +553,22 @@ const Settings: React.FC<SettingsProps> = ({ onShowAboutDialog }) => {
                     />
                   </PopoverContent>
                 </Popover>
+              </div>
+              <div>
+                <Label htmlFor="gender">Gender</Label>
+                <Select
+                  value={profileForm.gender}
+                  onValueChange={(value) => setProfileForm(prev => ({ ...prev, gender: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="md:col-span-2">
                 <Label htmlFor="bio">Bio</Label>

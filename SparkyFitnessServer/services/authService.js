@@ -125,7 +125,8 @@ async function updateUserProfile(authenticatedUserId, targetUserId, profileData)
       profileData.phone_number,
       profileData.date_of_birth,
       profileData.bio,
-      profileData.avatar_url
+      profileData.avatar_url,
+      profileData.gender
     );
     if (!updatedProfile) {
       throw new Error('Profile not found or no changes made.');

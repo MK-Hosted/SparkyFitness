@@ -8,6 +8,7 @@ interface ApiCallOptions extends RequestInit {
   suppress404Toast?: boolean; // New option to suppress toast for 404 errors
   externalApi?: boolean;
   isFormData?: boolean; // New option to indicate if the body is FormData
+  responseType?: 'json' | 'text' | 'blob'; // Add responseType option
 }
 
 export const API_BASE_URL = "/api";
@@ -89,6 +90,10 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
       }
     }
 
+    // Handle different response types
+    if (options?.responseType === 'blob') {
+      return await response.blob();
+    }
     // Handle cases where the response might be empty (e.g., DELETE requests)
     const text = await response.text();
     return text ? JSON.parse(text) : {};

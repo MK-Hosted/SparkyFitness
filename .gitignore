@@ -127,4 +127,4 @@ SparkyFitnessMobile/android/keystores/
 __pycache__/
 
 # Ignore uploaded exercise files
-SparkyFitnessServer/uploads/exercises/
+SparkyFitnessServer/uploads/

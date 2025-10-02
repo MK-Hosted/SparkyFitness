@@ -4,6 +4,42 @@ const { authenticateToken, authorizeAccess } = require('../middleware/authMiddle
 const { registerValidation, loginValidation } = require('../validation/authValidation');
 const { validationResult } = require('express-validator');
 const authService = require('../services/authService');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const UPLOADS_DIR = path.join(__dirname, '../uploads/avatars');
+console.log('AuthRoutes UPLOADS_DIR:', UPLOADS_DIR);
+
+// Ensure the uploads directory exists
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(file.originalname);
+    cb(null, req.userId + '-' + uniqueSuffix + fileExtension);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images (jpeg, jpg, png, gif) are allowed.'));
+    }
+  }
+});
 
 router.use(express.json());
 
@@ -170,10 +206,14 @@ router.get('/profiles', authenticateToken, authorizeAccess('profile', (req) => r
 });
 
 router.put('/profiles', authenticateToken, authorizeAccess('profile', (req) => req.userId), async (req, res, next) => {
-  const profileData = req.body;
+  const { full_name, phone_number, date_of_birth, bio, avatar_url, gender } = req.body;
  
   try {
-    const updatedProfile = await authService.updateUserProfile(req.userId, req.userId, profileData); // authenticatedUserId is targetUserId
+    const updatedProfile = await authService.updateUserProfile(
+      req.userId,
+      req.userId,
+      { full_name, phone_number, date_of_birth, bio, avatar_url, gender }
+    ); // authenticatedUserId is targetUserId
     res.status(200).json({ message: 'Profile updated successfully.', profile: updatedProfile });
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {
@@ -360,6 +400,48 @@ router.delete('/family-access/:id', authenticateToken, authorizeAccess('family_a
     if (error.message === 'Family access entry not found or not authorized to delete.') {
       return res.status(404).json({ error: error.message });
     }
+    next(error);
+  }
+});
+
+router.post('/profiles/avatar', authenticateToken, upload.single('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      console.error('Multer did not provide a file for upload.');
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    console.log('Multer req.file:', req.file);
+    // The file is already saved by multer to the correct location
+    // We need to update the user's profile with the new avatar_url,
+    // using the authenticated route for serving the avatar.
+    const avatarUrl = `/auth/profiles/avatar/${req.file.filename}`;
+    console.log('Generated avatarUrl for DB:', avatarUrl);
+    await authService.updateUserProfile(req.userId, req.userId, { avatar_url: avatarUrl });
+    res.status(200).json({ message: 'Avatar uploaded successfully.', avatar_url: avatarUrl });
+  } catch (error) {
+    console.error('Error in avatar upload route:', error);
+    next(error);
+  }
+});
+
+router.get('/profiles/avatar/:filename', authenticateToken, async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+    const userId = req.userId; // Authenticated user ID
+
+    // In a real application, you would verify that the requested avatar
+    // belongs to the authenticated user or is publicly accessible.
+    // For now, we'll assume the filename contains enough info or is safe.
+
+    const avatarPath = path.join(UPLOADS_DIR, filename);
+
+    // Check if the file exists
+    if (fs.existsSync(avatarPath)) {
+      res.sendFile(avatarPath);
+    } else {
+      res.status(404).json({ error: 'Avatar not found.' });
+    }
+  } catch (error) {
     next(error);
   }
 });

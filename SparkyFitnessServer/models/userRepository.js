@@ -127,7 +127,7 @@ async function getUserProfile(userId) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT id, full_name, phone_number, TO_CHAR(date_of_birth, 'YYYY-MM-DD') AS date_of_birth, bio, avatar_url FROM profiles WHERE id = $1`,
+      `SELECT id, full_name, phone_number, TO_CHAR(date_of_birth, 'YYYY-MM-DD') AS date_of_birth, bio, avatar_url, gender FROM profiles WHERE id = $1`,
       [userId]
     );
     return result.rows[0];
@@ -136,7 +136,7 @@ async function getUserProfile(userId) {
   }
 }
 
-async function updateUserProfile(userId, full_name, phone_number, date_of_birth, bio, avatar_url) {
+async function updateUserProfile(userId, full_name, phone_number, date_of_birth, bio, avatar_url, gender) {
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -146,10 +146,11 @@ async function updateUserProfile(userId, full_name, phone_number, date_of_birth,
            date_of_birth = COALESCE($4, date_of_birth),
            bio = COALESCE($5, bio),
            avatar_url = COALESCE($6, avatar_url),
+           gender = COALESCE($7, gender),
            updated_at = now()
-       WHERE id = $1
-       RETURNING *`,
-      [userId, full_name, phone_number, date_of_birth, bio, avatar_url]
+        WHERE id = $1
+        RETURNING *`,
+      [userId, full_name, phone_number, date_of_birth, bio, avatar_url, gender]
     );
     return result.rows[0];
   } finally {

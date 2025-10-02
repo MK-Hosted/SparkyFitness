@@ -54,7 +54,9 @@ app.use(express.json());
 // This middleware will first try to serve the file if it exists locally.
 // If the file is not found, it will fall through to the next middleware,
 // which will handle on-demand downloading.
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const UPLOADS_BASE_DIR = path.join(__dirname, 'uploads');
+console.log('SparkyFitnessServer UPLOADS_BASE_DIR:', UPLOADS_BASE_DIR);
+app.use('/uploads', express.static(UPLOADS_BASE_DIR));
 
 // On-demand image serving route
 app.get('/uploads/exercises/:exerciseId/:imageFileName', async (req, res, next) => {
