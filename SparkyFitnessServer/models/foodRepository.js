@@ -1,9 +1,9 @@
-const pool = require("../db/connection");
+const { getPool } = require("../db/poolManager");
 const { log } = require("../config/logging");
 const format = require("pg-format"); // Required for bulkCreateFoodVariants
 
 async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `
       SELECT
@@ -59,7 +59,7 @@ async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
 }
 
 async function createFood(foodData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query("BEGIN"); // Start transaction
 
@@ -153,7 +153,7 @@ async function createFood(foodData) {
 }
 
 async function getFoodById(foodId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -193,7 +193,7 @@ async function getFoodById(foodId) {
 }
 
 async function getFoodOwnerId(foodId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const foodResult = await client.query(
       "SELECT user_id FROM foods WHERE id = $1",
@@ -208,7 +208,7 @@ async function getFoodOwnerId(foodId) {
 }
 
 async function updateFood(id, userId, foodData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE foods SET
@@ -241,7 +241,7 @@ async function updateFood(id, userId, foodData) {
 }
 
 async function deleteFood(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "DELETE FROM foods WHERE id = $1 AND user_id = $2 RETURNING id",
@@ -261,7 +261,7 @@ async function getFoodsWithPagination(
   offset,
   sortBy
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let whereClauses = ["f.is_quick_food = FALSE"];
     const queryParams = [];
@@ -356,7 +356,7 @@ async function getFoodsWithPagination(
 }
 
 async function countFoods(searchTerm, foodFilter, authenticatedUserId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let whereClauses = ["is_quick_food = FALSE"];
     const countQueryParams = [];
@@ -402,7 +402,7 @@ async function countFoods(searchTerm, foodFilter, authenticatedUserId) {
 }
 
 async function createFoodVariant(variantData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO food_variants (
@@ -442,7 +442,7 @@ async function createFoodVariant(variantData) {
 }
 
 async function getFoodVariantById(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "SELECT * FROM food_variants WHERE id = $1",
@@ -454,7 +454,7 @@ async function getFoodVariantById(id) {
   }
 }
 async function getFoodVariantOwnerId(variantId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT f.user_id
@@ -475,7 +475,7 @@ async function getFoodVariantOwnerId(variantId) {
 }
 
 async function getFoodVariantsByFoodId(foodId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "SELECT * FROM food_variants WHERE food_id = $1",
@@ -488,7 +488,7 @@ async function getFoodVariantsByFoodId(foodId) {
 }
 
 async function updateFoodVariant(id, variantData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE food_variants SET
@@ -557,7 +557,7 @@ async function updateFoodVariant(id, variantData) {
 }
 
 async function deleteFoodVariant(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "DELETE FROM food_variants WHERE id = $1 RETURNING id",
@@ -570,7 +570,7 @@ async function deleteFoodVariant(id) {
 }
 
 async function createFoodEntry(entryData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
@@ -593,7 +593,7 @@ async function createFoodEntry(entryData) {
 }
 
 async function getFoodEntryOwnerId(entryId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "SELECT user_id FROM food_entries WHERE id = $1",
@@ -606,7 +606,7 @@ async function getFoodEntryOwnerId(entryId) {
 }
 
 async function deleteFoodEntry(entryId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "DELETE FROM food_entries WHERE id = $1 RETURNING id",
@@ -618,7 +618,7 @@ async function deleteFoodEntry(entryId) {
   }
 }
 async function updateFoodEntry(entryId, userId, entryData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE food_entries SET
@@ -646,7 +646,7 @@ async function updateFoodEntry(entryId, userId, entryData) {
 }
 
 async function getFoodEntriesByDate(userId, selectedDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -694,7 +694,7 @@ async function getFoodEntriesByDate(userId, selectedDate) {
 }
 
 async function getFoodEntriesByDateAndMealType(userId, date, mealType) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -742,7 +742,7 @@ async function getFoodEntriesByDateAndMealType(userId, date, mealType) {
 }
 
 async function getFoodEntriesByDateRange(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -766,7 +766,7 @@ async function getFoodEntriesByDateRange(userId, startDate, endDate) {
 }
 
 async function findFoodByNameAndBrand(name, brand, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -808,7 +808,7 @@ async function findFoodByNameAndBrand(name, brand, userId) {
 }
 
 async function bulkCreateFoodVariants(variantsData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const query = `
       INSERT INTO food_variants (
@@ -853,7 +853,7 @@ async function bulkCreateFoodVariants(variantsData) {
 }
 
 async function deleteFoodEntriesByMealPlanId(mealPlanId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2 RETURNING id",
@@ -877,7 +877,7 @@ async function deleteFoodEntriesByTemplateId(
   userId,
   currentClientDate = null
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `DELETE FROM food_entries WHERE meal_plan_template_id = $1 AND user_id = $2`;
     const params = [templateId, userId];
@@ -907,7 +907,7 @@ async function createFoodEntriesFromTemplate(
   userId,
   currentClientDate = null
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     log(
@@ -1072,7 +1072,7 @@ async function createFoodEntriesFromTemplate(
 }
 
 async function bulkCreateFoodEntries(entriesData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const query = `
       INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_template_id)
@@ -1098,7 +1098,7 @@ async function bulkCreateFoodEntries(entriesData) {
 }
 
 async function getFoodDataProviderById(providerId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       "SELECT * FROM external_data_providers WHERE id = $1",
@@ -1111,7 +1111,7 @@ async function getFoodDataProviderById(providerId) {
 }
 
 async function getRecentFoods(userId, limit) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -1155,7 +1155,7 @@ async function getRecentFoods(userId, limit) {
 }
 
 async function getTopFoods(userId, limit) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -1200,7 +1200,7 @@ async function getTopFoods(userId, limit) {
 }
 
 async function getDailyNutritionSummary(userId, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -1220,7 +1220,7 @@ async function getDailyNutritionSummary(userId, date) {
 }
 
 async function getFoodDeletionImpact(foodId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const queries = [
       client.query("SELECT COUNT(*) FROM food_entries WHERE food_id = $1", [
@@ -1271,7 +1271,7 @@ async function getFoodEntryByDetails(
   entryDate,
   variantId
 ) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT id FROM food_entries
@@ -1346,7 +1346,7 @@ async function createFoodsInBulk(userId, foodDataArray) {
     WHERE (user_id, name, brand) IN (VALUES ${placeholderString})
   `;
 
-  const { rows: existingFoods } = await pool.query(
+  const { rows: existingFoods } = await getPool().query(
     duplicateCheckQuery,
     flatValues
   );
@@ -1360,7 +1360,7 @@ async function createFoodsInBulk(userId, foodDataArray) {
   }
 
   // 3. Database Transaction starts here for Bulk Insert
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query("BEGIN");
 

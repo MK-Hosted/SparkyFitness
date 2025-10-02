@@ -47,6 +47,7 @@ services:
     volumes:
       - ../SparkyFitnessServer:/app/SparkyFitnessServer # Mount source for live reloading
       - /app/SparkyFitnessServer/node_modules # Preserve node_modules
+      - ./backups:/app/SparkyFitnessServer/backup # Mount volume for backups
 
   sparkyfitness-frontend:
     build:

@@ -1,12 +1,12 @@
 const path = require('path');
 const fs = require('fs');
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 
 const migrationsDir = path.join(__dirname, '../db/migrations');
 
 async function applyMigrations() {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     // Ensure the schema_migrations table exists
     await client.query(`

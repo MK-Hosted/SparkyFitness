@@ -1,9 +1,9 @@
 console.log('DEBUG: Loading measurementRepository.js');
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 
 async function upsertStepData(userId, value, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const existingRecord = await client.query(
       'SELECT * FROM check_in_measurements WHERE user_id = $1 AND entry_date = $2',
@@ -31,7 +31,7 @@ async function upsertStepData(userId, value, date) {
 }
 
 async function upsertWaterData(userId, waterMl, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const existingRecord = await client.query(
       'SELECT id, water_ml FROM water_intake WHERE user_id = $1 AND entry_date = $2',
@@ -59,7 +59,7 @@ async function upsertWaterData(userId, waterMl, date) {
 }
 
 async function getWaterIntakeByDate(userId, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT water_ml FROM water_intake WHERE user_id = $1 AND entry_date = $2',
@@ -72,7 +72,7 @@ async function getWaterIntakeByDate(userId, date) {
 }
 
 async function getWaterIntakeEntryById(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT * FROM water_intake WHERE id = $1',
@@ -85,7 +85,7 @@ async function getWaterIntakeEntryById(id) {
 }
 
 async function getWaterIntakeEntryOwnerId(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const entryResult = await client.query(
       'SELECT user_id FROM water_intake WHERE id = $1',
@@ -98,7 +98,7 @@ async function getWaterIntakeEntryOwnerId(id) {
 }
 
 async function updateWaterIntake(id, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE water_intake SET
@@ -116,7 +116,7 @@ async function updateWaterIntake(id, userId, updateData) {
 }
 
 async function deleteWaterIntake(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM water_intake WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -129,7 +129,7 @@ async function deleteWaterIntake(id, userId) {
 }
 
 async function upsertCheckInMeasurements(userId, entryDate, measurements) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query;
     let values;
@@ -165,7 +165,7 @@ async function upsertCheckInMeasurements(userId, entryDate, measurements) {
 }
 
 async function getCheckInMeasurementsByDate(userId, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT * FROM check_in_measurements WHERE user_id = $1 AND entry_date = $2',
@@ -179,7 +179,7 @@ async function getCheckInMeasurementsByDate(userId, date) {
 
 async function updateCheckInMeasurements(userId, entryDate, updateData) {
   log('info', `[measurementRepository] updateCheckInMeasurements called with: userId=${userId}, entryDate=${entryDate}, updateData=`, updateData);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const fieldsToUpdate = Object.keys(updateData)
       .filter(key => ['weight', 'neck', 'waist', 'hips', 'steps'].includes(key))
@@ -218,7 +218,7 @@ async function updateCheckInMeasurements(userId, entryDate, updateData) {
 }
 
 async function deleteCheckInMeasurements(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM check_in_measurements WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -231,7 +231,7 @@ async function deleteCheckInMeasurements(id, userId) {
 }
 
 async function getCustomCategories(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id, name, frequency, measurement_type FROM custom_categories WHERE user_id = $1',
@@ -244,7 +244,7 @@ async function getCustomCategories(userId) {
 }
 
 async function createCustomCategory(categoryData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO custom_categories (user_id, name, frequency, measurement_type, created_at, updated_at)
@@ -258,7 +258,7 @@ async function createCustomCategory(categoryData) {
 }
 
 async function updateCustomCategory(id, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE custom_categories SET
@@ -277,7 +277,7 @@ async function updateCustomCategory(id, userId, updateData) {
 }
 
 async function deleteCustomCategory(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM custom_categories WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -291,7 +291,7 @@ async function deleteCustomCategory(id, userId) {
 
 async function getCheckInMeasurementOwnerId(id) { // This function is problematic if 'id' is not the primary key
   log('warn', `[measurementRepository] getCheckInMeasurementOwnerId called with id: ${id}. This function might be problematic if 'id' is not the primary key for check_in_measurements.`);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT user_id FROM check_in_measurements WHERE id = $1',
@@ -304,7 +304,7 @@ async function getCheckInMeasurementOwnerId(id) { // This function is problemati
 }
 
 async function getCustomCategoryOwnerId(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT user_id FROM custom_categories WHERE id = $1',
@@ -317,7 +317,7 @@ async function getCustomCategoryOwnerId(id) {
 }
 
 async function getCustomMeasurementEntries(userId, limit, orderBy, filter) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `
       SELECT cm.*,
@@ -367,7 +367,7 @@ async function getCustomMeasurementEntries(userId, limit, orderBy, filter) {
 }
 
 async function getCustomMeasurementEntriesByDate(userId, date) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT cm.*,
@@ -390,7 +390,7 @@ async function getCustomMeasurementEntriesByDate(userId, date) {
 
 async function getCheckInMeasurementsByDateRange(userId, startDate, endDate) {
   log('info', `[measurementRepository] getCheckInMeasurementsByDateRange called for userId: ${userId}, startDate: ${startDate}, endDate: ${endDate}`);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT * FROM check_in_measurements WHERE user_id = $1 AND entry_date BETWEEN $2 AND $3 ORDER BY entry_date',
@@ -404,7 +404,7 @@ async function getCheckInMeasurementsByDateRange(userId, startDate, endDate) {
 }
 
 async function getCustomMeasurementsByDateRange(userId, categoryId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT category_id, entry_date AS date, entry_hour AS hour, value, entry_timestamp AS timestamp FROM custom_measurements WHERE user_id = $1 AND category_id = $2 AND entry_date BETWEEN $3 AND $4 ORDER BY entry_date, entry_timestamp',
@@ -417,7 +417,7 @@ async function getCustomMeasurementsByDateRange(userId, categoryId, startDate, e
 }
 
 async function upsertCustomMeasurement(userId, categoryId, value, entryDate, entryHour, entryTimestamp) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query;
     let values;
@@ -467,7 +467,7 @@ async function upsertCustomMeasurement(userId, categoryId, value, entryDate, ent
 }
 
 async function deleteCustomMeasurement(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM custom_measurements WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -507,7 +507,7 @@ module.exports = {
 };
 
 async function getLatestMeasurement(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT weight FROM check_in_measurements
@@ -523,7 +523,7 @@ async function getLatestMeasurement(userId) {
 }
 
 async function getCustomMeasurementOwnerId(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT user_id FROM custom_measurements WHERE id = $1',

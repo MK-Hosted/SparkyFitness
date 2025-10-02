@@ -178,8 +178,8 @@ const authorizeAccess = (permissionType, getTargetUserIdFromRequest = null) => {
     }
 
     try {
-      const pool = require("../db/connection"); // Import pool from connection.js
-      const client = await pool.connect();
+      const { getPool } = require("../db/poolManager"); // Import getPool from poolManager.js
+      const client = await getPool().connect();
       const result = await client.query(
         `SELECT public.can_access_user_data($1, $2, $3) AS can_access`,
         [targetUserId, permissionType, authenticatedUserId]

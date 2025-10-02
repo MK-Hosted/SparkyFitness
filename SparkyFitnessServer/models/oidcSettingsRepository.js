@@ -1,9 +1,9 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { encrypt, decrypt, ENCRYPTION_KEY } = require('../security/encryption');
 const { log } = require('../config/logging');
 
 async function getOidcSettings() {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const result = await client.query(
             `SELECT 
@@ -57,7 +57,7 @@ async function getOidcSettings() {
 }
 
 async function saveOidcSettings(settingsData) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         // 1. Check for existing settings
         const existingSettingsResult = await client.query(

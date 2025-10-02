@@ -204,7 +204,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Add default timezone
         item_display_limit: 10,
         food_display_limit: 10, // Add default foodDisplayLimit
-        water_display_unit: waterDisplayUnit // Set default water display unit
+        water_display_unit: waterDisplayUnit, // Set default water display unit
       };
 
 
@@ -391,6 +391,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
     info(loggingLevel, "PreferencesProvider: Setting default food data provider ID to:", id);
     setDefaultFoodDataProviderIdState(id);
   };
+
 
   const setTimezone = (newTimezone: string) => {
     info(loggingLevel, "PreferencesProvider: Setting timezone to:", newTimezone);

@@ -1,8 +1,8 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 
 async function getGoalByDate(userId, selectedDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT calories, protein, carbs, fat, water_goal_ml,
@@ -25,7 +25,7 @@ async function getGoalByDate(userId, selectedDate) {
 }
 
 async function getMostRecentGoalBeforeDate(userId, selectedDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT calories, protein, carbs, fat, water_goal_ml,
@@ -49,7 +49,7 @@ async function getMostRecentGoalBeforeDate(userId, selectedDate) {
 }
 
 async function upsertGoal(goalData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO user_goals (
@@ -113,7 +113,7 @@ async function upsertGoal(goalData) {
 }
 
 async function deleteGoalsInRange(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query(
       `DELETE FROM user_goals
@@ -130,7 +130,7 @@ async function deleteGoalsInRange(userId, startDate, endDate) {
 }
 
 async function deleteDefaultGoal(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query(
       `DELETE FROM user_goals

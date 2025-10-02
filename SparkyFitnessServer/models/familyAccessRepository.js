@@ -1,7 +1,7 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 
 async function checkFamilyAccessPermission(familyUserId, ownerUserId, permission) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT 1
@@ -20,7 +20,7 @@ async function checkFamilyAccessPermission(familyUserId, ownerUserId, permission
 }
 
 async function getFamilyAccessEntriesByOwner(ownerUserId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT fa.id, fa.owner_user_id, fa.family_user_id, fa.family_email, fa.access_permissions,
@@ -41,7 +41,7 @@ async function getFamilyAccessEntriesByOwner(ownerUserId) {
 }
 
 async function getFamilyAccessEntriesByUserId(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT fa.id, fa.owner_user_id, fa.family_user_id, fa.family_email, fa.access_permissions,
@@ -62,7 +62,7 @@ async function getFamilyAccessEntriesByUserId(userId) {
 }
 
 async function createFamilyAccessEntry(ownerUserId, familyUserId, familyEmail, accessPermissions, accessEndDate, status) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO family_access (owner_user_id, family_user_id, family_email, access_permissions, access_end_date, status, created_at, updated_at)
@@ -76,7 +76,7 @@ async function createFamilyAccessEntry(ownerUserId, familyUserId, familyEmail, a
 }
 
 async function updateFamilyAccessEntry(id, ownerUserId, accessPermissions, accessEndDate, isActive, status) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE family_access SET
@@ -96,7 +96,7 @@ async function updateFamilyAccessEntry(id, ownerUserId, accessPermissions, acces
 }
 
 async function deleteFamilyAccessEntry(id, ownerUserId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM family_access WHERE id = $1 AND owner_user_id = $2 RETURNING id',

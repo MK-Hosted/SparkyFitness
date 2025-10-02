@@ -1,11 +1,11 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 const format = require('pg-format');
 
 // --- Meal Template CRUD Operations ---
 
 async function createMeal(mealData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
@@ -39,7 +39,7 @@ async function createMeal(mealData) {
 }
 
 async function getMeals(userId, isPublic = false) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `
       SELECT id, user_id, name, description, is_public, created_at, updated_at
@@ -60,7 +60,7 @@ async function getMeals(userId, isPublic = false) {
 }
 
 async function searchMeals(searchTerm, userId, limit = null) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `
       SELECT id, user_id, name, description, is_public
@@ -99,7 +99,7 @@ async function searchMeals(searchTerm, userId, limit = null) {
 }
 
 async function getMealById(mealId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const mealResult = await client.query(
       `SELECT id, user_id, name, description, is_public, created_at, updated_at
@@ -128,7 +128,7 @@ async function getMealById(mealId) {
 }
 
 async function updateMeal(mealId, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
@@ -173,7 +173,7 @@ async function updateMeal(mealId, userId, updateData) {
 }
 
 async function deleteMeal(mealId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
     // meal_foods will be cascade deleted due to ON DELETE CASCADE on meal_id
@@ -195,7 +195,7 @@ async function deleteMeal(mealId, userId) {
 // --- Meal Plan CRUD Operations ---
 
 async function createMealPlanEntry(planData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO meal_plans (user_id, meal_id, food_id, variant_id, quantity, unit, plan_date, meal_type, is_template, template_name, day_of_week, meal_plan_template_id, created_at, updated_at)
@@ -216,7 +216,7 @@ async function createMealPlanEntry(planData) {
 }
 
 async function getMealPlanEntries(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -240,7 +240,7 @@ async function getMealPlanEntries(userId, startDate, endDate) {
 }
 
 async function updateMealPlanEntry(planId, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE meal_plans SET
@@ -275,7 +275,7 @@ async function updateMealPlanEntry(planId, userId, updateData) {
 }
 
 async function deleteMealPlanEntry(planId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM meal_plans WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -291,7 +291,7 @@ async function deleteMealPlanEntry(planId, userId) {
 }
 
 async function getMealPlanEntryById(planId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -314,7 +314,7 @@ async function getMealPlanEntryById(planId, userId) {
 // --- Helper for logging meal plan to food entries ---
 
 async function createFoodEntryFromMealPlan(entryData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO food_entries (user_id, food_id, meal_type, quantity, unit, entry_date, variant_id, meal_plan_id, created_at)
@@ -334,7 +334,7 @@ async function createFoodEntryFromMealPlan(entryData) {
 }
 
 async function deleteMealPlanEntriesByTemplateId(templateId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM meal_plans WHERE meal_plan_template_id = $1 AND user_id = $2 RETURNING id',
@@ -370,7 +370,7 @@ module.exports = {
 };
 
 async function getRecentMeals(userId, limit = null) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let query = `
       SELECT id, user_id, name, description, is_public, created_at, updated_at
@@ -407,7 +407,7 @@ async function getRecentMeals(userId, limit = null) {
 }
 
 async function getTopMeals(userId, limit = null) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     // For "top meals", we'll use a simple heuristic: meals with more foods,
     // or more recently created public meals. This can be refined later.
@@ -449,7 +449,7 @@ async function getTopMeals(userId, limit = null) {
 }
 
 async function getMealOwnerId(mealId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT user_id FROM meals WHERE id = $1',
@@ -462,7 +462,7 @@ async function getMealOwnerId(mealId) {
 }
 
 async function getMealPlanOwnerId(mealPlanId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT user_id FROM meal_plans WHERE id = $1',

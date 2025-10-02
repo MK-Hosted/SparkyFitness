@@ -1,7 +1,7 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 
 async function updateUserPreferences(userId, preferenceData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE user_preferences SET
@@ -31,7 +31,7 @@ async function updateUserPreferences(userId, preferenceData) {
 }
 
 async function deleteUserPreferences(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM user_preferences WHERE user_id = $1 RETURNING user_id',
@@ -44,7 +44,7 @@ async function deleteUserPreferences(userId) {
 }
 
 async function getUserPreferences(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT *, item_display_limit FROM user_preferences WHERE user_id = $1`,
@@ -57,13 +57,14 @@ async function getUserPreferences(userId) {
 }
 
 async function upsertUserPreferences(preferenceData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO user_preferences (
         user_id, date_format, default_weight_unit, default_measurement_unit,
         system_prompt, auto_clear_history, logging_level, timezone,
-        default_food_data_provider_id, item_display_limit, water_display_unit, created_at, updated_at
+        default_food_data_provider_id, item_display_limit, water_display_unit,
+        created_at, updated_at
       ) VALUES ($1, COALESCE($2, 'yyyy-MM-dd'), COALESCE($3, 'lbs'), COALESCE($4, 'in'), COALESCE($5, ''), COALESCE($6, 'never'), COALESCE($7, 'INFO'), COALESCE($8, 'UTC'), $9, COALESCE($10, 10), COALESCE($11, 'ml'), now(), now())
       ON CONFLICT (user_id) DO UPDATE SET
         date_format = COALESCE(EXCLUDED.date_format, user_preferences.date_format),

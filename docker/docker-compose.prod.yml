@@ -36,6 +36,8 @@ services:
     restart: always
     depends_on:
       - sparkyfitness-db # Backend depends on the database being available
+    volumes:
+      - ./backups:/app/SparkyFitnessServer/backup # Mount volume for backups
 
 
   sparkyfitness-frontend:

@@ -128,3 +128,5 @@ __pycache__/
 
 # Ignore uploaded exercise files
 SparkyFitnessServer/uploads/
+SparkyFitnessServer/backup/
+SparkyFitnessServer/temp_uploads/

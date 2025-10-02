@@ -1,7 +1,7 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 
 async function getNutritionData(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -37,7 +37,7 @@ async function getNutritionData(userId, startDate, endDate) {
 }
 
 async function getTabularFoodData(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT TO_CHAR(fe.entry_date, 'YYYY-MM-DD') AS entry_date, fe.meal_type, fe.quantity, fe.unit, fe.food_id, fe.variant_id, fe.user_id, f.name AS food_name, f.brand,
@@ -59,7 +59,7 @@ async function getTabularFoodData(userId, startDate, endDate) {
 }
 
 async function getMeasurementData(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
        `SELECT TO_CHAR(entry_date, 'YYYY-MM-DD') AS entry_date, weight, neck, waist, hips, steps FROM check_in_measurements WHERE user_id = $1 AND entry_date BETWEEN $2 AND $3 ORDER BY entry_date`,
@@ -72,7 +72,7 @@ async function getMeasurementData(userId, startDate, endDate) {
 }
 
 async function getCustomMeasurementsData(userId, categoryId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
        `SELECT category_id, TO_CHAR(entry_date, 'YYYY-MM-DD') AS entry_date, entry_hour AS hour, value, entry_timestamp AS timestamp FROM custom_measurements WHERE user_id = $1 AND category_id = $2 AND entry_date BETWEEN $3 AND $4 ORDER BY entry_date, entry_timestamp`,
@@ -85,7 +85,7 @@ async function getCustomMeasurementsData(userId, categoryId, startDate, endDate)
 }
 
 async function getMiniNutritionTrends(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -121,7 +121,7 @@ async function getMiniNutritionTrends(userId, startDate, endDate) {
 }
 
 async function getExerciseEntries(userId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT

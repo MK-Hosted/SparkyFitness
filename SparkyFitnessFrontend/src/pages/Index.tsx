@@ -30,8 +30,10 @@ import {
   Shield,
   X, // Add X here for the close icon
 } from "lucide-react";
+import { LucideIcon } from "lucide-react"; // Import LucideIcon
 import { toast } from "@/hooks/use-toast";
 import AuthenticationSettings from "@/pages/Admin/AuthenticationSettings";
+import BackupSettings from "@/pages/Admin/BackupSettings";
 import axios from "axios";
 
 import { API_BASE_URL } from "@/services/api";
@@ -485,7 +487,11 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
             </TabsContent>
             {user?.role === "admin" && (
               <TabsContent value="admin" className="space-y-6">
-                <AuthenticationSettings />
+                {/* Admin sub-navigation or direct content */}
+                <div className="flex flex-col space-y-4">
+                  <AuthenticationSettings />
+                  <BackupSettings />
+                </div>
               </TabsContent>
             )}
             {/* The "Add" tab does not have a content component */}

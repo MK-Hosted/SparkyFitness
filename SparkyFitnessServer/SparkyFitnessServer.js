@@ -3,7 +3,7 @@ const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') }); // Load .env from root directory
 const express = require('express');
 const cors = require('cors'); // Added this line
-const pool = require('./db/connection');
+const { getPool } = require('./db/poolManager');
 const { log } = require('./config/logging');
 const { getDefaultModel } = require('./ai/config');
 const { authenticateToken } = require('./middleware/authMiddleware');
@@ -32,7 +32,10 @@ const oidcSettingsRoutes = require('./routes/oidcSettingsRoutes');
 const versionRoutes = require('./routes/versionRoutes');
 const { applyMigrations } = require('./utils/dbMigrations');
 const waterContainerRoutes = require('./routes/waterContainerRoutes');
+const backupRoutes = require('./routes/backupRoutes'); // Import backup routes
 const errorHandler = require('./middleware/errorHandler'); // Import the new error handler
+const cron = require('node-cron'); // Import node-cron
+const { performBackup, applyRetentionPolicy } = require('./services/backupService'); // Import backup service
 
 const app = express();
 const PORT = process.env.SPARKY_FITNESS_SERVER_PORT || 3010;
@@ -116,43 +119,52 @@ app.get('/uploads/exercises/:exerciseId/:imageFileName', async (req, res, next) 
   }
 });
 
-const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
+let sessionMiddleware; // Declare sessionMiddleware globally
 
-// Trust the first proxy
-app.set('trust proxy', 1);
+const configureSessionMiddleware = (app, pool) => {
+  const session = require('express-session');
+  const pgSession = require('connect-pg-simple')(session);
 
-const isProduction = process.env.NODE_ENV === 'production';
+  // Trust the first proxy
+  app.set('trust proxy', 1);
 
-app.use(session({
-  store: new pgSession({
-    pool: pool, // Connection pool
-    tableName: 'session' // Use a table named 'session'
-  }),
-  name: 'sparky.sid',
-  secret: process.env.SESSION_SECRET ?? 'sparky_secret',
-  resave: false,
-  saveUninitialized: true,
-  proxy: true, // Trust the proxy in all environments (like Vite dev server)
-  cookie: {
-    path: '/', // Ensure cookie is sent for all paths
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
-    // secure and sameSite will be set dynamically
-  }
-}));
+  const isProduction = process.env.NODE_ENV === 'production';
 
-// Dynamically set cookie properties based on protocol
-app.use((req, res, next) => {
-  if (req.session && req.protocol === 'https') {
-    req.session.cookie.secure = true;
-    req.session.cookie.sameSite = 'none';
-  } else if (req.session) {
-    req.session.cookie.sameSite = 'lax';
-  }
-  log('debug', `[Session Debug] Request Protocol: ${req.protocol}, Secure: ${req.secure}, Host: ${req.headers.host}`);
-  next();
-});
+  sessionMiddleware = session({
+    store: new pgSession({
+      pool: pool, // Connection pool
+      tableName: 'session' // Use a table named 'session'
+    }),
+    name: 'sparky.sid',
+    secret: process.env.SESSION_SECRET ?? 'sparky_secret',
+    resave: false,
+    saveUninitialized: true,
+    proxy: true, // Trust the proxy in all environments (like Vite dev server)
+    cookie: {
+      path: '/', // Ensure cookie is sent for all paths
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+      // secure and sameSite will be set dynamically
+    }
+  });
+
+  app.use(sessionMiddleware);
+
+  // Dynamically set cookie properties based on protocol
+  app.use((req, res, next) => {
+    if (req.session && req.protocol === 'https') {
+      req.session.cookie.secure = true;
+      req.session.cookie.sameSite = 'none';
+    } else if (req.session) {
+      req.session.cookie.sameSite = 'lax';
+    }
+    log('debug', `[Session Debug] Request Protocol: ${req.protocol}, Secure: ${req.secure}, Host: ${req.headers.host}`);
+    next();
+  });
+};
+
+// Initial session middleware configuration
+configureSessionMiddleware(app, getPool());
 
 // Apply authentication middleware to all routes except auth
 app.use((req, res, next) => {
@@ -206,6 +218,7 @@ app.use('/version', versionRoutes); // Version routes
 log('debug', 'Registering /openid routes');
 app.use('/openid', openidRoutes); // Import OpenID routes
 app.use('/water-containers', waterContainerRoutes);
+app.use('/admin/backup', backupRoutes); // Add backup routes
 
 // Temporary debug route to log incoming requests for meal plan templates
 app.use('/meal-plan-templates', (req, res, next) => {
@@ -214,9 +227,31 @@ app.use('/meal-plan-templates', (req, res, next) => {
 }, mealPlanTemplateRoutes);
 
 console.log('DEBUG: Attempting to start server...');
+
+// Function to schedule backups
+const scheduleBackups = async () => {
+  // For now, a placeholder. In a later step, we will fetch backup preferences from the DB.
+  // Example: Schedule a backup every day at 2 AM
+  cron.schedule('0 2 * * *', async () => {
+    log('info', 'Scheduled backup initiated.');
+    const result = await performBackup();
+    if (result.success) {
+      log('info', `Scheduled backup completed successfully: ${result.path}`);
+      // Apply retention policy after successful backup
+      await applyRetentionPolicy(7); // Keep 7 days of backups for now
+    } else {
+      log('error', `Scheduled backup failed: ${result.error}`);
+    }
+  });
+  log('info', 'Backup scheduler initialized.');
+};
+
 applyMigrations().then(async () => {
   // Initialize OIDC client after migrations are applied
   await initializeOidcClient();
+
+  // Schedule backups after migrations and OIDC client initialization
+  scheduleBackups();
 
   // Set admin user from environment variable if provided
   if (process.env.SPARKY_FITNESS_ADMIN_EMAIL) {
@@ -242,6 +277,8 @@ applyMigrations().then(async () => {
   log('error', 'Failed to apply migrations and start server:', error);
   process.exit(1);
 });
+
+module.exports = { configureSessionMiddleware };
 
 // Centralized error handling middleware - MUST be placed after all routes and other middleware
 app.use(errorHandler);

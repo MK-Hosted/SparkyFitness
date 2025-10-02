@@ -1,8 +1,8 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 
 async function getExerciseById(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT id, source, source_id, name, force, level, mechanic, equipment,
@@ -28,7 +28,7 @@ async function getExerciseById(id) {
 }
 
 async function getExerciseOwnerId(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const exerciseResult = await client.query(
       'SELECT user_id FROM exercises WHERE id = $1',
@@ -42,7 +42,7 @@ async function getExerciseOwnerId(id) {
 
 async function getOrCreateActiveCaloriesExercise(userId) {
   const exerciseName = "Active Calories";
-  const client = await pool.connect();
+  const client = await getPool().connect();
   let exercise = null;
   try {
     const result = await client.query(
@@ -59,7 +59,7 @@ async function getOrCreateActiveCaloriesExercise(userId) {
 
   if (!exercise) {
     log('info', `Creating default exercise: ${exerciseName} for user ${userId}`);
-    const insertClient = await pool.connect();
+    const insertClient = await getPool().connect();
     let newExercise = null;
     try {
       const result = await insertClient.query(
@@ -81,7 +81,7 @@ async function getOrCreateActiveCaloriesExercise(userId) {
 
 async function upsertExerciseEntryData(userId, exerciseId, caloriesBurned, date) {
   log('info', "upsertExerciseEntryData received date parameter:", date);
-  const client = await pool.connect();
+  const client = await getPool().connect();
   let existingEntry = null;
   try {
     const result = await client.query(
@@ -99,7 +99,7 @@ async function upsertExerciseEntryData(userId, exerciseId, caloriesBurned, date)
   let result;
   if (existingEntry) {
     log('info', `Existing active calories entry found for ${date}, updating calories from ${existingEntry.calories_burned} to ${caloriesBurned}.`);
-    const updateClient = await pool.connect();
+    const updateClient = await getPool().connect();
     try {
       const updateResult = await updateClient.query(
         'UPDATE exercise_entries SET calories_burned = $1, notes = $2 WHERE id = $3 RETURNING *',
@@ -114,7 +114,7 @@ async function upsertExerciseEntryData(userId, exerciseId, caloriesBurned, date)
     }
   } else {
     log('info', `No existing active calories entry found for ${date}, inserting new entry.`);
-    const insertClient = await pool.connect();
+    const insertClient = await getPool().connect();
     try {
       const insertResult = await insertClient.query(
         `INSERT INTO exercise_entries (user_id, exercise_id, entry_date, calories_burned, duration_minutes, notes)
@@ -133,7 +133,7 @@ async function upsertExerciseEntryData(userId, exerciseId, caloriesBurned, date)
 }
 
 async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter, limit, offset) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let whereClauses = ['1=1'];
     const queryParams = [];
@@ -210,7 +210,7 @@ async function getExercisesWithPagination(targetUserId, searchTerm, categoryFilt
 }
 
 async function countExercises(targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let whereClauses = ['1=1'];
     const queryParams = [];
@@ -270,7 +270,7 @@ async function countExercises(targetUserId, searchTerm, categoryFilter, ownershi
 }
 
 async function getDistinctEquipment() {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT DISTINCT jsonb_array_elements_text(equipment::jsonb) AS equipment_name
@@ -284,7 +284,7 @@ async function getDistinctEquipment() {
 }
 
 async function getDistinctMuscleGroups() {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT DISTINCT muscle_name FROM (
@@ -304,7 +304,7 @@ async function getDistinctMuscleGroups() {
 }
 
 async function searchExercises(name, userId, equipmentFilter, muscleGroupFilter) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let whereClauses = ['1=1'];
     const queryParams = [];
@@ -358,7 +358,7 @@ async function searchExercises(name, userId, equipmentFilter, muscleGroupFilter)
 }
 
 async function createExercise(exerciseData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO exercises (
@@ -396,7 +396,7 @@ async function createExercise(exerciseData) {
 }
 
 async function createExerciseEntry(userId, entryData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, created_at, updated_at)
@@ -420,7 +420,7 @@ async function createExerciseEntry(userId, entryData) {
 }
 
 async function getExerciseEntryById(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT * FROM exercise_entries WHERE id = $1',
@@ -433,7 +433,7 @@ async function getExerciseEntryById(id) {
 }
 
 async function getExerciseEntryOwnerId(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const entryResult = await client.query(
       'SELECT user_id FROM exercise_entries WHERE id = $1',
@@ -446,7 +446,7 @@ async function getExerciseEntryOwnerId(id) {
 }
 
 async function updateExerciseEntry(id, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE exercise_entries SET
@@ -481,7 +481,7 @@ async function updateExerciseEntry(id, userId, updateData) {
 }
 
 async function deleteExerciseEntry(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM exercise_entries WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -494,7 +494,7 @@ async function deleteExerciseEntry(id, userId) {
 }
 
 async function updateExercise(id, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE exercises SET
@@ -541,7 +541,7 @@ async function updateExercise(id, userId, updateData) {
 }
 
 async function deleteExercise(id, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM exercises WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -554,7 +554,7 @@ async function deleteExercise(id, userId) {
 }
 
 async function getExerciseEntriesByDate(userId, selectedDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -631,7 +631,7 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
 }
 
 async function getRecentExercises(userId, limit) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -667,7 +667,7 @@ async function getRecentExercises(userId, limit) {
 }
 
 async function getTopExercises(userId, limit) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -703,7 +703,7 @@ async function getTopExercises(userId, limit) {
   }
 }
 async function getExerciseProgressData(userId, exerciseId, startDate, endDate) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -753,7 +753,7 @@ module.exports = {
 };
 
 async function getExerciseBySourceAndSourceId(source, sourceId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT id, source, source_id, name, force, level, mechanic, equipment,
@@ -779,7 +779,7 @@ async function getExerciseBySourceAndSourceId(source, sourceId) {
 }
 
 async function getExerciseDeletionImpact(exerciseId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const result = await client.query(
             'SELECT COUNT(*) FROM exercise_entries WHERE exercise_id = $1',

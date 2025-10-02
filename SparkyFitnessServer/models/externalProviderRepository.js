@@ -1,9 +1,9 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { encrypt, decrypt, ENCRYPTION_KEY } = require('../security/encryption');
 const { log } = require('../config/logging');
 
 async function getExternalDataProviders(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id, provider_name, provider_type, is_active, base_url FROM external_data_providers WHERE user_id = $1 ORDER BY created_at DESC',
@@ -17,7 +17,7 @@ async function getExternalDataProviders(userId) {
 }
 
 async function getExternalDataProvidersByUserId(targetUserId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -76,7 +76,7 @@ async function getExternalDataProvidersByUserId(targetUserId) {
 }
 
 async function createExternalDataProvider(providerData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     log('debug', 'createExternalDataProvider: Received providerData:', providerData);
     const {
@@ -149,7 +149,7 @@ async function createExternalDataProvider(providerData) {
 }
 
 async function updateExternalDataProvider(id, userId, updateData) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     let encryptedAppId = updateData.encrypted_app_id || null;
     let appIdIv = updateData.app_id_iv || null;
@@ -222,7 +222,7 @@ async function updateExternalDataProvider(id, userId, updateData) {
 }
 
 async function getExternalDataProviderById(providerId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -282,7 +282,7 @@ async function getExternalDataProviderById(providerId) {
 }
 
 async function getExternalDataProviderByUserIdAndProviderName(userId, providerName) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     log('debug', `Fetching external data provider for user ${userId} and provider ${providerName}`);
     const result = await client.query(
@@ -346,7 +346,7 @@ async function getExternalDataProviderByUserIdAndProviderName(userId, providerNa
 }
 
 async function checkExternalDataProviderOwnership(providerId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const checkOwnership = await client.query(
       'SELECT 1 FROM external_data_providers WHERE id = $1 AND user_id = $2',
@@ -359,7 +359,7 @@ async function checkExternalDataProviderOwnership(providerId, userId) {
 }
  
 async function deleteExternalDataProvider(id) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM external_data_providers WHERE id = $1 RETURNING id',

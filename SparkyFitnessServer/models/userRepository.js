@@ -1,7 +1,7 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 
 async function createUser(userId, email, hashedPassword, full_name) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN'); // Start transaction for atomicity
 
@@ -34,7 +34,7 @@ async function createUser(userId, email, hashedPassword, full_name) {
 }
 
 async function findUserByEmail(email) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id, password_hash, role, oidc_sub FROM auth.users WHERE LOWER(email) = LOWER($1)',
@@ -47,7 +47,7 @@ async function findUserByEmail(email) {
 }
 
 async function findUserById(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id, email, role, created_at FROM auth.users WHERE id = $1',
@@ -60,7 +60,7 @@ async function findUserById(userId) {
 }
 
 async function findUserIdByEmail(email) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id FROM auth.users WHERE LOWER(email) = LOWER($1)',
@@ -73,7 +73,7 @@ async function findUserIdByEmail(email) {
 }
 
 async function generateApiKey(userId, newApiKey, description) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `INSERT INTO user_api_keys (user_id, api_key, description, permissions, created_at, updated_at)
@@ -87,7 +87,7 @@ async function generateApiKey(userId, newApiKey, description) {
 }
 
 async function deleteApiKey(apiKeyId, userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'DELETE FROM user_api_keys WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -100,7 +100,7 @@ async function deleteApiKey(apiKeyId, userId) {
 }
 
 async function getAccessibleUsers(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT
@@ -124,7 +124,7 @@ async function getAccessibleUsers(userId) {
 }
 
 async function getUserProfile(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `SELECT id, full_name, phone_number, TO_CHAR(date_of_birth, 'YYYY-MM-DD') AS date_of_birth, bio, avatar_url, gender FROM profiles WHERE id = $1`,
@@ -137,7 +137,7 @@ async function getUserProfile(userId) {
 }
 
 async function updateUserProfile(userId, full_name, phone_number, date_of_birth, bio, avatar_url, gender) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       `UPDATE profiles
@@ -159,7 +159,7 @@ async function updateUserProfile(userId, full_name, phone_number, date_of_birth,
 }
 
 async function getUserApiKeys(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT id, description, api_key, created_at, last_used_at, is_active FROM user_api_keys WHERE user_id = $1 ORDER BY created_at DESC',
@@ -172,7 +172,7 @@ async function getUserApiKeys(userId) {
 }
 
 async function updateUserPassword(userId, hashedPassword) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'UPDATE auth.users SET password_hash = $1, updated_at = now() WHERE id = $2 RETURNING id',
@@ -185,7 +185,7 @@ async function updateUserPassword(userId, hashedPassword) {
 }
 
 async function updateUserEmail(userId, newEmail) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'UPDATE auth.users SET email = $1, updated_at = now() WHERE id = $2 RETURNING id',
@@ -198,7 +198,7 @@ async function updateUserEmail(userId, newEmail) {
 }
 
 async function getUserRole(userId) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'SELECT role FROM auth.users WHERE id = $1',
@@ -230,7 +230,7 @@ module.exports = {
 };
 
 async function updateUserRole(userId, role) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'UPDATE auth.users SET role = $1, updated_at = now() WHERE id = $2 RETURNING id',
@@ -243,7 +243,7 @@ async function updateUserRole(userId, role) {
 }
 
 async function createOidcUser(userId, email, fullName, oidcSub) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
@@ -278,7 +278,7 @@ async function createOidcUser(userId, email, fullName, oidcSub) {
 }
 
 async function updateUserOidcSub(userId, oidcSub) {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.query(
       'UPDATE auth.users SET oidc_sub = $1, updated_at = now() WHERE id = $2 RETURNING id',

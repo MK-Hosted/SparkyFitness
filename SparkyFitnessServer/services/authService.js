@@ -6,6 +6,7 @@ const { JWT_SECRET } = require('../security/encryption');
 const userRepository = require('../models/userRepository');
 const familyAccessRepository = require('../models/familyAccessRepository');
 const oidcSettingsRepository = require('../models/oidcSettingsRepository');
+const { getPool } = require('../db/poolManager');
 const nutrientDisplayPreferenceService = require('./nutrientDisplayPreferenceService');
 
 async function registerUser(email, password, full_name) {
@@ -182,8 +183,7 @@ async function updateUserEmail(authenticatedUserId, newEmail) {
 
 async function canAccessUserData(targetUserId, permissionType, authenticatedUserId) {
   try {
-    const pool = require('../db/connection'); // Import pool from connection.js
-    const client = await pool.connect();
+    const client = await getPool().connect();
     const result = await client.query(
       `SELECT public.can_access_user_data($1, $2, $3) AS can_access`,
       [targetUserId, permissionType, authenticatedUserId]

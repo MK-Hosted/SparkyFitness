@@ -1,9 +1,9 @@
-const pool = require('../db/connection');
+const { getPool } = require('../db/poolManager');
 const { log } = require('../config/logging');
 const format = require('pg-format');
 
 async function createMealPlanTemplate(planData) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         log('info', 'createMealPlanTemplate - planData:', planData);
         await client.query('BEGIN');
@@ -88,7 +88,7 @@ async function createMealPlanTemplate(planData) {
 }
 
 async function getMealPlanTemplatesByUserId(userId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const query = `
             SELECT
@@ -129,7 +129,7 @@ async function getMealPlanTemplatesByUserId(userId) {
 }
 
 async function updateMealPlanTemplate(planId, planData) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         await client.query('BEGIN');
 
@@ -210,7 +210,7 @@ async function updateMealPlanTemplate(planId, planData) {
 }
 
 async function deleteMealPlanTemplate(planId, userId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         // The assignments table will be cascade deleted due to the foreign key constraint
         const result = await client.query(
@@ -227,7 +227,7 @@ async function deleteMealPlanTemplate(planId, userId) {
 }
 
 async function deactivateAllMealPlanTemplates(userId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         await client.query(
             `UPDATE meal_plan_templates SET is_active = FALSE WHERE user_id = $1`,
@@ -240,7 +240,7 @@ async function deactivateAllMealPlanTemplates(userId) {
 }
 
 async function getMealPlanTemplateOwnerId(templateId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const result = await client.query(
             `SELECT user_id FROM meal_plan_templates WHERE id = $1`,
@@ -253,7 +253,7 @@ async function getMealPlanTemplateOwnerId(templateId) {
 }
 
 async function getActiveMealPlanForDate(userId, date) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const query = `
             SELECT
@@ -298,7 +298,7 @@ async function getActiveMealPlanForDate(userId, date) {
 }
 
 async function getMealPlanTemplatesByMealId(mealId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const query = `
             SELECT

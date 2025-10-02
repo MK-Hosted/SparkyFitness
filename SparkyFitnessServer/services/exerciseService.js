@@ -1,4 +1,4 @@
-const pool = require('../db/connection'); // Import the database connection pool
+const { getPool } = require('../db/poolManager'); // Import the database connection pool
 const exerciseRepository = require('../models/exerciseRepository');
 const userRepository = require('../models/userRepository');
 const { v4: uuidv4 } = require('uuid'); // New import for UUID generation
@@ -535,7 +535,7 @@ module.exports = {
 };
 
 async function getExerciseDeletionImpact(exerciseId) {
-    const client = await pool.connect();
+    const client = await getPool().connect();
     try {
         const result = await client.query(
             'SELECT COUNT(*) FROM exercise_entries WHERE exercise_id = $1',

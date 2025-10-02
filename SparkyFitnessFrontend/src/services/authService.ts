@@ -17,6 +17,22 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
   return response as AuthResponse;
 };
 
+export const logoutUser = async (): Promise<void> => {
+  try {
+    await apiCall('/auth/logout', { method: 'POST' });
+  } catch (error) {
+    console.error('Error during backend logout:', error);
+  } finally {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    // Optionally, clear other relevant local storage items
+    // For example, if user preferences or other sensitive data are stored
+    // localStorage.removeItem('userPreferences');
+    // Redirect to login page or home page
+    window.location.href = '/login'; // Assuming a login route
+  }
+};
+
 export const initiateOidcLogin = async () => {
   try {
     const response = await apiCall('/openid/login');

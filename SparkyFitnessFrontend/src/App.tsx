@@ -10,6 +10,7 @@ import AboutDialog from "@/components/AboutDialog";
 import NewReleaseDialog from "@/components/NewReleaseDialog";
 import AppSetup from '@/components/AppSetup';
 import axios from 'axios';
+import { Toaster } from "@/components/ui/toaster"; // Import the Toaster component
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => {
               releaseInfo={latestRelease}
               onDismissForVersion={handleDismissRelease}
             />
+            <Toaster /> {/* Render the Toaster component */}
           </WaterContainerProvider>
         </ChatbotVisibilityProvider>
       </PreferencesProvider>
