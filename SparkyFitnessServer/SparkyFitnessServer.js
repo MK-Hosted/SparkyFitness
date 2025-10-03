@@ -173,6 +173,8 @@ app.use((req, res, next) => {
     '/auth/login',
     '/auth/register',
     '/auth/settings',
+    '/auth/forgot-password', // Allow password reset request to be public
+    '/auth/reset-password', // Allow password reset to be public
     '/api/health-data',
     '/health',
     '/openid', // All OIDC routes are handled by session, not JWT token

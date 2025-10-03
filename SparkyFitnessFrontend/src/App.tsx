@@ -11,6 +11,9 @@ import NewReleaseDialog from "@/components/NewReleaseDialog";
 import AppSetup from '@/components/AppSetup';
 import axios from 'axios';
 import { Toaster } from "@/components/ui/toaster"; // Import the Toaster component
+import { Routes, Route } from 'react-router-dom';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 
 const queryClient = new QueryClient();
 
@@ -47,7 +50,11 @@ const App = () => {
               setLatestRelease={setLatestRelease}
               setShowNewReleaseDialog={setShowNewReleaseDialog}
             />
-            <AppContent onShowAboutDialog={() => setShowAboutDialog(true)} />
+            <Routes>
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="*" element={<AppContent onShowAboutDialog={() => setShowAboutDialog(true)} />} />
+            </Routes>
             <DraggableChatbotButton />
             <AboutDialog isOpen={showAboutDialog} onClose={() => setShowAboutDialog(false)} version={appVersion} />
             <NewReleaseDialog

@@ -17,6 +17,20 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
   return response as AuthResponse;
 };
 
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  await apiCall('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+  });
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  await apiCall('/auth/reset-password', {
+    method: 'POST',
+    body: { token, newPassword },
+  });
+};
+
 export const logoutUser = async (): Promise<void> => {
   try {
     await apiCall('/auth/logout', { method: 'POST' });

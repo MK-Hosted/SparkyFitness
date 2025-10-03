@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeAccess } = require('../middleware/authMiddleware');
-const { registerValidation, loginValidation } = require('../validation/authValidation');
+const { registerValidation, loginValidation, forgotPasswordValidation, resetPasswordValidation } = require('../validation/authValidation');
 const { validationResult } = require('express-validator');
 const authService = require('../services/authService');
 const multer = require('multer');
@@ -442,6 +442,41 @@ router.get('/profiles/avatar/:filename', authenticateToken, async (req, res, nex
       res.status(404).json({ error: 'Avatar not found.' });
     }
   } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/forgot-password', forgotPasswordValidation, async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { email } = req.body;
+
+  try {
+    await authService.forgotPassword(email);
+    res.status(200).json({ message: 'If a user with that email exists, a password reset email has been sent.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/reset-password', resetPasswordValidation, async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { token, newPassword } = req.body;
+
+  try {
+    await authService.resetPassword(token, newPassword);
+    res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (error) {
+    if (error.message === 'Password reset token is invalid or has expired.') {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
