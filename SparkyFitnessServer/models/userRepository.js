@@ -37,7 +37,7 @@ async function findUserByEmail(email) {
   const client = await getPool().connect();
   try {
     const result = await client.query(
-      'SELECT id, password_hash, role, oidc_sub FROM auth.users WHERE LOWER(email) = LOWER($1)',
+      'SELECT id, email, password_hash, role, oidc_sub FROM auth.users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
     return result.rows[0];
@@ -227,6 +227,8 @@ module.exports = {
   getUserRole,
   updateUserRole,
   updateUserOidcSub,
+  updatePasswordResetToken,
+  findUserByPasswordResetToken,
 };
 
 async function updateUserRole(userId, role) {
@@ -285,6 +287,32 @@ async function updateUserOidcSub(userId, oidcSub) {
       [oidcSub, userId]
     );
     return result.rowCount > 0;
+  } finally {
+    client.release();
+  }
+}
+
+async function updatePasswordResetToken(userId, token, expires) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      'UPDATE auth.users SET password_reset_token = $1, password_reset_expires = $2, updated_at = now() WHERE id = $3 RETURNING id',
+      [token, expires, userId]
+    );
+    return result.rowCount > 0;
+  } finally {
+    client.release();
+  }
+}
+
+async function findUserByPasswordResetToken(token) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      'SELECT id, email, password_hash, password_reset_expires FROM auth.users WHERE password_reset_token = $1 AND to_timestamp(password_reset_expires / 1000) > NOW()',
+      [token]
+    );
+    return result.rows[0];
   } finally {
     client.release();
   }

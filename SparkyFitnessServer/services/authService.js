@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto'); // For generating secure tokens
 const { log } = require('../config/logging');
 const { JWT_SECRET } = require('../security/encryption');
 const userRepository = require('../models/userRepository');
@@ -8,6 +9,7 @@ const familyAccessRepository = require('../models/familyAccessRepository');
 const oidcSettingsRepository = require('../models/oidcSettingsRepository');
 const { getPool } = require('../db/poolManager');
 const nutrientDisplayPreferenceService = require('./nutrientDisplayPreferenceService');
+const emailService = require('./emailService');
 
 async function registerUser(email, password, full_name) {
   try {
@@ -336,6 +338,9 @@ module.exports = {
   createFamilyAccessEntry,
   updateFamilyAccessEntry,
   deleteFamilyAccessEntry,
+  deleteFamilyAccessEntry,
+  forgotPassword,
+  resetPassword,
 };
 
 async function registerOidcUser(email, fullName, oidcSub) {
@@ -346,6 +351,54 @@ async function registerOidcUser(email, fullName, oidcSub) {
     return userId;
   } catch (error) {
     log('error', 'Error during OIDC user registration in authService:', error);
+    throw error;
+  }
+}
+
+async function forgotPassword(email) {
+  try {
+    const user = await userRepository.findUserByEmail(email);
+    if (!user) {
+      // For security, don't reveal if the user exists or not
+      log('info', `Password reset requested for non-existent email: ${email}`);
+      return;
+    }
+    log('debug', `User object before sending email: ${JSON.stringify(user)}`);
+    log('debug', `User found for password reset: ${JSON.stringify(user)}`);
+
+    // Generate a secure, unique token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const passwordResetExpires = Date.now() + 3600000; // 1 hour from now
+
+    await userRepository.updatePasswordResetToken(user.id, resetToken, passwordResetExpires);
+
+    const resetUrl = `${process.env.SPARKY_FITNESS_FRONTEND_URL}/reset-password?token=${resetToken}`;
+    await emailService.sendPasswordResetEmail(user.email, resetUrl);
+
+    log('info', `Password reset token generated and email sent to user: ${user.id}`);
+  } catch (error) {
+    log('error', `Error in forgotPassword for email ${email} in authService:`, error);
+    throw error;
+  }
+}
+
+async function resetPassword(token, newPassword) {
+  try {
+    const user = await userRepository.findUserByPasswordResetToken(token);
+
+    if (!user) {
+      throw new Error('Password reset token is invalid or has expired.');
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    await userRepository.updateUserPassword(user.id, hashedPassword);
+    await userRepository.updatePasswordResetToken(user.id, null, null); // Clear the token and expiration
+
+    log('info', `Password successfully reset for user: ${user.id}`);
+  } catch (error) {
+    log('error', `Error in resetPassword for token ${token} in authService:`, error);
     throw error;
   }
 }

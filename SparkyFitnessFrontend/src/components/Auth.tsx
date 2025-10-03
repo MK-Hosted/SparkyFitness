@@ -143,18 +143,6 @@ const Auth = () => {
     debug(loggingLevel, "Auth: Sign in loading state set to false.");
   };
 
-  const handlePasswordReset = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    info(
-      loggingLevel,
-      "Auth: Password reset functionality is not yet implemented in the new backend."
-    );
-    toast({
-      title: "Info",
-      description: "Password reset functionality is not yet implemented.",
-    });
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md dark:bg-gray-">
@@ -234,8 +222,7 @@ const Auth = () => {
                 </div>
                 <div className="text-right text-sm">
                   <a
-                    href="#"
-                    onClick={handlePasswordReset}
+                    href="/forgot-password"
                     className="font-medium text-primary hover:underline"
                   >
                     Forgot password?
