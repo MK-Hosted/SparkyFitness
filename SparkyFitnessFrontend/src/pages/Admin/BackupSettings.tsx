@@ -267,6 +267,9 @@ const BackupSettings: React.FC = () => {
 
           <div className="mb-4">
             <h3 className="text-xl font-bold mb-2">Restore Backup</h3>
+            <p className="text-orange-500 mb-2">
+              **Important Note:** This backup functionality is new and should be used with caution. While it creates a backup, it's highly recommended to create additional backups independently of this application. Always follow the 3-2-1 backup strategy (3 copies of your data, on 2 different media, with 1 copy offsite) to ensure data safety. The functionality of restore may not work properly in all scenarios, so do not rely solely on this in-app backup.
+            </p>
             <p className="text-red-600 mb-2">
               WARNING: Restoring a backup will wipe all current data and replace it with the backup content. Proceed with extreme caution. Restart the server manually after restoring.
             </p>
