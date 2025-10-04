@@ -51,7 +51,8 @@ app.use(cors({
 }));
 
 // Middleware to parse JSON bodies for all incoming requests
-app.use(express.json());
+// Increased limit to 50mb to accommodate image uploads
+app.use(express.json({ limit: '50mb' }));
 
 // Serve static files from the 'uploads' directory
 // This middleware will first try to serve the file if it exists locally.

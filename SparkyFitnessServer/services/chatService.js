@@ -356,15 +356,15 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           body: JSON.stringify({
             model: model,
             max_tokens: 1000,
-            messages: userMessages,
-            system: systemPrompt,
+            messages: messagesForAI.filter(msg => msg.role !== 'system'), // Anthropic system prompt is separate
+            system: systemPromptContent,
           }),
         });
         break;
 
       case 'google':
         const googleBody = {
-          contents: messages.map(msg => {
+          contents: messagesForAI.map(msg => {
             const role = msg.role === 'assistant' ? 'model' : 'user';
             let parts = [];
             if (typeof msg.content === 'string') {
@@ -436,6 +436,26 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
         break;
 
       case 'ollama':
+        // For Ollama, extract only the text content from the last user message
+        // and send it as a string. Ollama does not support multimodal input
+        // in the same way as other providers.
+        const ollamaMessages = messagesForAI.map(msg => {
+          let contentString = '';
+          if (Array.isArray(msg.content)) {
+            const textParts = msg.content.filter(part => part.type === 'text');
+            if (textParts.length > 0) {
+              contentString = textParts.map(part => part.text).join(' ');
+            }
+            const imageParts = msg.content.filter(part => part.type === 'image_url');
+            if (imageParts.length > 0) {
+              log('warn', `Image data detected for Ollama service. Ollama does not support multimodal input in this format. Image data will be ignored.`);
+            }
+          } else if (typeof msg.content === 'string') {
+            contentString = msg.content;
+          }
+          return { role: msg.role, content: contentString };
+        });
+
         response = await fetch(`${aiService.custom_url}/api/chat`, {
           method: 'POST',
           headers: {
@@ -443,14 +463,14 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           },
           body: JSON.stringify({
             model: model,
-            messages: messages,
+            messages: ollamaMessages,
             stream: false,
           }),
         });
         break;
 
       default:
-        const hasImage = messages.some(msg => Array.isArray(msg.content) && msg.content.some(part => part.type === 'image_url'));
+        const hasImage = messagesForAI.some(msg => Array.isArray(msg.content) && msg.content.some(part => part.type === 'image_url'));
         if (hasImage) {
           throw new Error(`Image analysis is not supported for the selected AI service type: ${aiService.service_type}. Please select a multimodal model like Google Gemini in settings.`);
         }
@@ -574,7 +594,7 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
         break;
 
       case 'google':
-        const googleBody = {
+        const googleBodyFoodOptions = {
           contents: messages.map(msg => {
             const role = msg.role === 'assistant' ? 'model' : 'user';
             return {
@@ -584,19 +604,19 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           }).filter(content => content.parts[0].text.trim() !== ''),
         };
 
-        if (googleBody.contents.length === 0) {
+        if (googleBodyFoodOptions.contents.length === 0) {
           throw new Error('No valid content found to send to Google AI.');
         }
 
-        const cleanSystemPrompt = systemPrompt
+        const cleanSystemPromptFoodOptions = systemPrompt
           .replace(/[^\w\s\-.,!?:;()\[\]{}'"]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim()
           .substring(0, 1000);
 
-        if (cleanSystemPrompt && cleanSystemPrompt.length > 0) {
-          googleBody.systemInstruction = {
-            parts: [{ text: cleanSystemPrompt }]
+        if (cleanSystemPromptFoodOptions && cleanSystemPromptFoodOptions.length > 0) {
+          googleBodyFoodOptions.systemInstruction = {
+            parts: [{ text: cleanSystemPromptFoodOptions }]
           };
         }
 
@@ -608,11 +628,25 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(googleBody),
+          body: JSON.stringify(googleBodyFoodOptions),
         });
         break;
 
       case 'ollama':
+        // For Ollama, extract only the text content from the messages
+        const ollamaMessagesFoodOptions = messages.map(msg => {
+          let contentString = '';
+          if (Array.isArray(msg.content)) {
+            const textParts = msg.content.filter(part => part.type === 'text');
+            if (textParts.length > 0) {
+              contentString = textParts.map(part => part.text).join(' ');
+            }
+          } else if (typeof msg.content === 'string') {
+            contentString = msg.content;
+          }
+          return { role: msg.role, content: contentString };
+        });
+
         response = await fetch(`${aiService.custom_url}/api/chat`, {
           method: 'POST',
           headers: {
@@ -620,7 +654,7 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           },
           body: JSON.stringify({
             model: model,
-            messages: messages,
+            messages: ollamaMessagesFoodOptions,
             stream: false,
           }),
         });
