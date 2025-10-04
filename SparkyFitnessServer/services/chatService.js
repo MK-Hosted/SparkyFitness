@@ -195,7 +195,7 @@ For image inputs:
 - Analyze the image to identify food items, estimate quantities, and infer nutritional information.
 - If the image clearly shows food, prioritize the 'log_food' intent.
 - Extract food_name, quantity, unit, and meal_type from the image content.
-- If possible, infer and include nutritional details (calories, protein, carbs, fat, etc.) based on the identified food and estimated quantity, populating the corresponding fields in the 'log_food' intent's data.
+- **CRITICAL:** Always infer and include *estimated* nutritional details (calories, protein, carbs, fat, etc.) based on the identified food and estimated quantity, populating the corresponding fields in the 'log_food' intent's data. Do NOT default to 0 if an estimation can be made.
 - If the image is not food-related or unclear, treat the text input as primary.
 
 **IMPORTANT:** If the user specifies a date or time (e.g., "yesterday", "last Monday", "at 7 PM"), extract this information and include it as a 'entryDate' field in the top level of the JSON object. **Provide relative terms like "today", "yesterday", "tomorrow", or a specific date in 'MM-DD' or 'YYYY-MM-DD' format. Do NOT try to resolve relative terms to a full date yourself.** If no date is specified, omit the 'entryDate' field.
@@ -541,7 +541,7 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
       throw new Error('API key missing for selected AI service.');
     }
 
-    const systemPrompt = `You are Sparky, an AI nutrition and wellness coach. Your task is to generate minimum 3 realistic food options in JSON format when requested. Respond ONLY with a JSON array of FoodOption objects, including detailed nutritional information (calories, protein, carbs, fat, saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat, cholesterol, sodium, potassium, dietary_fiber, sugars, vitamin_a, vitamin_c, calcium, iron) if available. Do NOT include any other text.
+    const systemPrompt = `You are Sparky, an AI nutrition and wellness coach. Your task is to generate minimum 3 realistic food options in JSON format when requested. Respond ONLY with a JSON array of FoodOption objects, including detailed nutritional information (calories, protein, carbs, fat, saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat, cholesterol, sodium, potassium, dietary_fiber, sugars, vitamin_a, vitamin_c, calcium, iron). **CRITICAL: Always provide estimated nutritional details for each food option. Do NOT default to 0 for any nutritional field if an estimation can be made.** Do NOT include any other text.
 **CRITICAL: When a unit is specified in the request (e.g., 'GENERATE_FOOD_OPTIONS:apple in piece'), ensure the \`serving_unit\` in the generated \`FoodOption\` objects matches the requested unit exactly, if it's a common and logical unit for that food. If not, provide a common and realistic serving unit.**`;
 
     const messages = [
