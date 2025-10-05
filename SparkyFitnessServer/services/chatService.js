@@ -3,6 +3,7 @@ const userRepository = require('../models/userRepository');
 const measurementRepository = require('../models/measurementRepository');
 const { log } = require('../config/logging');
 const { getDefaultModel } = require('../ai/config');
+const { Agent } = require('undici'); // Import Agent from undici
 
 async function handleAiServiceSettings(action, serviceData, authenticatedUserId) {
   try {
@@ -343,6 +344,10 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
             temperature: 0.7,
           }),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'anthropic':
@@ -360,6 +365,10 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
             system: systemPromptContent,
           }),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'google':
@@ -433,6 +442,10 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           },
           body: JSON.stringify(googleBody),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'ollama':
@@ -456,17 +469,38 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
           return { role: msg.role, content: contentString };
         });
 
-        response = await fetch(`${aiService.custom_url}/api/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: ollamaMessages,
-            stream: false,
-          }),
+        const timeout = aiService.timeout || 1200000; // Default to 1200 seconds (20 minutes)
+        log('info', `Ollama chat request timeout set to ${timeout}ms`);
+
+        // Create an undici Agent with the desired timeouts
+        const ollamaAgent = new Agent({
+          headersTimeout: timeout,
+          bodyTimeout: timeout,
         });
+
+        try {
+          response = await fetch(`${aiService.custom_url}/api/chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: ollamaMessages,
+              stream: false,
+            }),
+            // Pass the undici agent to the fetch call
+            dispatcher: ollamaAgent,
+          });
+        } catch (error) {
+          if (error.name === 'HeadersTimeoutError' || error.name === 'BodyTimeoutError') {
+            throw new Error(`Ollama chat request timed out after ${timeout}ms due to undici timeout.`);
+          }
+          throw error;
+        } finally {
+          // Destroy the agent to prevent resource leaks
+          ollamaAgent.destroy();
+        }
         break;
 
       default:
@@ -478,9 +512,9 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      log('error', `AI service API call error for ${aiService.service_type}:`, errorText);
-      throw new Error(`AI service API call error: ${response.status} - ${errorText}`);
+      const errorBody = await response.text();
+      log('error', `AI service API call error for ${aiService.service_type}. Status: ${response.status}, StatusText: ${response.statusText}, Body: ${errorBody}`);
+      throw new Error(`AI service API call error: ${response.status} - ${response.statusText} - ${errorBody}`);
     }
 
     const data = await response.json();
@@ -574,6 +608,10 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
             temperature: 0.7,
           }),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'anthropic':
@@ -591,6 +629,10 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
             system: systemPrompt,
           }),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'google':
@@ -630,6 +672,10 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           },
           body: JSON.stringify(googleBodyFoodOptions),
         });
+
+        if (!response) {
+          throw new Error('Fetch did not return a response object.');
+        }
         break;
 
       case 'ollama':
@@ -647,17 +693,38 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
           return { role: msg.role, content: contentString };
         });
 
-        response = await fetch(`${aiService.custom_url}/api/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: ollamaMessagesFoodOptions,
-            stream: false,
-          }),
+        const timeoutFoodOptions = aiService.timeout || 1200000; // Default to 1200 seconds (20 minutes)
+        log('info', `Ollama food options request timeout set to ${timeoutFoodOptions}ms`);
+
+        // Create an undici Agent with the desired timeouts
+        const ollamaAgentFoodOptions = new Agent({
+          headersTimeout: timeoutFoodOptions,
+          bodyTimeout: timeoutFoodOptions,
         });
+
+        try {
+          response = await fetch(`${aiService.custom_url}/api/chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: ollamaMessagesFoodOptions,
+              stream: false,
+            }),
+            // Pass the undici agent to the fetch call
+            dispatcher: ollamaAgentFoodOptions,
+          });
+        } catch (error) {
+          if (error.name === 'HeadersTimeoutError' || error.name === 'BodyTimeoutError') {
+            throw new Error(`Ollama food options request timed out after ${timeoutFoodOptions}ms due to undici timeout.`);
+          }
+          throw error;
+        } finally {
+          // Destroy the agent to prevent resource leaks
+          ollamaAgentFoodOptions.destroy();
+        }
         break;
 
       default:
@@ -665,9 +732,9 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      log('error', `AI service API call error for food options (${aiService.service_type}):`, errorText);
-      throw new Error(`AI service API call error: ${response.status} - ${errorText}`);
+      const errorBody = await response.text();
+      log('error', `AI service API call error for food options (${aiService.service_type}). Status: ${response.status}, StatusText: ${response.statusText}, Body: ${errorBody}`);
+      throw new Error(`AI service API call error: ${response.status} - ${response.statusText} - ${errorBody}`);
     }
 
     const data = await response.json();

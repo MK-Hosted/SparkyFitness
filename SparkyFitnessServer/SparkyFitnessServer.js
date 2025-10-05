@@ -159,7 +159,7 @@ const configureSessionMiddleware = (app, pool) => {
     } else if (req.session) {
       req.session.cookie.sameSite = 'lax';
     }
-    log('debug', `[Session Debug] Request Protocol: ${req.protocol}, Secure: ${req.secure}, Host: ${req.headers.host}`);
+    // log('debug', `[Session Debug] Request Protocol: ${req.protocol}, Secure: ${req.secure}, Host: ${req.headers.host}`); // Commented out for less verbose logging
     next();
   });
 };

@@ -72,6 +72,7 @@ class BackupSettingsRepository {
   async updateLastBackupStatus(status, timestamp) {
     const client = await getPool().connect();
     try {
+      log('info', `Attempting to update last backup status to: ${status} at ${timestamp}`);
       const result = await client.query(
         `UPDATE backup_settings
           SET last_backup_status = $1,
@@ -82,8 +83,10 @@ class BackupSettingsRepository {
         [status, timestamp]
       );
       if (result.rows.length === 0) {
+        log('error', 'Backup settings row not found for status update. This should not happen if default settings are created.');
         throw new Error('Backup settings row not found for status update.');
       }
+      log('info', `Successfully updated last backup status. New settings:`, result.rows[0]);
       return result.rows[0];
     } catch (error) {
       log('error', 'Error updating last backup status:', error);

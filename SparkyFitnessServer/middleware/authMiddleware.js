@@ -14,7 +14,7 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
   if (token) {
-    log("debug", `Authentication: JWT token found. Verifying...`);
+    // log("debug", `Authentication: JWT token found. Verifying...`); // Commented out for less verbose logging
     jwt.verify(token, JWT_SECRET, (err, user) => {
       if (err) {
         log("warn", "Authentication: Invalid or expired token.", err.message);
@@ -23,15 +23,15 @@ const authenticateToken = (req, res, next) => {
           .json({ error: "Authentication: Invalid or expired token." });
       }
       req.userId = user.userId; // Attach userId from JWT payload to request
-      log("debug", `Authentication: JWT token valid. User ID: ${req.userId}`);
+      // log("debug", `Authentication: JWT token valid. User ID: ${req.userId}`); // Commented out for less verbose logging
       next();
     });
   } else if (req.session && req.session.user && req.session.user.userId) {
     // If no JWT token, check for session-based authentication (for OIDC)
-    log(
-      "debug",
-      `Authentication: No JWT token found, checking session. User ID from session: ${req.session.user.userId}`
-    );
+    // log(
+    //   "debug",
+    //   `Authentication: No JWT token found, checking session. User ID from session: ${req.session.user.userId}`
+    // ); // Commented out for less verbose logging
     req.userId = req.session.user.userId;
     next();
   } else {

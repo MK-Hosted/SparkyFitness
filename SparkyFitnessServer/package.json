@@ -31,6 +31,7 @@
     "openid-client": "^5.7.0",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
+    "undici": "^7.16.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

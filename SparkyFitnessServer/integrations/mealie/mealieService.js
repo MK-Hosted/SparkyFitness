@@ -33,8 +33,15 @@ class MealieService {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Search failed: ${response.status} ${response.statusText} - ${errorData.detail}`);
+                const errorText = await response.text(); // Read response as text
+                log('error', `Mealie API Error Response (Raw): ${errorText}`); // Log the raw response
+                try {
+                    const errorData = JSON.parse(errorText); // Attempt to parse as JSON
+                    throw new Error(`Search failed: ${response.status} ${response.statusText} - ${errorData.detail}`);
+                } catch (jsonError) {
+                    // If parsing fails, use the raw text as the error message
+                    throw new Error(`Search failed: ${response.status} ${response.statusText} - ${errorText}`);
+                }
             }
 
             const data = await response.json();
