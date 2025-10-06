@@ -45,6 +45,7 @@ async function getReportsData(authenticatedUserId, targetUserId, startDate, endD
         potassium: row.potassium,
         dietary_fiber: row.dietary_fiber,
         sugars: row.sugars,
+  glycemic_index: row.glycemic_index,
         vitamin_a: row.vitamin_a,
         vitamin_c: row.vitamin_c,
         calcium: row.calcium,

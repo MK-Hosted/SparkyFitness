@@ -43,7 +43,7 @@ async function getTabularFoodData(userId, startDate, endDate) {
       `SELECT TO_CHAR(fe.entry_date, 'YYYY-MM-DD') AS entry_date, fe.meal_type, fe.quantity, fe.unit, fe.food_id, fe.variant_id, fe.user_id, f.name AS food_name, f.brand,
               fv.calories, fv.protein, fv.carbs, fv.fat,
               fv.saturated_fat, fv.polyunsaturated_fat, fv.monounsaturated_fat, fv.trans_fat,
-              fv.cholesterol, fv.sodium, fv.potassium, fv.dietary_fiber, fv.sugars,
+              fv.cholesterol, fv.sodium, fv.potassium, fv.dietary_fiber, fv.sugars, fv.glycemic_index,
               fv.vitamin_a, fv.vitamin_c, fv.calcium, fv.iron, fv.serving_size, fv.serving_unit
        FROM food_entries fe
        JOIN foods f ON fe.food_id = f.id

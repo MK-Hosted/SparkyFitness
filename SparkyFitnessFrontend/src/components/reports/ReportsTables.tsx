@@ -20,6 +20,7 @@ interface DailyFoodEntry {
     protein: number;
     carbs: number;
     fat: number;
+    glycemic_index?: string;
     saturated_fat?: number;
     polyunsaturated_fat?: number;
     monounsaturated_fat?: number;
@@ -255,9 +256,14 @@ const ReportsTables = ({
                   <TableHead>Meal</TableHead>
                   <TableHead className="min-w-[250px]">Food</TableHead>
                   <TableHead>Quantity</TableHead>
-                  {visibleNutrients.map(nutrient => (
-                    <TableHead key={nutrient}>{nutrient.replace(/_/g, ' ')} ({getNutrientUnit(nutrient)})</TableHead>
-                  ))}
+                  {visibleNutrients.map(nutrient => {
+                    // Create a human-friendly label and only show unit when available
+                    const rawLabel = nutrient.replace(/_/g, ' ');
+                    const toTitleCase = (s: string) => s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const label = nutrient === 'glycemic_index' ? 'Glycemic Index' : toTitleCase(rawLabel);
+                    const unit = getNutrientUnit(nutrient);
+                    return <TableHead key={nutrient}>{label}{unit ? ` (${unit})` : ''}</TableHead>;
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,6 +285,16 @@ const ReportsTables = ({
                       </TableCell>
                       <TableCell>{entry.isTotal ? '' : `${entry.quantity} ${entry.unit}`}</TableCell>
                       {visibleNutrients.map(nutrient => {
+                        // Special-case glycemic_index because it's a categorical value (string), not numeric
+                        if (nutrient === 'glycemic_index') {
+                          // Try multiple fallback locations since different endpoints may return GI in different shapes
+                          const topLevelGi = (entry as any).glycemic_index || (entry as any).glycemicIndex;
+                          const variantGi = (entry as any).food_variants?.glycemic_index || (entry as any).food_variants?.glycemicIndex;
+                          const foodsGi = (food as any).glycemic_index || (food as any).glycemicIndex;
+                          const giValue = entry.isTotal ? '' : (foodsGi || variantGi || topLevelGi || 'None');
+                          return <TableCell key={nutrient}>{giValue}</TableCell>;
+                        }
+
                         const value = (food[nutrient as keyof typeof food] as number || 0) * multiplier;
                         return <TableCell key={nutrient}>{formatNutrientValue(value, nutrient)}</TableCell>
                       })}
