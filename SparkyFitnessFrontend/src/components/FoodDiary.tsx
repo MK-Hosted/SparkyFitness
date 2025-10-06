@@ -31,7 +31,7 @@ import {
   copyFoodEntries, // Import the new copy function
   copyFoodEntriesFromYesterday, // Import the new copy from yesterday function
 } from "@/services/foodDiaryService";
-import { Food, FoodVariant } from "@/types/food";
+import { Food, FoodVariant, GlycemicIndex } from "@/types/food"; // Import GlycemicIndex
 import { FoodEntry } from "@/types/food";
 import { ExpandedGoals } from "@/types/goals";
 import { Exercise } from "@/services/exerciseSearchService"; // Import Exercise interface
@@ -168,8 +168,22 @@ const FoodDiary = ({
     try {
       const data = await loadFoodEntries(currentUserId, selectedDate); // Use imported loadFoodEntries
       info(loggingLevel, "Food entries loaded successfully:", data);
-      setFoodEntries(data || []);
-      _calculateDayTotals(data || []);
+      debug(loggingLevel, "Raw food entries from API:", data); // Added raw data log
+      const processedData = (data || []).map(entry => {
+        debug(loggingLevel, `Processing entry for food: ${entry.foods.name}, raw glycemic_index: ${entry.food_variants?.glycemic_index}`); // Log raw GI
+        return {
+          ...entry,
+          food_variants: entry.food_variants ? {
+            ...entry.food_variants,
+            glycemic_index: (entry.food_variants.glycemic_index === "0.0" || entry.food_variants.glycemic_index === null || entry.food_variants.glycemic_index === undefined || entry.food_variants.glycemic_index === "" || entry.food_variants.glycemic_index === 0)
+              ? 'None'
+              : entry.food_variants.glycemic_index
+          } : entry.food_variants
+        };
+      });
+      debug(loggingLevel, "Processed food entries with glycemic_index:", processedData.map(entry => ({ food_name: entry.foods.name, glycemic_index: entry.food_variants?.glycemic_index })));
+      setFoodEntries(processedData);
+      _calculateDayTotals(processedData);
     } catch (err) {
       error(loggingLevel, "Error loading food entries:", err);
     }

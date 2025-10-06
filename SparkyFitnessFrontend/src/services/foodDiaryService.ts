@@ -1,7 +1,7 @@
 import { apiCall } from './api';
 
 import { Food, FoodVariant } from '@/types/food';
-import { FoodEntry } from '@/types/food.d';
+import { FoodEntry } from '@/types/food'; // Import FoodEntry from food.d.ts
 import { ExpandedGoals } from '@/types/goals'; // Import ExpandedGoals
 
 export const loadFoodEntries = async (userId: string, selectedDate: string): Promise<FoodEntry[]> => {
@@ -13,6 +13,15 @@ export const loadFoodEntries = async (userId: string, selectedDate: string): Pro
     method: 'GET',
     suppress404Toast: true, // Suppress toast for 404
   });
+  // Add debug log to inspect raw data from API
+  if (data) {
+    data.forEach((entry: any) => {
+      console.debug("foodDiaryService: Raw API data for food entry:", {
+        foodName: entry.foods.name,
+        glycemicIndex: entry.food_variants?.glycemic_index,
+      });
+    });
+  }
   return data || []; // Return empty array if 404 (no food entries found)
 };
 
@@ -30,7 +39,7 @@ export const loadGoals = async (userId: string, selectedDate: string): Promise<E
     protein: data?.protein ?? 150,
     carbs: data?.carbs ?? 250,
     fat: data?.fat ?? 67,
-    water_goal: data?.water_goal ?? 8,
+    water_goal_ml: data?.water_goal_ml ?? 8,
     saturated_fat: data?.saturated_fat ?? 20,
     polyunsaturated_fat: data?.polyunsaturated_fat ?? 10,
     monounsaturated_fat: data?.monounsaturated_fat ?? 25,

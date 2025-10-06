@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 const allNutrients = [
     'calories', 'protein', 'carbs', 'fat', 'dietary_fiber', 'sugars', 'sodium',
     'cholesterol', 'saturated_fat', 'trans_fat', 'potassium',
-    'vitamin_a', 'vitamin_c', 'iron', 'calcium'
+    'vitamin_a', 'vitamin_c', 'iron', 'calcium', 'glycemic_index'
 ];
 
 const viewGroups = [

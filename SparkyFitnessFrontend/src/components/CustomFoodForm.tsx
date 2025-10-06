@@ -5,8 +5,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { debug, info, warn, error } from '@/utils/logging';
+
+import { GlycemicIndex } from "@/types/food";
 
 interface CustomFood {
   name: string;
@@ -31,6 +34,7 @@ interface CustomFood {
   servingSize: number;
   servingUnit: string;
   is_quick_food?: boolean;
+  glycemic_index?: GlycemicIndex;
 }
 
 interface CustomFoodFormProps {
@@ -63,6 +67,7 @@ const CustomFoodForm = ({ onSave }: CustomFoodFormProps) => {
    servingSize: 100,
    servingUnit: "g",
    is_quick_food: false,
+   glycemic_index: "None", // Default to 'None'
  });
 
  const handleSubmit = (e: React.FormEvent) => {
@@ -98,11 +103,12 @@ const CustomFoodForm = ({ onSave }: CustomFoodFormProps) => {
      servingSize: 100,
      servingUnit: "g",
      is_quick_food: false,
+     glycemic_index: "None",
    });
    info(loggingLevel, "CustomFoodForm: Form data reset.");
  };
 
- const handleInputChange = (field: keyof CustomFood, value: string | number) => {
+ const handleInputChange = (field: keyof CustomFood, value: string | number | boolean | GlycemicIndex) => {
    debug(loggingLevel, `CustomFoodForm: Input change for field "${field}":`, value);
    setFormData(prev => ({
      ...prev,
@@ -134,6 +140,25 @@ const CustomFoodForm = ({ onSave }: CustomFoodFormProps) => {
                onChange={(e) => handleInputChange("brand", e.target.value)}
                placeholder="e.g., Homemade"
              />
+           </div>
+           <div className="space-y-2">
+             <Label htmlFor="glycemic_index">Glycemic Index (GI)</Label>
+             <Select
+               value={formData.glycemic_index}
+               onValueChange={(value: GlycemicIndex) => handleInputChange("glycemic_index", value)}
+             >
+               <SelectTrigger id="glycemic_index">
+                 <SelectValue placeholder="Select GI" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="None">None</SelectItem>
+                 <SelectItem value="Very Low">Very Low</SelectItem>
+                 <SelectItem value="Low">Low</SelectItem>
+                 <SelectItem value="Medium">Medium</SelectItem>
+                 <SelectItem value="High">High</SelectItem>
+                 <SelectItem value="Very High">Very High</SelectItem>
+               </SelectContent>
+             </Select>
            </div>
          </div>
 

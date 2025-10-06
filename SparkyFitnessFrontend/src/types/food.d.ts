@@ -54,4 +54,21 @@ export interface FoodVariant {
   vitamin_c?: number;
   calcium?: number;
   iron?: number;
+  glycemic_index?: GlycemicIndex; // Add this line
+}
+
+export type GlycemicIndex = 'None' | 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+
+export interface FoodEntry {
+  id: string;
+  user_id: string;
+  food_id: string;
+  meal_type: string;
+  quantity: number;
+  unit: string;
+  entry_date: string;
+  variant_id?: string;
+  foods: Food; // The actual food item details
+  food_variants?: FoodVariant; // The specific variant details
+  meal_plan_template_id?: string; // Optional: if this entry came from a meal plan
 }

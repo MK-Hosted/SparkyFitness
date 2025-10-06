@@ -279,7 +279,10 @@ async function createFood(authenticatedUserId, foodData) {
   try {
     // The foodData object already contains all necessary fields for food and its default variant.
     // foodRepository.createFood handles the creation of both the food and its default variant in a single transaction.
-    const newFood = await foodRepository.createFood(foodData);
+    const newFood = await foodRepository.createFood({
+      ...foodData,
+      glycemic_index: foodData.glycemic_index || null,
+    });
     return newFood;
   } catch (error) {
     log(
@@ -342,7 +345,8 @@ async function updateFood(authenticatedUserId, foodId, foodData) {
     // If nutrient or serving data is provided, update the default variant
     if (
       foodData.serving_size !== undefined ||
-      foodData.calories !== undefined
+      foodData.calories !== undefined ||
+      foodData.glycemic_index !== undefined
     ) {
       const defaultVariant = await foodRepository.getFoodVariantById(
         updatedFood.default_variant_id
@@ -370,6 +374,7 @@ async function updateFood(authenticatedUserId, foodId, foodData) {
           vitamin_c: foodData.vitamin_c ?? defaultVariant.vitamin_c,
           calcium: foodData.calcium ?? defaultVariant.calcium,
           iron: foodData.iron ?? defaultVariant.iron,
+          glycemic_index: foodData.glycemic_index ?? defaultVariant.glycemic_index,
         };
         await foodRepository.updateFoodVariant(
           defaultVariant.id,
@@ -457,7 +462,10 @@ async function createFoodVariant(authenticatedUserId, variantData) {
       );
     }
     variantData.user_id = authenticatedUserId; // Ensure user_id is set from authenticated user
-    const newVariant = await foodRepository.createFoodVariant(variantData);
+    const newVariant = await foodRepository.createFoodVariant({
+      ...variantData,
+      glycemic_index: variantData.glycemic_index || null,
+    });
     return newVariant;
   } catch (error) {
     log(
@@ -508,7 +516,10 @@ async function updateFoodVariant(authenticatedUserId, variantId, variantData) {
     variantData.user_id = authenticatedUserId; // Ensure user_id is set from authenticated user
     const updatedVariant = await foodRepository.updateFoodVariant(
       variantId,
-      variantData
+      {
+        ...variantData,
+        glycemic_index: variantData.glycemic_index || null,
+      }
     );
     if (!updatedVariant) {
       throw new Error("Food variant not found.");
@@ -752,6 +763,7 @@ async function createOrGetFood(authenticatedUserId, foodSuggestion) {
       provider_external_id: foodSuggestion.provider_external_id || null,
       shared_with_public: foodSuggestion.shared_with_public || false,
       provider_type: foodSuggestion.provider_type || null,
+      glycemic_index: foodSuggestion.glycemic_index || null,
     };
 
     const newFood = await foodRepository.createFood(foodToCreate);
@@ -777,6 +789,7 @@ async function createOrGetFood(authenticatedUserId, foodSuggestion) {
       vitamin_c: foodSuggestion.vitamin_c || 0,
       calcium: foodSuggestion.calcium || 0,
       iron: foodSuggestion.iron || 0,
+      glycemic_index: foodSuggestion.glycemic_index || null,
     };
     const newVariant = await foodRepository.createFoodVariant(
       defaultVariantData
@@ -814,7 +827,7 @@ async function bulkCreateFoodVariants(authenticatedUserId, variantsData) {
             `Forbidden: You do not have permission to create a variant for food ID ${variant.food_id}.`
           );
         }
-        return { ...variant, user_id: authenticatedUserId };
+        return { ...variant, user_id: authenticatedUserId, glycemic_index: variant.glycemic_index || null };
       })
     );
     const createdVariants = await foodRepository.bulkCreateFoodVariants(
@@ -1131,7 +1144,10 @@ async function importFoodsInBulk(authenticatedUserId, foodDataArray) {
     }
     return await foodRepository.createFoodsInBulk(
       authenticatedUserId,
-      foodDataArray
+      foodDataArray.map(food => ({
+        ...food,
+        glycemic_index: food.glycemic_index || null,
+      }))
     );
   } catch (error) {
     log(

@@ -1,3 +1,5 @@
+export type GlycemicIndex = 'None' | 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+
 export interface FoodVariant {
   id?: string;
   serving_size: number;
@@ -21,6 +23,7 @@ export interface FoodVariant {
   iron?: number;
   is_default?: boolean;
   is_locked?: boolean;
+  glycemic_index?: GlycemicIndex;
 }
 
 export interface Food {
@@ -35,6 +38,7 @@ export interface Food {
   default_variant?: FoodVariant;
   variants?: FoodVariant[];
   is_quick_food?: boolean;
+  glycemic_index?: GlycemicIndex;
 }
 
 export interface FoodDeletionImpact {

@@ -44,7 +44,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
 import { apiCall } from "@/services/api";
 import { getProviderCategory } from "@/services/externalProviderService"; // New import
-import { Food, FoodVariant, CSVData } from "@/types/food";
+import { Food, FoodVariant, CSVData, GlycemicIndex } from "@/types/food";
 import { Meal } from "@/types/meal"; // Import Meal type
 interface OpenFoodFactsProduct {
   product_name: string;
@@ -278,6 +278,7 @@ const EnhancedFoodSearch = ({
       calcium: 0,
       iron: 0,
       is_default: true,
+      glycemic_index: "None", // Default GI for OpenFoodFacts
     };
 
     const convertedFood: Food = {
@@ -289,6 +290,7 @@ const EnhancedFoodSearch = ({
       provider_type: "openfoodfacts",
       default_variant: defaultVariant,
       variants: [defaultVariant],
+      glycemic_index: "None", // Default GI for OpenFoodFacts
     };
     return convertedFood;
   };
@@ -463,6 +465,7 @@ const EnhancedFoodSearch = ({
       calcium: nutrientData.calcium || 0,
       iron: nutrientData.iron || 0,
       is_default: true,
+      glycemic_index: nutrientData.glycemic_index || "None",
     };
 
     return {
@@ -474,6 +477,7 @@ const EnhancedFoodSearch = ({
       provider_type: "nutritionix",
       default_variant: defaultVariant,
       variants: [defaultVariant],
+      glycemic_index: nutrientData.glycemic_index || "None",
     };
   };
 
@@ -533,6 +537,7 @@ const EnhancedFoodSearch = ({
       calcium: nutrientData.calcium || 0,
       iron: nutrientData.iron || 0,
       is_default: true,
+      glycemic_index: nutrientData.glycemic_index || "None",
     };
 
     return {
@@ -544,6 +549,7 @@ const EnhancedFoodSearch = ({
       provider_type: "fatsecret",
       default_variant: defaultVariant,
       variants: [defaultVariant],
+      glycemic_index: nutrientData.glycemic_index || "None",
     };
   };
 
@@ -590,11 +596,11 @@ const EnhancedFoodSearch = ({
     setLoading(false);
   };
 
-  const foodSearchPreferences = nutrientDisplayPreferences.find(
-    (p) => p.view_group === "food_search" && p.platform === platform
+  const quickInfoPreferences = nutrientDisplayPreferences.find(
+    (p) => p.view_group === "quick_info" && p.platform === platform
   );
-  const visibleNutrients = foodSearchPreferences
-    ? foodSearchPreferences.visible_nutrients
+  const visibleNutrients = quickInfoPreferences
+    ? quickInfoPreferences.visible_nutrients
     : ["calories", "protein", "carbs", "fat"];
 
   const nutrientDetails: { [key: string]: { label: string; unit: string } } = {
@@ -613,6 +619,7 @@ const EnhancedFoodSearch = ({
     vitamin_c: { label: "vit c", unit: "mg" },
     iron: { label: "iron", unit: "mg" },
     calcium: { label: "calcium", unit: "mg" },
+    glycemic_index: { label: "GI", unit: "" },
   };
 
   return (
@@ -741,43 +748,58 @@ const EnhancedFoodSearch = ({
                             {food.is_custom && (
                               <Badge variant="outline" className="text-xs">
                                 Custom
-                              </Badge>
-                            )}
-                          </div>
-                          <div
-                            className={`grid grid-cols-1 sm:grid-cols-${visibleNutrients.length}  gap-2 text-sm   text-gray-600`}
-                          >
-                            {visibleNutrients.map((nutrient) => {
-                              const details = nutrientDetails[nutrient];
-                              if (!details) return null;
-                              const value =
-                                (food.default_variant?.[
-                                  nutrient as keyof FoodVariant
-                                ] as number) || 0;
-                              return (
-                                <span key={nutrient}>
-                                  <strong>
-                                    {value.toFixed(
-                                      nutrient === "calories" ? 0 : 1
-                                    )}
-                                    {details.unit}
-                                  </strong>{" "}
-                                  {details.label}
-                                </span>
-                              );
-                            })}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Per {food.default_variant?.serving_size}
-                            {food.default_variant?.serving_unit}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                               </Badge>
+                             )}
+                             {food.default_variant?.glycemic_index && food.default_variant.glycemic_index !== "None" && (
+                                <Badge variant="outline" className="text-xs">
+                                  GI: {food.default_variant.glycemic_index}
+                                </Badge>
+                             )}
+                           </div>
+                           <div
+                             className={`grid grid-cols-1 sm:grid-cols-${visibleNutrients.length}  gap-2 text-sm   text-gray-600`}
+                           >
+                             {visibleNutrients.map((nutrient) => {
+                                const details = nutrientDetails[nutrient];
+                                if (!details) return null;
+
+                                if (nutrient === "glycemic_index") {
+                                  const giValue = food.default_variant?.glycemic_index || "None";
+                                  return (
+                                    <span key={nutrient}>
+                                      <strong>{giValue}</strong> {details.label}
+                                    </span>
+                                  );
+                                }
+
+                                const value =
+                                  (food.default_variant?.[
+                                    nutrient as keyof FoodVariant
+                                  ] as number) || 0;
+                                return (
+                                  <span key={nutrient}>
+                                    <strong>
+                                      {value.toFixed(
+                                        nutrient === "calories" ? 0 : 1
+                                      )}
+                                      {details.unit}
+                                    </strong>{" "}
+                                    {details.label}
+                                  </span>
+                                );
+                             })}
+                           </div>
+                           <p className="text-xs text-gray-500 mt-1">
+                             Per {food.default_variant?.serving_size}
+                             {food.default_variant?.serving_unit}
+                           </p>
+                         </div>
+                       </div>
+                     </CardContent>
+                   </Card>
+                 ))}
+               </div>
+             )}
 
             {topFoods.length > 0 && (
               <div className="space-y-2 mt-4">
@@ -801,43 +823,58 @@ const EnhancedFoodSearch = ({
                             {food.is_custom && (
                               <Badge variant="outline" className="text-xs">
                                 Custom
-                              </Badge>
-                            )}
-                          </div>
-                          <div
-                            className={`grid grid-cols-1 sm:grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
-                          >
-                            {visibleNutrients.map((nutrient) => {
-                              const details = nutrientDetails[nutrient];
-                              if (!details) return null;
-                              const value =
-                                (food.default_variant?.[
-                                  nutrient as keyof FoodVariant
-                                ] as number) || 0;
-                              return (
-                                <span key={nutrient}>
-                                  <strong>
-                                    {value.toFixed(
-                                      nutrient === "calories" ? 0 : 1
-                                    )}
-                                    {details.unit}
-                                  </strong>{" "}
-                                  {details.label}
-                                </span>
-                              );
-                            })}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Per {food.default_variant?.serving_size}
-                            {food.default_variant?.serving_unit}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                               </Badge>
+                             )}
+                             {food.default_variant?.glycemic_index && food.default_variant.glycemic_index !== "None" && (
+                                <Badge variant="outline" className="text-xs">
+                                  GI: {food.default_variant.glycemic_index}
+                                </Badge>
+                             )}
+                           </div>
+                           <div
+                             className={`grid grid-cols-1 sm:grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
+                           >
+                             {visibleNutrients.map((nutrient) => {
+                                const details = nutrientDetails[nutrient];
+                                if (!details) return null;
+
+                                if (nutrient === "glycemic_index") {
+                                  const giValue = food.default_variant?.glycemic_index || "None";
+                                  return (
+                                    <span key={nutrient}>
+                                      <strong>{giValue}</strong> {details.label}
+                                    </span>
+                                  );
+                                }
+
+                                const value =
+                                  (food.default_variant?.[
+                                    nutrient as keyof FoodVariant
+                                  ] as number) || 0;
+                                return (
+                                  <span key={nutrient}>
+                                    <strong>
+                                      {value.toFixed(
+                                        nutrient === "calories" ? 0 : 1
+                                      )}
+                                      {details.unit}
+                                    </strong>{" "}
+                                    {details.label}
+                                  </span>
+                                );
+                             })}
+                           </div>
+                           <p className="text-xs text-gray-500 mt-1">
+                             Per {food.default_variant?.serving_size}
+                             {food.default_variant?.serving_unit}
+                           </p>
+                         </div>
+                       </div>
+                     </CardContent>
+                   </Card>
+                 ))}
+               </div>
+             )}
 
             {recentFoods.length === 0 && topFoods.length === 0 && (
               <div className="text-center py-8 text-gray-500">
@@ -897,6 +934,11 @@ const EnhancedFoodSearch = ({
                       <Badge variant="outline" className="text-xs">
                         Mealie
                       </Badge>
+                      {food.default_variant?.glycemic_index && food.default_variant.glycemic_index !== "None" && (
+                        <Badge variant="outline" className="text-xs">
+                          GI: {food.default_variant.glycemic_index}
+                        </Badge>
+                      )}
                     </div>
                     <div
                       className={`grid grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
@@ -904,6 +946,16 @@ const EnhancedFoodSearch = ({
                       {visibleNutrients.map((nutrient) => {
                         const details = nutrientDetails[nutrient];
                         if (!details) return null;
+
+                        if (nutrient === "glycemic_index") {
+                          const giValue = food.default_variant?.glycemic_index || "None";
+                          return (
+                            <span key={nutrient}>
+                              <strong>{giValue}</strong> {details.label}
+                            </span>
+                          );
+                        }
+
                         const value =
                           (food.default_variant?.[
                             nutrient as keyof FoodVariant
@@ -991,6 +1043,11 @@ const EnhancedFoodSearch = ({
                           Custom
                         </Badge>
                       )}
+                      {food.default_variant?.glycemic_index && food.default_variant.glycemic_index !== "None" && (
+                        <Badge variant="outline" className="text-xs">
+                          GI: {food.default_variant.glycemic_index}
+                        </Badge>
+                      )}
                     </div>
                     <div
                       className={`grid grid-cols-${visibleNutrients.length} gap-2 text-sm text-gray-600`}
@@ -998,6 +1055,16 @@ const EnhancedFoodSearch = ({
                       {visibleNutrients.map((nutrient) => {
                         const details = nutrientDetails[nutrient];
                         if (!details) return null;
+
+                        if (nutrient === "glycemic_index") {
+                          const giValue = food.default_variant?.glycemic_index || "None";
+                          return (
+                            <span key={nutrient}>
+                              <strong>{giValue}</strong> {details.label}
+                            </span>
+                          );
+                        }
+
                         const value =
                           (food.default_variant?.[
                             nutrient as keyof FoodVariant
@@ -1050,6 +1117,17 @@ const EnhancedFoodSearch = ({
                       {visibleNutrients.map((nutrient) => {
                         const details = nutrientDetails[nutrient];
                         if (!details) return null;
+
+                        if (nutrient === "glycemic_index") {
+                          // For OpenFoodFacts, GI is not directly available in product.nutriments,
+                          // so we'll display "None" or handle it as a special case.
+                          return (
+                            <span key={nutrient}>
+                              <strong>None</strong> {details.label}
+                            </span>
+                          );
+                        }
+
                         let value = 0;
                         switch (nutrient) {
                           case "calories":
@@ -1125,7 +1203,18 @@ const EnhancedFoodSearch = ({
                       >
                         {visibleNutrients.map((nutrient) => {
                           const details = nutrientDetails[nutrient];
-                          if (!details || !item[nutrient]) return null;
+                          if (!details) return null;
+
+                          if (nutrient === "glycemic_index") {
+                            const giValue = item.glycemic_index || "None"; // Assuming item has glycemic_index
+                            return (
+                              <span key={nutrient}>
+                                <strong>{giValue}</strong> {details.label}
+                              </span>
+                            );
+                          }
+
+                          if (item[nutrient] === undefined) return null;
                           return (
                             <span key={nutrient}>
                               <strong>
@@ -1188,7 +1277,18 @@ const EnhancedFoodSearch = ({
                         >
                           {visibleNutrients.map((nutrient) => {
                             const details = nutrientDetails[nutrient];
-                            if (!details || item[nutrient] === undefined)
+                            if (!details) return null;
+
+                            if (nutrient === "glycemic_index") {
+                              const giValue = item.glycemic_index || "None"; // Assuming item has glycemic_index
+                              return (
+                                <span key={nutrient}>
+                                  <strong>{giValue}</strong> {details.label}
+                                </span>
+                              );
+                            }
+
+                            if (item[nutrient] === undefined)
                               return null;
                             return (
                               <span key={nutrient}>

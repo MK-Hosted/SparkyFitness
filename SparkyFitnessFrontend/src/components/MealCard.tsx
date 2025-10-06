@@ -29,7 +29,7 @@ import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePre
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debug, info, warn, error } from "@/utils/logging"; // Import logging utility
 
-import type { Food, FoodVariant, FoodEntry } from "@/types/food";
+import type { Food, FoodVariant, FoodEntry, GlycemicIndex } from "@/types/food";
 
 // import { Meal as MealType } from '@/types/meal'; // No longer needed as we define Meal directly
 
@@ -118,12 +118,19 @@ const MealCard = ({
   const foodDatabasePreferences = nutrientDisplayPreferences.find(
     (p) => p.view_group === "food_database" && p.platform === platform,
   );
-  const visibleNutrients = quickInfoPreferences
-    ? quickInfoPreferences.visible_nutrients
-    : ["calories", "protein", "carbs", "fat", "dietary_fiber"];
-  const foodDatabaseVisibleNutrients = foodDatabasePreferences
-    ? foodDatabasePreferences.visible_nutrients
-    : visibleNutrients;
+  const summableNutrients = ["calories", "protein", "carbs", "fat", "dietary_fiber", "sugar", "sodium", "cholesterol", "saturated_fat", "trans_fat", "potassium", "vitamin_a", "vitamin_c", "iron", "calcium"];
+  const allDisplayableNutrients = [...summableNutrients, "glycemic_index"];
+
+  let quickInfoNutrients = quickInfoPreferences
+    ? [...quickInfoPreferences.visible_nutrients, ...(quickInfoPreferences.visible_nutrients.includes('glycemic_index') ? [] : ['glycemic_index'])]
+    : allDisplayableNutrients;
+
+  let foodDatabaseNutrients = foodDatabasePreferences
+    ? [...foodDatabasePreferences.visible_nutrients, ...(foodDatabasePreferences.visible_nutrients.includes('glycemic_index') ? [] : ['glycemic_index'])]
+    : allDisplayableNutrients;
+
+  const visibleNutrientsForGrid = quickInfoNutrients.filter(nutrient => summableNutrients.includes(nutrient));
+  const foodDatabaseVisibleNutrients = foodDatabaseNutrients.filter(nutrient => summableNutrients.includes(nutrient));
 
   const nutrientDetails: {
     [key: string]: { color: string; label: string; unit: string };
@@ -147,6 +154,7 @@ const MealCard = ({
     vitamin_c: { color: "text-orange-400", label: "vit c", unit: "mg" },
     iron: { color: "text-gray-500", label: "iron", unit: "mg" },
     calcium: { color: "text-blue-400", label: "calcium", unit: "mg" },
+    glycemic_index: { color: "text-purple-600", label: "GI", unit: "" },
   };
 
   return (
@@ -232,6 +240,21 @@ const MealCard = ({
                 const food = entry.foods;
                 const entryNutrition = getEntryNutrition(entry);
                 const isFromMealPlan = !!entry.meal_plan_template_id; // Corrected property name
+                // Determine glycemic index from several possible locations.
+                // GI may be stored at the food level or on variants (default_variant, selected variant, or returned as entry.food_variants).
+                const giValue: GlycemicIndex | undefined | null =
+                  food.glycemic_index ??
+                  food.default_variant?.glycemic_index ??
+                  (entry.variant_id ? food.variants?.find((v) => v.id === entry.variant_id)?.glycemic_index : undefined) ??
+                  (entry.food_variants as FoodVariant | undefined)?.glycemic_index ??
+                  null;
+
+                const validGiValues: GlycemicIndex[] = ['Very Low', 'Low', 'Medium', 'High', 'Very High'];
+
+                debug(
+                  loggingLevel,
+                  `MealCard: Rendering entry for food: ${food.name}, GI Value: ${giValue}, quickInfoNutrients includes GI: ${quickInfoNutrients.includes('glycemic_index')}, giValue is valid: ${giValue != null && validGiValues.includes(giValue as GlycemicIndex)}`,
+                );
 
                 // Handle case where food data is missing
                 if (!food) {
@@ -300,11 +323,19 @@ const MealCard = ({
                             From Plan
                           </Badge>
                         )}
+                        {giValue && validGiValues.includes(giValue as GlycemicIndex) && quickInfoNutrients.includes('glycemic_index') && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs w-fit font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-transparent dark:text-purple-600"
+                          >
+                            GI: {giValue}
+                          </Badge>
+                        )}
                       </div>
                       <div
-                        className={`grid grid-cols-${visibleNutrients.length} gap-x-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400`}
+                        className={`grid grid-cols-${visibleNutrientsForGrid.length} gap-x-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400`}
                       >
-                        {visibleNutrients.map((nutrient) => {
+                        {visibleNutrientsForGrid.map((nutrient) => {
                           const details = nutrientDetails[nutrient];
                           if (!details) return null;
                           const value =
@@ -319,6 +350,7 @@ const MealCard = ({
                             </div>
                           );
                         })}
+                        {/* GI is shown as a badge beside the food title; do not duplicate in the nutrient grid */}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -380,9 +412,9 @@ const MealCard = ({
                   {meal.name} Total:
                 </span>
                 <div
-                  className={`grid grid-cols-${visibleNutrients.length} justify-end gap-x-4 text-xs sm:text-sm`}
+                  className={`grid grid-cols-${visibleNutrientsForGrid.length} justify-end gap-x-4 text-xs sm:text-sm`}
                 >
-                  {visibleNutrients.map((nutrient) => {
+                  {visibleNutrientsForGrid.map((nutrient) => {
                     const details = nutrientDetails[nutrient];
                     if (!details) return null;
                     const value = totals[nutrient as keyof MealTotals] || 0;
