@@ -56,6 +56,9 @@ export const calculateFoodEntryNutrition = (entry: FoodEntry) => {
     };
   }
 
+  // Add a debug log to check the glycemic_index of the variant
+  //console.debug("calculateFoodEntryNutrition: variant glycemic_index:", variant.glycemic_index);
+
   // All nutrient values are now sourced directly from the food_variants object
   const nutrientValuesPerReferenceSize = {
     calories: isNaN(variant.calories) ? 0 : variant.calories || 0,

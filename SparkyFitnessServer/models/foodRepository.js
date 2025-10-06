@@ -2,6 +2,15 @@ const { getPool } = require("../db/poolManager");
 const { log } = require("../config/logging");
 const format = require("pg-format"); // Required for bulkCreateFoodVariants
 
+function sanitizeGlycemicIndex(gi) {
+  const allowedGICategories = ['None', 'Very Low', 'Low', 'Medium', 'High', 'Very High'];
+  // Explicitly convert "0" or "0.0" to null, as these are not valid categorical GI values
+  if (gi === "0" || gi === "0.0" || gi === null || gi === undefined || gi === '' || !allowedGICategories.includes(gi)) {
+    return null;
+  }
+  return gi;
+}
+
 async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
   const client = await getPool().connect();
   try {
@@ -29,7 +38,8 @@ async function searchFoods(name, userId, exactMatch, broadMatch, checkCustom) {
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant
       FROM foods f
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
@@ -88,8 +98,8 @@ async function createFood(foodData) {
         food_id, serving_size, serving_unit, calories, protein, carbs, fat,
         saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
         cholesterol, sodium, potassium, dietary_fiber, sugars,
-        vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, now(), now()) RETURNING id`,
+        vitamin_a, vitamin_c, calcium, iron, is_default, glycemic_index, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, $21, now(), now()) RETURNING id`,
       [
         newFood.id,
         foodData.serving_size,
@@ -111,6 +121,7 @@ async function createFood(foodData) {
         foodData.vitamin_c,
         foodData.calcium,
         foodData.iron,
+        sanitizeGlycemicIndex(foodData.glycemic_index),
       ]
     );
     const newVariantId = variantResult.rows[0].id;
@@ -179,7 +190,8 @@ async function getFoodById(foodId) {
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant
       FROM foods f
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
@@ -318,7 +330,8 @@ async function getFoodsWithPagination(
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant
       FROM foods f
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
@@ -409,8 +422,8 @@ async function createFoodVariant(variantData) {
         food_id, serving_size, serving_unit, calories, protein, carbs, fat,
         saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
         cholesterol, sodium, potassium, dietary_fiber, sugars,
-        vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now(), now()) RETURNING id`,
+        vitamin_a, vitamin_c, calcium, iron, is_default, glycemic_index, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, now(), now()) RETURNING id`,
       [
         variantData.food_id,
         variantData.serving_size,
@@ -433,6 +446,7 @@ async function createFoodVariant(variantData) {
         variantData.calcium,
         variantData.iron,
         variantData.is_default || false,
+        sanitizeGlycemicIndex(variantData.glycemic_index),
       ]
     );
     return result.rows[0];
@@ -445,7 +459,7 @@ async function getFoodVariantById(id) {
   const client = await getPool().connect();
   try {
     const result = await client.query(
-      "SELECT * FROM food_variants WHERE id = $1",
+      "SELECT *, glycemic_index FROM food_variants WHERE id = $1",
       [id]
     );
     return result.rows[0];
@@ -513,8 +527,9 @@ async function updateFoodVariant(id, variantData) {
         calcium = COALESCE($19, calcium),
         iron = COALESCE($20, iron),
         is_default = COALESCE($21, is_default),
+        glycemic_index = COALESCE($22, glycemic_index),
         updated_at = now()
-      WHERE id = $22
+      WHERE id = $23
       RETURNING *`,
       [
         variantData.food_id,
@@ -538,6 +553,7 @@ async function updateFoodVariant(id, variantData) {
         variantData.calcium,
         variantData.iron,
         variantData.is_default,
+        sanitizeGlycemicIndex(variantData.glycemic_index),
         id,
       ]
     );
@@ -679,7 +695,8 @@ async function getFoodEntriesByDate(userId, selectedDate) {
           'vitamin_a', fv.vitamin_a,
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
-          'iron', fv.iron
+          'iron', fv.iron,
+          'glycemic_index', fv.glycemic_index::TEXT
         ) AS food_variants
        FROM food_entries fe
        JOIN foods f ON fe.food_id = f.id
@@ -727,7 +744,8 @@ async function getFoodEntriesByDateAndMealType(userId, date, mealType) {
           'vitamin_a', fv.vitamin_a,
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
-          'iron', fv.iron
+          'iron', fv.iron,
+          'glycemic_index', fv.glycemic_index::TEXT
         ) AS food_variants
        FROM food_entries fe
        JOIN foods f ON fe.food_id = f.id
@@ -793,7 +811,8 @@ async function findFoodByNameAndBrand(name, brand, userId) {
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant
        FROM foods f
        LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
@@ -815,7 +834,7 @@ async function bulkCreateFoodVariants(variantsData) {
         food_id, serving_size, serving_unit, calories, protein, carbs, fat,
         saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
         cholesterol, sodium, potassium, dietary_fiber, sugars,
-        vitamin_a, vitamin_c, calcium, iron, is_default, created_at, updated_at
+        vitamin_a, vitamin_c, calcium, iron, is_default, glycemic_index, created_at, updated_at
       ) VALUES %L RETURNING id`;
 
     const values = variantsData.map((variant) => [
@@ -840,6 +859,7 @@ async function bulkCreateFoodVariants(variantsData) {
       variant.calcium,
       variant.iron,
       variant.is_default || false,
+      sanitizeGlycemicIndex(variant.glycemic_index),
       "now()",
       "now()",
     ]);
@@ -1137,7 +1157,8 @@ async function getRecentFoods(userId, limit) {
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant
       FROM food_entries fe
       JOIN foods f ON fe.food_id = f.id
@@ -1181,7 +1202,8 @@ async function getTopFoods(userId, limit) {
           'vitamin_c', fv.vitamin_c,
           'calcium', fv.calcium,
           'iron', fv.iron,
-          'is_default', fv.is_default
+          'is_default', fv.is_default,
+          'glycemic_index', fv.glycemic_index
         ) AS default_variant,
         COUNT(fe.food_id) AS usage_count
       FROM food_entries fe
@@ -1393,10 +1415,10 @@ async function createFoodsInBulk(userId, foodDataArray) {
             food_id, serving_size, serving_unit, is_default, calories, protein, carbs, fat,
             saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
             cholesterol, sodium, potassium, dietary_fiber, sugars,
-            vitamin_a, vitamin_c, calcium, iron, created_at, updated_at
+            vitamin_a, vitamin_c, calcium, iron, glycemic_index, created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-            $14, $15, $16, $17, $18, $19, $20, $21, now(), now()
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+            $14, $15, $16, $17, $18, $19, $20, $21, $22, now(), now()
           )`,
           [
             newFoodId,
@@ -1420,6 +1442,7 @@ async function createFoodsInBulk(userId, foodDataArray) {
             variant.vitamin_c || 0,
             variant.calcium || 0,
             variant.iron || 0,
+            sanitizeGlycemicIndex(variant.glycemic_index),
           ]
         );
         totalVariantsCreated++;

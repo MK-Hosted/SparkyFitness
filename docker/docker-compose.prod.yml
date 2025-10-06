@@ -43,7 +43,8 @@ services:
     depends_on:
       - sparkyfitness-db # Backend depends on the database being available
     volumes:
-      - ./backups:/app/SparkyFitnessServer/backup # Mount volume for backups
+      - ./backup:/app/SparkyFitnessServer/backup # Mount volume for backups
+      - ./uploads:/app/SparkyFitnessServer/uploads # Mount volume for Profile pictures and excercise images
 
 
   sparkyfitness-frontend:

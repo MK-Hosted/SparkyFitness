@@ -187,73 +187,90 @@ async function processChatMessage(messages, serviceConfig, authenticatedUserId) 
     const systemPromptContent = `You are Sparky, an AI nutrition and wellness coach. Your primary goal is to help users track their food, exercise, and measurements, and provide helpful advice and motivation based on their data and general health knowledge.
 
 The current date is ${new Date().toISOString().split('T')[0]}.
+          // Fetch user's custom categories to provide context to the AI
+          const customCategories = await measurementRepository.getCustomCategories(authenticatedUserId);
+          // Summarize long category lists to avoid huge prompts
+          const MAX_CUSTOM_CATEGORIES_DISPLAY = 10;
+          let customCategoriesList;
+          if (customCategories.length > 0) {
+            const display = customCategories.slice(0, MAX_CUSTOM_CATEGORIES_DISPLAY)
+              .map(cat => `- ${cat.name} (${cat.measurement_type}, ${cat.frequency})`);
+            const remaining = customCategories.length - display.length;
+            customCategoriesList = display.join('\n') + (remaining > 0 ? `\n+${remaining} more` : '');
+          } else {
+            customCategoriesList = 'None';
+          }
 
-**CRITICAL INSTRUCTION:** When the user mentions "water" in any context related to consumption or intake, you MUST use the 'log_water' intent. Do NOT classify water as a 'log_food' item.
+          // Build the system prompt and truncate if it exceeds a safe threshold
+          const MAX_PROMPT_CHARS = parseInt(process.env.SPARKY_MAX_PROMPT_CHARS || '6000', 10); // configurable
+          let systemPromptContentRaw = `You are Sparky, an AI nutrition and wellness coach. Your primary goal is to help users track their food, exercise, and measurements, and provide helpful advice and motivation based on their data and general health knowledge.
 
-You will receive user input, which can include text and/or images. Your task is to identify the user's intent and extract relevant data. You MUST respond with a JSON object containing the 'intent' and 'data', strictly adhering to the defined intents and their required data structures.
+          The current date is ${new Date().toISOString().split('T')[0]}.
 
-For image inputs:
-- Analyze the image to identify food items, estimate quantities, and infer nutritional information.
-- If the image clearly shows food, prioritize the 'log_food' intent.
-- Extract food_name, quantity, unit, and meal_type from the image content.
-- **CRITICAL:** Always infer and include *estimated* nutritional details (calories, protein, carbs, fat, etc.) based on the identified food and estimated quantity, populating the corresponding fields in the 'log_food' intent's data. Do NOT default to 0 if an estimation can be made.
-- If the image is not food-related or unclear, treat the text input as primary.
+          **CRITICAL INSTRUCTION:** When the user mentions "water" in any context related to consumption or intake, you MUST use the 'log_water' intent. Do NOT classify water as a 'log_food' item.
 
-**IMPORTANT:** If the user specifies a date or time (e.g., "yesterday", "last Monday", "at 7 PM"), extract this information and include it as a 'entryDate' field in the top level of the JSON object. **Provide relative terms like "today", "yesterday", "tomorrow", or a specific date in 'MM-DD' or 'YYYY-MM-DD' format. Do NOT try to resolve relative terms to a full date yourself.** If no date is specified, omit the 'entryDate' field.
+          You will receive user input, which can include text and/or images. Your task is to identify the user's intent and extract relevant data. You MUST respond with a JSON object containing the 'intent' and 'data', strictly adhering to the defined intents and their required data structures.
 
-When the user mentions logging food, exercise, or measurements, prioritize extracting the exact name of the item (food name, exercise name, measurement name) as accurately as possible from the user's input. This is crucial for looking up existing items in the database.
+          For image inputs:
+          - Analyze the image to identify food items, estimate quantities, and infer nutritional information.
+          - If the image clearly shows food, prioritize the 'log_food' intent.
+          - Extract food_name, quantity, unit, and meal_type from the image content.
+          - **CRITICAL:** Always infer and include *estimated* nutritional details (calories, protein, carbs, fat, etc.) based on the identified food and estimated quantity, populating the corresponding fields in the 'log_food' intent's data. Do NOT default to 0 if an estimation can be made.
+          - If the image is not food-related or unclear, treat the text input as primary.
 
-Here are the user's existing custom measurement categories:
-${customCategoriesList}
+          **IMPORTANT:** If the user specifies a date or time (e.g., "yesterday", "last Monday", "at 7 PM"), extract this information and include it as a 'entryDate' field in the top level of the JSON object. **Provide relative terms like "today", "yesterday", "tomorrow", or a specific date in 'MM-DD' or 'YYYY-MM-DD' format. Do NOT try to resolve relative terms to a full date yourself.** If no date is specified, omit the 'entryDate' field.
 
-When the user mentions a custom measurement, compare it to the list above. If you find a match or a very similar variation (considering synonyms and capitalization), use the **exact name** from the list in the 'name' field of the measurement data. If no clear match is found in the list, use the name as provided by the user.
+          When the user mentions logging food, exercise, or measurements, prioritize extracting the exact name of the item (food name, exercise name, measurement name) as accurately as possible from the user's input. This is crucial for looking up existing items in the database.
 
-**For 'log_food' intent, pay close attention to the unit specified by the user and match it in the 'unit' field of the food data.**
-- If the user says "gram" or "g", use "g".
-- If the user says "cup" or "cups", use "cup".
-- If the user refers to individual items by count (e.g., "two apples", "3 eggs"), use "piece".
-- If the unit is not explicitly mentioned, infer the most appropriate unit based on the food item and context (e.g., "apple" is likely "piece", "rice" is likely "g" or "cup"). Refer to common food units used in the application (like 'g', 'cup', 'oz', 'ml', 'serving', 'piece').
+          Here are the user's existing custom measurement categories:
+          ${customCategoriesList}
 
-Possible intents and their required data. You MUST select one of these intents and provide the data in the specified format:
-- 'log_food': User wants to log food. This intent is for solid food items or beverages that are not water. **This intent MUST NOT be used for logging water intake.**
-  - If you can confidently identify a single food item and its details, data should include:
-    - food_name: string (e.g., "apple", "chicken breast", "Dosa") - Extract the most likely exact name.
-    - quantity: number (e.g., 1, 100) - Infer if possible, default to 1 if a specific quantity isn't clear but a food is mentioned.
-    - unit: string (e.g., "piece", "g", "oz", "ml", "cup", "serving") - **CRITICAL: Match the user's specified unit exactly.** If the user refers to individual items by count (e.g., "two apples", "3 eggs"), use "piece". If no unit is explicitly mentioned, infer the most appropriate unit based on the food item and context (e.g., "apple" is likely "piece", "rice" is likely "g" or "cup"). Refer to common food units used in the application (like 'g', 'cup', 'oz', 'ml', 'serving', 'piece').
-    - meal_type: string ("breakfast", "lunch", "dinner", "snacks") - Infer based on time of day or context, default to "snacks".
-    - **Include as many of the following nutritional fields as you can extract from the user's input or your knowledge about the food:**
-      - calories: number
-      - protein: number
-      - carbs: number
-      - fat: number
-      - saturated_fat: number
-      - polyunsaturated_fat: number
-      - monounsaturated_fat: number
-      - trans_fat: number
-      - cholesterol: number
-      - sodium: number
-      - potassium: number
-      - dietary_fiber: number
-      - sugars: number
-      - vitamin_a: number
-      - vitamin_c: number
-      - calcium: number
-      - iron: number
-      - FoodOption: array of realistic food options (if applicable)
-      - serving_size: number
-      - serving_unit: string
+          When the user mentions a custom measurement, compare it to the list above. If you find a match or a very similar variation (considering synonyms and capitalization), use the **exact name** from the list in the 'name' field of the measurement data. If no clear match is found in the list, use the name as provided by the user.
 
+          **For 'log_food' intent, pay close attention to the unit specified by the user and match it in the 'unit' field of the food data.**
+          - If the user says "gram" or "g", use "g".
+          - If the user says "cup" or "cups", use "cup".
+          - If the user refers to individual items by count (e.g., "two apples", "3 eggs"), use "piece".
+          - If the unit is not explicitly mentioned, infer the most appropriate unit based on the food item and context (e.g., "apple" is likely "piece", "rice" is likely "g" or "cup"). Refer to common food units used in the application (like 'g', 'cup', 'oz', 'ml', 'serving', 'piece').
 
-- 'log_exercise': User wants to log exercise. Data should include:
- - exercise_name: string (e.g., "running", "yoga") - Extract the most likely exact name.
- - duration_minutes: number | null (e.g., 30, 60) - Infer if possible.
- - distance: number | null (e.g., 5, 3.1) - Infer if mentioned.
- - distance_unit: string | null ("miles", "km") - Infer if mentioned.
-- 'log_measurement': User wants to log a body measurement or steps. Data should include an array of measurements:
- - measurements: Array of objects, each with:
-   - type: string ("weight", "neck", "waist", "hips", "steps", "custom") - Use "custom" for any measurement not in the standard list.
-   - value: number
-   - unit: string | null (e.g., "kg", "lbs", "cm", "inches", "steps") - Infer if possible, default to null for steps.
+          Possible intents and their required data. You MUST select one of these intents and provide the data in the specified format:
+          - 'log_food': User wants to log food. This intent is for solid food items or beverages that are not water. **This intent MUST NOT be used for logging water intake.**
+            - If you can confidently identify a single food item and its details, data should include:
+              - food_name: string (e.g., "apple", "chicken breast", "Dosa") - Extract the most likely exact name.
+              - quantity: number (e.g., 1, 100) - Infer if possible, default to 1 if a specific quantity isn't clear but a food is mentioned.
+              - unit: string (e.g., "piece", "g", "oz", "ml", "cup", "serving") - **CRITICAL: Match the user's specified unit exactly.** If the user refers to individual items by count (e.g., "two apples", "3 eggs"), use "piece". If no unit is explicitly mentioned, infer the most appropriate unit based on the food item and context (e.g., "apple" is likely "piece", "rice" is likely "g" or "cup"). Refer to common food units used in the application (like 'g', 'cup', 'oz', 'ml', 'serving', 'piece').
+              - meal_type: string ("breakfast", "lunch", "dinner", "snacks") - Infer based on time of day or context, default to "snacks".
+              - **Include as many of the following nutritional fields as you can extract from the user's input or your knowledge about the food:**
+                - calories: number
+                - protein: number
+                - carbs: number
+                - fat: number
+                - saturated_fat: number
+                - polyunsaturated_fat: number
+                - monounsaturated_fat: number
+                - trans_fat: number
+                - cholesterol: number
+                - sodium: number
+                - potassium: number
+                - dietary_fiber: number
+                - sugars: number
+                - vitamin_a: number
+                - vitamin_c: number
+                - calcium: number
+                - iron: number
+                - FoodOption: array of realistic food options (if applicable)
+                - serving_size: number
+                - serving_unit: string
+
+          ...
+          `;
+
+          // Truncate the prompt if it's too long for the model/transport
+          let systemPromptContent = systemPromptContentRaw;
+          if (systemPromptContentRaw.length > MAX_PROMPT_CHARS) {
+              log('warn', `System prompt length ${systemPromptContentRaw.length} exceeds max ${MAX_PROMPT_CHARS}. Truncating to ${MAX_PROMPT_CHARS} chars.`);
+              systemPromptContent = systemPromptContentRaw.substring(0, MAX_PROMPT_CHARS) + '\n[...TRUNCATED]';
+          }
    - name: string | null (required if type is "custom") - **Crucially, if the user mentions a custom category from the list provided, use its exact name here.**
 - 'log_water': User wants to log water intake. This intent should be prioritized when the user mentions "water" in conjunction with a quantity or a desire to log water. The AI should understand from the user's context that they are referring to drinking water. Data should include:
  - glasses_consumed: number (e.g., 1, 2) - Infer if possible, default to 1.
@@ -479,24 +496,40 @@ Example JSON output for "GENERATE_FOOD_OPTIONS:apple":
         });
 
         try {
+          const payload = JSON.stringify({
+            model: model,
+            messages: ollamaMessages,
+            stream: false,
+          });
+          const payloadSize = Buffer.byteLength(payload, 'utf8');
+          log('info', `Ollama request to ${aiService.custom_url}/api/chat - model: ${model}, payload size: ${payloadSize} bytes`);
+
+          const startTime = Date.now();
           response = await fetch(`${aiService.custom_url}/api/chat`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              model: model,
-              messages: ollamaMessages,
-              stream: false,
-            }),
+            body: payload,
             // Pass the undici agent to the fetch call
             dispatcher: ollamaAgent,
           });
+          const elapsed = Date.now() - startTime;
+          try {
+            const respClone = response.clone();
+            const respText = await respClone.text();
+            log('info', `Ollama response status: ${response.status}, content-type: ${response.headers.get('content-type') || 'unknown'}, body size: ${respText.length} bytes, elapsed: ${elapsed}ms`);
+          } catch (e) {
+            log('warn', 'Could not read Ollama response clone for logging:', e.message);
+          }
         } catch (error) {
+          // Translate undici timeouts into a clear timeout error
           if (error.name === 'HeadersTimeoutError' || error.name === 'BodyTimeoutError') {
             throw new Error(`Ollama chat request timed out after ${timeout}ms due to undici timeout.`);
           }
-          throw error;
+          // For network-level errors (ECONNREFUSED, ENOTFOUND, etc.) surface a 502-style error so the route returns JSON
+          // Prefix with a recognizable token so the router can map to an appropriate HTTP status
+          throw new Error(`AI service API call error: 502 - Ollama fetch error: ${error.message}`);
         } finally {
           // Destroy the agent to prevent resource leaks
           ollamaAgent.destroy();
@@ -703,24 +736,37 @@ async function processFoodOptionsRequest(foodName, unit, authenticatedUserId, se
         });
 
         try {
+          const payloadFood = JSON.stringify({
+            model: model,
+            messages: ollamaMessagesFoodOptions,
+            stream: false,
+          });
+          const payloadFoodSize = Buffer.byteLength(payloadFood, 'utf8');
+          log('info', `Ollama food-options request to ${aiService.custom_url}/api/chat - model: ${model}, payload size: ${payloadFoodSize} bytes`);
+
+          const startTimeFood = Date.now();
           response = await fetch(`${aiService.custom_url}/api/chat`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              model: model,
-              messages: ollamaMessagesFoodOptions,
-              stream: false,
-            }),
+            body: payloadFood,
             // Pass the undici agent to the fetch call
             dispatcher: ollamaAgentFoodOptions,
           });
+          const elapsedFood = Date.now() - startTimeFood;
+          try {
+            const respCloneFood = response.clone();
+            const respTextFood = await respCloneFood.text();
+            log('info', `Ollama food-options response status: ${response.status}, content-type: ${response.headers.get('content-type') || 'unknown'}, body size: ${respTextFood.length} bytes, elapsed: ${elapsedFood}ms`);
+          } catch (e) {
+            log('warn', 'Could not read Ollama food-options response clone for logging:', e.message);
+          }
         } catch (error) {
           if (error.name === 'HeadersTimeoutError' || error.name === 'BodyTimeoutError') {
             throw new Error(`Ollama food options request timed out after ${timeoutFoodOptions}ms due to undici timeout.`);
           }
-          throw error;
+          throw new Error(`AI service API call error: 502 - Ollama fetch error: ${error.message}`);
         } finally {
           // Destroy the agent to prevent resource leaks
           ollamaAgentFoodOptions.destroy();
