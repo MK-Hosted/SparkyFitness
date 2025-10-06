@@ -18,7 +18,7 @@ app = FastAPI()
 
 # Get port from environment variable or use default
 PORT = int(os.getenv("GARMIN_SERVICE_PORT", 8000))
-IS_CN = bool(os.getenv("IS_CN", "false").lower() == "true")
+IS_CN = bool(os.getenv("GARMIN_SERVICE_IS_CN", "false").lower() == "true")
 logger.info(f"Garmin service configured to run on port: {PORT}")
 if IS_CN:
     logger.info("Configured for Garmin China (CN) region.")
