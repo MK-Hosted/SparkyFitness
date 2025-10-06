@@ -65,6 +65,7 @@ services:
   #   environment:
   #     GARMIN_MICROSERVICE_URL: http://sparkyfitness-garmin:${GARMIN_SERVICE_PORT}
   #     GARMIN_SERVICE_PORT: ${GARMIN_SERVICE_PORT}
+  #     GARMIN_SERVICE_IS_CN: ${GARMIN_SERVICE_IS_CN}  # set to true for China region. Everything else should be false. Optional - defaults to false
   #   networks:
   #     - sparkyfitness-network
   #   restart: unless-stopped
