@@ -7,6 +7,7 @@ const { JWT_SECRET } = require('../security/encryption');
 const userRepository = require('../models/userRepository');
 const familyAccessRepository = require('../models/familyAccessRepository');
 const oidcSettingsRepository = require('../models/oidcSettingsRepository');
+const adminActivityLogRepository = require('../models/adminActivityLogRepository'); // Import admin activity log repository
 const { getPool } = require('../db/poolManager');
 const nutrientDisplayPreferenceService = require('./nutrientDisplayPreferenceService');
 const emailService = require('./emailService');
@@ -41,6 +42,13 @@ async function loginUser(email, password) {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       throw new Error('Invalid credentials.');
     }
+
+    if (!user.is_active) {
+      throw new Error('Account is disabled. Please contact an administrator.');
+    }
+
+    // Update last login time
+    await userRepository.updateUserLastLogin(user.id);
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
     return { userId: user.id, token, role: user.role };
@@ -341,6 +349,12 @@ module.exports = {
   deleteFamilyAccessEntry,
   forgotPassword,
   resetPassword,
+  getAllUsers,
+  deleteUser,
+  updateUserStatus,
+  updateUserRole,
+  updateUserFullName,
+  logAdminAction,
 };
 
 async function registerOidcUser(email, fullName, oidcSub) {
@@ -379,6 +393,77 @@ async function forgotPassword(email) {
   } catch (error) {
     log('error', `Error in forgotPassword for email ${email} in authService:`, error);
     throw error;
+  }
+}
+
+async function getAllUsers(limit, offset, searchTerm) {
+  try {
+    const users = await userRepository.getAllUsers(limit, offset, searchTerm);
+    return users;
+  } catch (error) {
+    log('error', `Error fetching all users in authService:`, error);
+    throw error;
+  }
+}
+
+async function deleteUser(userId) {
+  try {
+    const success = await userRepository.deleteUser(userId);
+    if (!success) {
+      throw new Error('User not found or could not be deleted.');
+    }
+    return true;
+  } catch (error) {
+    log('error', `Error deleting user ${userId} in authService:`, error);
+    throw error;
+  }
+}
+
+async function updateUserStatus(userId, isActive) {
+  try {
+    const success = await userRepository.updateUserStatus(userId, isActive);
+    if (!success) {
+      throw new Error('User not found or status could not be updated.');
+    }
+    return true;
+  } catch (error) {
+    log('error', `Error updating user status for user ${userId} in authService:`, error);
+    throw error;
+  }
+}
+
+async function updateUserRole(userId, role) {
+  try {
+    const success = await userRepository.updateUserRole(userId, role);
+    if (!success) {
+      throw new Error('User not found or role could not be updated.');
+    }
+    return true;
+  } catch (error) {
+    log('error', `Error updating user role for user ${userId} in authService:`, error);
+    throw error;
+  }
+}
+
+async function updateUserFullName(userId, fullName) {
+  try {
+    const success = await userRepository.updateUserFullName(userId, fullName);
+    if (!success) {
+      throw new Error('User not found or full name could not be updated.');
+    }
+    return true;
+  } catch (error) {
+    log('error', `Error updating user full name for user ${userId} in authService:`, error);
+    throw error;
+  }
+}
+
+async function logAdminAction(adminUserId, targetUserId, actionType, details) {
+  try {
+    await adminActivityLogRepository.createAdminActivityLog(adminUserId, targetUserId, actionType, details);
+  } catch (error) {
+    log('error', `Failed to log admin action for admin ${adminUserId} on user ${targetUserId}:`, error);
+    // Do not re-throw, logging should not block the main operation
   }
 }
 

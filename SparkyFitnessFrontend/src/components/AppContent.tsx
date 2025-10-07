@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth"; // Import useAuth
 import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
 import AuthenticationSettings from "@/pages/Admin/AuthenticationSettings"; // Import AuthenticationSettings
+import UserManagement from "@/pages/Admin/UserManagement"; // Import UserManagement
 import OidcCallback from "@/components/OidcCallback"; // Import OidcCallback
 import Auth from "@/components/Auth"; // Import Auth component
 import MealManagement from "./MealManagement"; // Import MealManagement
@@ -69,6 +70,10 @@ const AppContent: React.FC<AppContentProps> = ({ onShowAboutDialog }) => {
             <Route
               path="/admin/oidc-settings"
               element={user ? <AuthenticationSettings /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/admin/user-management"
+              element={user ? <UserManagement /> : <Navigate to="/" />}
             />
             <Route
               path="/reports/mood"

@@ -53,6 +53,15 @@ const authorizeAccess = (permissionType, getTargetUserIdFromRequest = null) => {
         .json({ error: "Authorization: Authentication required." });
     }
 
+    // Check for super-admin via environment variable
+    if (process.env.SPARKY_FITNESS_ADMIN_EMAIL) {
+      const user = await userRepository.findUserById(authenticatedUserId);
+      if (user && user.email === process.env.SPARKY_FITNESS_ADMIN_EMAIL) {
+        log("debug", `Authorization: Super-admin ${user.email} granted access.`);
+        return next();
+      }
+    }
+
     let targetUserId;
 
     if (getTargetUserIdFromRequest) {
@@ -230,6 +239,15 @@ const isAdmin = async (req, res, next) => {
   }
 
   try {
+    // Prioritize environment variable for super-admin check
+    if (process.env.SPARKY_FITNESS_ADMIN_EMAIL) {
+      const user = await userRepository.findUserById(req.userId);
+      if (user && user.email === process.env.SPARKY_FITNESS_ADMIN_EMAIL) {
+        log("debug", `Admin Check: Super-admin ${user.email} granted access.`);
+        return next();
+      }
+    }
+
     const userRole = await userRepository.getUserRole(req.userId);
     if (userRole === "admin") {
       next();
