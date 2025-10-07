@@ -37,7 +37,7 @@ async function findUserByEmail(email) {
   const client = await getPool().connect();
   try {
     const result = await client.query(
-      'SELECT id, email, password_hash, role, oidc_sub FROM auth.users WHERE LOWER(email) = LOWER($1)',
+      'SELECT id, email, password_hash, role, oidc_sub, is_active FROM auth.users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
     return result.rows[0];
@@ -210,27 +210,6 @@ async function getUserRole(userId) {
   }
 }
 
-module.exports = {
-  createUser,
-  createOidcUser,
-  findUserByEmail,
-  findUserById,
-  findUserIdByEmail,
-  generateApiKey,
-  deleteApiKey,
-  getAccessibleUsers,
-  getUserProfile,
-  updateUserProfile,
-  getUserApiKeys,
-  updateUserPassword,
-  updateUserEmail,
-  getUserRole,
-  updateUserRole,
-  updateUserOidcSub,
-  updatePasswordResetToken,
-  findUserByPasswordResetToken,
-};
-
 async function updateUserRole(userId, role) {
   const client = await getPool().connect();
   try {
@@ -317,3 +296,133 @@ async function findUserByPasswordResetToken(token) {
     client.release();
   }
 }
+
+async function updateUserLastLogin(userId) {
+  const client = await getPool().connect();
+  try {
+    await client.query(
+      'UPDATE auth.users SET last_login_at = now() WHERE id = $1',
+      [userId]
+    );
+  } finally {
+    client.release();
+  }
+}
+
+async function getAllUsers(limit, offset, searchTerm) {
+  const client = await getPool().connect();
+  try {
+    let query = `
+      SELECT
+        au.id,
+        au.email,
+        au.role,
+        au.is_active,
+        au.created_at,
+        au.last_login_at,
+        p.full_name
+      FROM auth.users au
+      LEFT JOIN profiles p ON au.id = p.id
+    `;
+    const params = [];
+    let whereClause = '';
+
+    if (searchTerm) {
+      whereClause += ` WHERE LOWER(au.email) LIKE LOWER($${params.length + 1}) OR LOWER(p.full_name) LIKE LOWER($${params.length + 1}) `;
+      params.push(`%${searchTerm}%`);
+    }
+
+    query += whereClause;
+    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const result = await client.query(query, params);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteUser(userId) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+
+    // Delete from tables that have a direct foreign key to auth.users with CASCADE DELETE
+    // For tables without CASCADE DELETE, or for more complex logic, explicit deletion is needed.
+    // Based on the schema, profiles, user_goals, user_api_keys should have CASCADE DELETE.
+    // We might need to explicitly delete from other tables if they don't have CASCADE.
+
+    // Example: Delete from profiles (assuming CASCADE DELETE is set up)
+    await client.query('DELETE FROM profiles WHERE id = $1', [userId]);
+
+    // Example: Delete from user_goals (assuming CASCADE DELETE is set up)
+    await client.query('DELETE FROM user_goals WHERE user_id = $1', [userId]);
+
+    // Example: Delete from user_api_keys (assuming CASCADE DELETE is set up)
+    await client.query('DELETE FROM user_api_keys WHERE user_id = $1', [userId]);
+
+    // Delete from auth.users (this should trigger cascades for other tables if configured)
+    const result = await client.query('DELETE FROM auth.users WHERE id = $1 RETURNING id', [userId]);
+
+    await client.query('COMMIT');
+    return result.rowCount > 0;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function updateUserStatus(userId, isActive) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      'UPDATE auth.users SET is_active = $1, updated_at = now() WHERE id = $2 RETURNING id',
+      [isActive, userId]
+    );
+    return result.rowCount > 0;
+  } finally {
+    client.release();
+  }
+}
+
+async function updateUserFullName(userId, fullName) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      'UPDATE profiles SET full_name = $1, updated_at = now() WHERE id = $2 RETURNING id',
+      [fullName, userId]
+    );
+    return result.rowCount > 0;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = {
+  createUser,
+  createOidcUser,
+  findUserByEmail,
+  findUserById,
+  findUserIdByEmail,
+  generateApiKey,
+  deleteApiKey,
+  getAccessibleUsers,
+  getUserProfile,
+  updateUserProfile,
+  getUserApiKeys,
+  updateUserPassword,
+  updateUserEmail,
+  getUserRole,
+  updateUserRole,
+  updateUserOidcSub,
+  updatePasswordResetToken,
+  findUserByPasswordResetToken,
+  updateUserLastLogin,
+  getAllUsers,
+  deleteUser,
+  updateUserStatus,
+  updateUserFullName,
+};

@@ -27,6 +27,7 @@ const healthRoutes = require('./routes/healthRoutes');
 const externalProviderRoutes = require('./routes/externalProviderRoutes'); // Renamed import
 const garminRoutes = require('./routes/garminRoutes'); // Import Garmin routes
 const moodRoutes = require('./routes/moodRoutes'); // Import Mood routes
+const adminRoutes = require('./routes/adminRoutes'); // Import admin routes
 const { router: openidRoutes, initializeOidcClient } = require('./openidRoutes');
 const oidcSettingsRoutes = require('./routes/oidcSettingsRoutes');
 const versionRoutes = require('./routes/versionRoutes');
@@ -218,6 +219,7 @@ app.use('/integrations/garmin', garminRoutes); // Add Garmin integration routes
 app.use('/mood', moodRoutes); // Add Mood routes
 app.use('/admin/oidc-settings', oidcSettingsRoutes); // Admin OIDC settings routes
 app.use('/version', versionRoutes); // Version routes
+app.use('/admin', adminRoutes); // Add admin routes
 log('debug', 'Registering /openid routes');
 app.use('/openid', openidRoutes); // Import OpenID routes
 app.use('/water-containers', waterContainerRoutes);
