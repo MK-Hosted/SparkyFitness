@@ -9,7 +9,7 @@ class MealieService {
         if (baseUrl && !baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
             this.baseUrl = `https://${baseUrl}`;
         } else {
-            this.baseUrl = baseUrl;
+            this.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
         }
         this.accessToken = apiKey; // Directly use the provided API key as the access token
     }
@@ -20,7 +20,9 @@ class MealieService {
         }
 
         const url = new URL(`${this.baseUrl}/api/recipes`);
-        url.searchParams.append('query', query); // Changed from 'search' to 'query' to match Mealie API
+        url.searchParams.append('queryFilter', `name LIKE "%${query}%"`); // Use queryFilter for better filtering
+        url.searchParams.append('perPage', 10); // Limit results to 10 using perPage
+        url.searchParams.append('page', 1); // Request the first page of results
 
         try {
             const response = await fetch(url.toString(), {
