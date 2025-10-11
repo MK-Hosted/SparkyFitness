@@ -3,31 +3,40 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // New import
 import { usePreferences } from "@/contexts/PreferencesContext";
+import { useAuth } from "@/hooks/useAuth"; // New import
 import { debug, info, warn, error } from '@/utils/logging';
 import { apiCall } from '@/services/api'; // Import apiCall
-import { searchExercises as searchExercisesService, searchExternalExercises, addExternalExerciseToUserExercises, addNutritionixExercise, addFreeExerciseDBExercise, Exercise } from '@/services/exerciseSearchService'; // Added addFreeExerciseDBExercise
+import { searchExercises as searchExercisesService, searchExternalExercises, addExternalExerciseToUserExercises, addNutritionixExercise, addFreeExerciseDBExercise, Exercise, getRecentExercises, getTopExercises } from '@/services/exerciseSearchService'; // Added getRecentExercises, getTopExercises
+import { createExercise } from '@/services/exerciseService'; // New import for creating custom exercises
 import { getFreeExerciseDBMuscleGroups, getFreeExerciseDBEquipment } from '@/services/freeExerciseDBSchemaService'; // New import
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Loader2, Search, ChevronLeft, ChevronRight, Volume2 } from "lucide-react"; // Added Loader2, Search, ChevronLeft, ChevronRight, Volume2
+import { Plus, Loader2, Search, ChevronLeft, ChevronRight, Volume2, XCircle } from "lucide-react"; // Added Loader2, Search, ChevronLeft, ChevronRight, Volume2, XCircle
 import { useToast } from "@/hooks/use-toast";
 import { getExternalDataProviders, DataProvider, getProviderCategory } from '@/services/externalProviderService'; // New import
 import BodyMapFilter from './BodyMapFilter'; // Import BodyMapFilter
+import { Textarea } from "@/components/ui/textarea"; // New import
+import { Label } from "@/components/ui/label"; // New import
 
 interface ExerciseSearchProps {
-  onExerciseSelect: (exercise: Exercise) => void;
+  onExerciseSelect: (exercise: Exercise, sourceMode: 'internal' | 'external') => void;
   showInternalTab?: boolean; // New prop
-  selectedDate: string; // Add selectedDate prop
-  onLogSuccess: () => void; // Add onLogSuccess prop
+  selectedDate?: string; // Add selectedDate prop
+  onLogSuccess?: () => void; // Add onLogSuccess prop
+  disableTabs?: boolean; // New prop to disable internal tabs
+  initialSearchSource?: 'internal' | 'external'; // New prop for initial search source when tabs are disabled
 }
-
-const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate, onLogSuccess = () => {} }: ExerciseSearchProps) => {
+ 
+const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate, onLogSuccess = () => {}, disableTabs = false, initialSearchSource }: ExerciseSearchProps) => {
   const { loggingLevel, itemDisplayLimit } = usePreferences(); // Get itemDisplayLimit from preferences
+  const { user } = useAuth(); // New
   const { toast } = useToast();
   debug(loggingLevel, "ExerciseSearch: Component rendered.");
   const [searchTerm, setSearchTerm] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [recentExercises, setRecentExercises] = useState<Exercise[]>([]);
+  const [topExercises, setTopExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchSource, setSearchSource] = useState<'internal' | 'external'>(showInternalTab ? 'internal' : 'external');
+  const [searchSource, setSearchSource] = useState<'internal' | 'external'>(disableTabs && initialSearchSource ? initialSearchSource : (showInternalTab ? 'internal' : 'external'));
   const [providers, setProviders] = useState<DataProvider[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedProviderType, setSelectedProviderType] = useState<string | null>(null);
@@ -36,15 +45,38 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<string[]>([]); // New state for muscle group filter
   const [availableEquipment, setAvailableEquipment] = useState<string[]>([]); // New state for available equipment
   const [availableMuscleGroups, setAvailableMuscleGroups] = useState<string[]>([]); // New state for available muscle groups
+  const [hasSearchedExternal, setHasSearchedExternal] = useState(false); // New state to track if external search has been performed
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, isInitialLoad = false) => {
     debug(loggingLevel, `ExerciseSearch: Searching exercises with query: "${query}" from source: "${searchSource}" and provider ID: "${selectedProviderId}", type: "${selectedProviderType}", equipment: "${equipmentFilter.join(',')}", muscles: "${muscleGroupFilter.join(',')}"`);
     const hasSearchTerm = query.trim().length > 0;
     const hasFilters = equipmentFilter.length > 0 || muscleGroupFilter.length > 0;
 
-    if (!hasSearchTerm && !hasFilters) {
-      debug(loggingLevel, "ExerciseSearch: Search query and filters are empty, clearing exercises.");
+    if (searchSource === 'external' && !hasSearchTerm && !hasFilters && !isInitialLoad) {
+      debug(loggingLevel, "ExerciseSearch: External search query and filters are empty, clearing exercises.");
       setExercises([]);
+      return;
+    }
+    // For internal search, allow to proceed even with empty search term to show all exercises
+    if (searchSource === 'internal' && !hasSearchTerm && !hasFilters && !isInitialLoad) {
+      debug(loggingLevel, "ExerciseSearch: Internal search query and filters are empty, performing a broad search.");
+      // If no search term and no filters, fetch recent and top exercises
+      try {
+        const recent = await getRecentExercises(user?.id || '', itemDisplayLimit);
+        const top = await getTopExercises(user?.id || '', itemDisplayLimit);
+        // Combine and deduplicate
+        setRecentExercises(recent);
+        setTopExercises(top);
+        setExercises([]); // Clear the main exercises list
+      } catch (err) {
+        error(loggingLevel, "ExerciseSearch: Error fetching recent/top exercises:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load recent and top exercises.",
+          variant: "destructive"
+        });
+      }
+      setLoading(false);
       return;
     }
 
@@ -52,6 +84,8 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
     try {
       let data: Exercise[] = [];
       if (searchSource === 'internal') {
+        setRecentExercises([]);
+        setTopExercises([]);
         data = await searchExercisesService(query, equipmentFilter, muscleGroupFilter);
       } else {
         if (!selectedProviderId || !selectedProviderType) {
@@ -97,7 +131,7 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
           title: "Success",
           description: `${exercise.name} added to your exercises. You can now log it from the diary page.`,
         });
-        onExerciseSelect(newExercise); // Call onExerciseSelect to trigger logging in parent
+        onExerciseSelect(newExercise, 'external'); // Call onExerciseSelect to trigger logging in parent
       }
       return newExercise;
     } catch (error) {
@@ -112,32 +146,31 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
     }
   };
 
-  // Effect for search term changes (debounced for internal search)
+  // Effect for initial data load
   useEffect(() => {
-    if (searchSource === 'internal') {
-      debug(loggingLevel, "ExerciseSearch: Internal searchTerm useEffect triggered.");
-      const timeoutId = setTimeout(() => {
-        handleSearch(searchTerm);
-      }, 300);
-
-      return () => {
-        debug(loggingLevel, "ExerciseSearch: Cleaning up internal search timeout.");
-        clearTimeout(timeoutId);
-      };
+    if (searchSource === 'internal' && user?.id) {
+      handleSearch("", true);
     }
-  }, [searchTerm, loggingLevel, equipmentFilter, muscleGroupFilter, searchSource]); // Added searchSource to dependencies
+  }, [searchSource, user?.id]);
 
-  // Effect for searchSource or provider changes (immediate search for external, if provider changes)
+  // Effect for handling search logic
   useEffect(() => {
-    if (searchSource === 'external' && selectedProviderId && selectedProviderType) {
-      debug(loggingLevel, "ExerciseSearch: External searchSource or provider useEffect triggered.");
-      // No automatic search on provider change, only on button click for external
-      // This useEffect is primarily to react to provider changes, not to trigger a search.
-    } else if (searchSource === 'internal') {
-      debug(loggingLevel, "ExerciseSearch: Internal searchSource useEffect triggered, performing immediate search.");
-      handleSearch(searchTerm);
-    }
-  }, [searchSource, selectedProviderId, selectedProviderType, loggingLevel]);
+    const handler = setTimeout(() => {
+      if (searchSource === 'internal') {
+        const isBroadSearch = searchTerm.trim().length === 0 && equipmentFilter.length === 0 && muscleGroupFilter.length === 0;
+        if (!isBroadSearch) {
+          handleSearch(searchTerm, false);
+        } else {
+          // If search term is cleared, re-fetch recent and top
+          handleSearch("", true);
+        }
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, equipmentFilter, muscleGroupFilter, searchSource]);
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -234,13 +267,9 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
 
   return (
     <div className="space-y-4">
-      <Tabs value={searchSource} onValueChange={(value) => setSearchSource(value as 'internal' | 'external')}>
-        <TabsList className={`grid w-full ${showInternalTab ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          {showInternalTab && <TabsTrigger value="internal">My Exercises</TabsTrigger>}
-          <TabsTrigger value="external">External Database</TabsTrigger>
-        </TabsList>
-        {showInternalTab && (
-          <TabsContent value="internal" className="mt-4 space-y-4">
+      {searchSource === 'internal' && (
+        <div className="mt-4 space-y-4">
+          <div className="flex space-x-2 items-center">
             <Input
               type="text"
               placeholder="Search your exercises..."
@@ -249,28 +278,84 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
                 debug(loggingLevel, "ExerciseSearch: Internal search term input changed:", e.target.value);
                 setSearchTerm(e.target.value);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  debug(loggingLevel, "ExerciseSearch: Enter key pressed, triggering internal search.");
+                  handleSearch(searchTerm);
+                }
+              }}
+              className="flex-1"
             />
-            {/* Equipment Filters */}
-            <div className="flex flex-wrap gap-2">
-              {availableEquipment.map(eq => (
-                <Button
-                  key={eq}
-                  variant={equipmentFilter.includes(eq) ? "default" : "outline"}
-                  onClick={() => handleEquipmentToggle(eq)}
-                >
-                  {eq}
-                </Button>
-              ))}
-            </div>
-
-            {/* Muscle Group Filters (Body Map) */}
-            <BodyMapFilter
-              selectedMuscles={muscleGroupFilter}
-              onMuscleToggle={handleMuscleToggle}
-              availableMuscleGroups={availableMuscleGroups}
-            />
-
-            {loading && <div>Searching...</div>}
+            <Button
+              onClick={() => handleSearch(searchTerm)}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            </Button>
+          </div>
+          {/* Equipment Filters */}
+          <div className="flex flex-wrap gap-2">
+            {availableEquipment.map(eq => (
+              <Button
+                key={eq}
+                variant={equipmentFilter.includes(eq) ? "default" : "outline"}
+                onClick={() => handleEquipmentToggle(eq)}
+              >
+                {eq}
+              </Button>
+            ))}
+          </div>
+ 
+          {/* Muscle Group Filters (Body Map) */}
+          <BodyMapFilter
+            selectedMuscles={muscleGroupFilter}
+            onMuscleToggle={handleMuscleToggle}
+            availableMuscleGroups={availableMuscleGroups}
+          />
+ 
+          {loading && <div>Searching...</div>}
+          {searchTerm.trim().length === 0 && !loading && (
+            <>
+              {recentExercises.length > 0 && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Recent Exercises</h3>
+                  <div className="max-h-40 overflow-y-auto space-y-2 border-b pb-4 mb-4">
+                    {recentExercises.map((exercise) => (
+                      <div key={`recent-${exercise.id}`} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{exercise.name}</div>
+                          <div className="text-sm text-gray-500">{exercise.category} • {exercise.calories_per_hour} cal/hour</div>
+                          {exercise.description && <div className="text-xs text-gray-400">{exercise.description}</div>}
+                        </div>
+                        <Button onClick={() => onExerciseSelect(exercise, 'internal')}>Select</Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {topExercises.length > 0 && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Top Exercises</h3>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {topExercises.map((exercise) => (
+                      <div key={`top-${exercise.id}`} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{exercise.name}</div>
+                          <div className="text-sm text-gray-500">{exercise.category} • {exercise.calories_per_hour} cal/hour</div>
+                          {exercise.description && <div className="text-xs text-gray-400">{exercise.description}</div>}
+                        </div>
+                        <Button onClick={() => onExerciseSelect(exercise, 'internal')}>Select</Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {recentExercises.length === 0 && topExercises.length === 0 && (
+                <div className="text-center text-gray-500">No recent or top exercises found.</div>
+              )}
+            </>
+          )}
+          {searchTerm.trim().length > 0 && !loading && (
             <div className="max-h-60 overflow-y-auto space-y-2">
               {exercises.map((exercise) => (
                 <div key={exercise.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -283,18 +368,20 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
                       <div className="text-xs text-gray-400">{exercise.description}</div>
                     )}
                   </div>
-                  <Button onClick={() => onExerciseSelect(exercise)}>
+                  <Button onClick={() => onExerciseSelect(exercise, 'internal')}>
                     Select
                   </Button>
                 </div>
               ))}
             </div>
-            {searchTerm && !loading && exercises.length === 0 && (
-              <div className="text-center text-gray-500">No exercises found in your database.</div>
-            )}
-          </TabsContent>
-        )}
-        <TabsContent value="external" className="mt-4 space-y-4">
+          )}
+          {searchTerm && !loading && exercises.length === 0 && recentExercises.length === 0 && topExercises.length === 0 && (
+            <div className="text-center text-gray-500">No exercises found in your database.</div>
+          )}
+        </div>
+      )}
+      {searchSource === 'external' && (
+        <div className="mt-4 space-y-4">
           <Select value={selectedProviderId || ''} onValueChange={(value) => {
             const provider = providers.find(p => p.id === value);
             setSelectedProviderId(value);
@@ -314,7 +401,7 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
           <div className="flex space-x-2 items-center">
             <Input
               type="text"
-              placeholder={selectedProviderType === 'nutritionix' ? "Describe your exercise (e.g., 'ran 3 miles', 'swam for 30 minutes')" : `Search ${selectedProviderType || 'external'} database...`}
+              placeholder={selectedProviderType === 'nutritionix' ? "Describe your exercise (e.g., 'ran 3 miles', 'swam for 30 minutes')" : `Search ${selectedProviderType || 'Online'} database...`}
               value={searchTerm}
               onChange={(e) => {
                 debug(loggingLevel, "ExerciseSearch: External search term input changed:", e.target.value);
@@ -324,12 +411,16 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
                 if (e.key === 'Enter') {
                   debug(loggingLevel, "ExerciseSearch: Enter key pressed, triggering search.");
                   handleSearch(searchTerm);
+                  setHasSearchedExternal(true);
                 }
               }}
               className="flex-1"
             />
             <Button
-              onClick={() => handleSearch(searchTerm)}
+              onClick={() => {
+                handleSearch(searchTerm);
+                setHasSearchedExternal(true);
+              }}
               disabled={loading || (!searchTerm.trim() && equipmentFilter.length === 0 && muscleGroupFilter.length === 0)}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -347,15 +438,21 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
               </Button>
             ))}
           </div>
-
+ 
           {/* Muscle Group Filters (Body Map) */}
           <BodyMapFilter
             selectedMuscles={muscleGroupFilter}
             onMuscleToggle={handleMuscleToggle}
             availableMuscleGroups={availableMuscleGroups}
           />
-
+ 
           {loading && <div>Searching...</div>}
+          {!hasSearchedExternal && !loading && (
+            <div className="text-center text-gray-500">Enter a search term and click the search button to find exercises.</div>
+          )}
+          {hasSearchedExternal && !loading && exercises.length === 0 && (
+            <div className="text-center text-gray-500">No exercises found in {selectedProviderType || 'Online'} database for "{searchTerm}".</div>
+          )}
           <div className="max-h-60 overflow-y-auto space-y-2">
             {exercises.map((exercise) => (
               <div key={exercise.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -438,20 +535,20 @@ const ExerciseSearch = ({ onExerciseSelect, showInternalTab = true, selectedDate
                 </div>
                 <Button onClick={async () => {
                   debug(loggingLevel, "ExerciseSearch: Add/Select button clicked for external exercise:", exercise.name);
-                  await handleAddExternalExercise(exercise);
+                  const newExercise = await handleAddExternalExercise(exercise);
+                  if (newExercise) {
+                    onExerciseSelect(newExercise, 'external');
+                  }
                 }}>
                   {selectedProviderType === 'nutritionix' ? 'Select' : <><Plus className="h-4 w-4 mr-2" /> Add</>}
                 </Button>
               </div>
             ))}
           </div>
-          {searchTerm && !loading && exercises.length === 0 && (
-            <div className="text-center text-gray-500">No exercises found in {selectedProviderType || 'external'} database.</div>
-          )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
-  );
+);
 };
 
 export default ExerciseSearch;

@@ -1,5 +1,7 @@
 const { getPool } = require('../db/poolManager');
+const format = require('pg-format');
 const { log } = require('../config/logging');
+const workoutPresetRepository = require('./workoutPresetRepository');
 
 async function getExerciseById(id) {
   const client = await getPool().connect();
@@ -327,29 +329,42 @@ async function searchExercises(name, userId, equipmentFilter, muscleGroupFilter)
     }
 
     if (muscleGroupFilter && muscleGroupFilter.length > 0) {
-      whereClauses.push(`(primary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}] OR secondary_muscles::jsonb ?| ARRAY[${muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',')}])`);
+      const primaryMusclesPlaceholders = muscleGroupFilter.map((_, i) => `$${paramIndex + i}`).join(',');
+      const secondaryMusclesPlaceholders = muscleGroupFilter.map((_, i) => `$${paramIndex + muscleGroupFilter.length + i}`).join(',');
+      whereClauses.push(`(primary_muscles::jsonb ?| ARRAY[${primaryMusclesPlaceholders}] OR secondary_muscles::jsonb ?| ARRAY[${secondaryMusclesPlaceholders}])`);
       queryParams.push(...muscleGroupFilter);
       queryParams.push(...muscleGroupFilter); // Push twice for primary and secondary muscles
       paramIndex += (muscleGroupFilter.length * 2);
     }
 
-    const result = await client.query(
-      `SELECT id, source, source_id, name, force, level, mechanic, equipment,
+    const finalQuery = `
+      SELECT id, source, source_id, name, force, level, mechanic, equipment,
               primary_muscles, secondary_muscles, instructions, category, images,
               calories_per_hour, description, user_id, is_custom, shared_with_public
        FROM exercises
-       WHERE ${whereClauses.join(' AND ')} LIMIT 50`, // Added a limit to prevent too many results
-      queryParams
-    );
+       WHERE ${whereClauses.join(' AND ')} LIMIT 50`; // Added a limit to prevent too many results
+    const result = await client.query(finalQuery, queryParams);
     return result.rows.map(row => {
-      if (row.images) {
-        try {
-          row.images = JSON.parse(row.images);
-        } catch (e) {
-          log('error', `Error parsing images for exercise ${row.id}:`, e);
-          row.images = [];
+      // Helper function to safely parse JSONB fields into arrays
+      const parseJsonbField = (field) => {
+        if (row[field]) {
+          try {
+            const parsed = JSON.parse(row[field]);
+            return Array.isArray(parsed) ? parsed : [parsed]; // Ensure it's an array
+          } catch (e) {
+            log('error', `Error parsing ${field} for exercise ${row.id}:`, e);
+            return [];
+          }
         }
-      }
+        return [];
+      };
+
+      row.equipment = parseJsonbField('equipment');
+      row.primary_muscles = parseJsonbField('primary_muscles');
+      row.secondary_muscles = parseJsonbField('secondary_muscles');
+      row.instructions = parseJsonbField('instructions');
+      row.images = parseJsonbField('images');
+      
       return row;
     });
   } finally {
@@ -399,18 +414,20 @@ async function createExerciseEntry(userId, entryData) {
   const client = await getPool().connect();
   try {
     const result = await client.query(
-      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) RETURNING *`,
+      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, workout_plan_assignment_id, image_url, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), now()) RETURNING *`,
       [
         userId,
         entryData.exercise_id,
-        entryData.duration_minutes,
+        typeof entryData.duration_minutes === 'number' ? entryData.duration_minutes : 0,
         entryData.calories_burned,
         entryData.entry_date,
         entryData.notes,
         entryData.sets || null,
         entryData.reps || null,
         entryData.weight || null,
+        entryData.workout_plan_assignment_id || null,
+        entryData.image_url || null,
       ]
     );
     return result.rows[0];
@@ -458,18 +475,22 @@ async function updateExerciseEntry(id, userId, updateData) {
         sets = COALESCE($6, sets),
         reps = COALESCE($7, reps),
         weight = COALESCE($8, weight),
+        workout_plan_assignment_id = COALESCE($9, workout_plan_assignment_id),
+        image_url = COALESCE($10, image_url),
         updated_at = now()
-      WHERE id = $9 AND user_id = $10
+      WHERE id = $11 AND user_id = $12
       RETURNING *`,
       [
         updateData.exercise_id,
-        updateData.duration_minutes,
+        updateData.duration_minutes || null,
         updateData.calories_burned,
         updateData.entry_date,
         updateData.notes,
         updateData.sets || null,
         updateData.reps || null,
         updateData.weight || null,
+        updateData.workout_plan_assignment_id || null,
+        updateData.image_url || null,
         id,
         userId,
       ]
@@ -567,6 +588,8 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
          ee.sets,
          ee.reps,
          ee.weight,
+         ee.workout_plan_assignment_id,
+         ee.image_url,
          e.name AS exercise_name,
          e.category AS exercise_category,
          e.calories_per_hour AS exercise_calories_per_hour,
@@ -606,6 +629,8 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
         sets: row.sets,
         reps: row.reps,
         weight: row.weight,
+        workout_plan_assignment_id: row.workout_plan_assignment_id,
+        image_url: row.image_url,
         exercises: {
           id: row.exercise_id,
           name: row.exercise_name,
@@ -651,14 +676,26 @@ async function getRecentExercises(userId, limit) {
       [userId, limit]
     );
     return result.rows.map(row => {
-      if (row.images) {
-        try {
-          row.images = JSON.parse(row.images);
-        } catch (e) {
-          log('error', `Error parsing images for exercise ${row.id}:`, e);
-          row.images = [];
+      // Helper function to safely parse JSONB fields into arrays
+      const parseJsonbField = (field) => {
+        if (row[field]) {
+          try {
+            const parsed = JSON.parse(row[field]);
+            return Array.isArray(parsed) ? parsed : [parsed]; // Ensure it's an array
+          } catch (e) {
+            log('error', `Error parsing ${field} for exercise ${row.id}:`, e);
+            return [];
+          }
         }
-      }
+        return [];
+      };
+
+      row.equipment = parseJsonbField('equipment');
+      row.primary_muscles = parseJsonbField('primary_muscles');
+      row.secondary_muscles = parseJsonbField('secondary_muscles');
+      row.instructions = parseJsonbField('instructions');
+      row.images = parseJsonbField('images');
+      
       return row;
     });
   } finally {
@@ -688,14 +725,26 @@ async function getTopExercises(userId, limit) {
       [userId, limit]
     );
     return result.rows.map(row => {
-      if (row.images) {
-        try {
-          row.images = JSON.parse(row.images);
-        } catch (e) {
-          log('error', `Error parsing images for exercise ${row.id}:`, e);
-          row.images = [];
+      // Helper function to safely parse JSONB fields into arrays
+      const parseJsonbField = (field) => {
+        if (row[field]) {
+          try {
+            const parsed = JSON.parse(row[field]);
+            return Array.isArray(parsed) ? parsed : [parsed]; // Ensure it's an array
+          } catch (e) {
+            log('error', `Error parsing ${field} for exercise ${row.id}:`, e);
+            return [];
+          }
         }
-      }
+        return [];
+      };
+
+      row.equipment = parseJsonbField('equipment');
+      row.primary_muscles = parseJsonbField('primary_muscles');
+      row.secondary_muscles = parseJsonbField('secondary_muscles');
+      row.instructions = parseJsonbField('instructions');
+      row.images = parseJsonbField('images');
+      
       return row;
     });
   } finally {
@@ -719,6 +768,32 @@ async function getExerciseProgressData(userId, exerciseId, startDate, endDate) {
          AND ee.entry_date BETWEEN $3 AND $4
        ORDER BY ee.entry_date ASC`,
       [userId, exerciseId, startDate, endDate]
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+ 
+async function getExerciseHistory(userId, exerciseId, limit = 5) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         ee.entry_date,
+         ee.sets,
+         ee.reps,
+         ee.weight,
+         ee.duration_minutes,
+         ee.calories_burned,
+         ee.notes,
+         ee.image_url
+       FROM exercise_entries ee
+       WHERE ee.user_id = $1
+         AND ee.exercise_id = $2
+       ORDER BY ee.entry_date DESC, ee.created_at DESC
+       LIMIT $3`,
+      [userId, exerciseId, limit]
     );
     return result.rows;
   } finally {
@@ -749,8 +824,156 @@ module.exports = {
   getRecentExercises,
   getTopExercises,
   getExerciseBySourceAndSourceId,
-  getExerciseProgressData, // New export
+  getExerciseProgressData,
+  getExerciseHistory,
+  getExerciseBySourceAndSourceId, // Export the new function
+  getExerciseDeletionImpact,
+  createExerciseEntriesFromTemplate,
+  deleteExerciseEntriesByTemplateId,
 };
+
+async function createExerciseEntriesFromTemplate(templateId, userId) {
+  log('info', `createExerciseEntriesFromTemplate called for templateId: ${templateId}, userId: ${userId}`);
+  const client = await getPool().connect();
+  try {
+    // Fetch the workout plan template with its assignments
+    const templateResult = await client.query(
+      `SELECT
+          wpt.id,
+          wpt.user_id,
+          wpt.plan_name,
+          wpt.description,
+          wpt.start_date,
+          wpt.end_date,
+          wpt.is_active,
+          COALESCE(
+              (
+                  SELECT json_agg(
+                      json_build_object(
+                          'id', wpta.id,
+                          'day_of_week', wpta.day_of_week,
+                          'workout_preset_id', wpta.workout_preset_id,
+                          'exercise_id', wpta.exercise_id,
+                          'sets', wpta.sets,
+                          'reps', wpta.reps,
+                          'weight', wpta.weight,
+                          'duration', wpta.duration,
+                          'notes', wpta.notes
+                      )
+                  )
+                  FROM workout_plan_template_assignments wpta
+                  WHERE wpta.template_id = wpt.id
+              ),
+              '[]'::json
+          ) as assignments
+       FROM workout_plan_templates wpt
+       WHERE wpt.id = $1 AND wpt.user_id = $2`,
+      [templateId, userId]
+    );
+
+    const template = templateResult.rows[0];
+    log('info', `createExerciseEntriesFromTemplate - Fetched template:`, template);
+
+    if (!template || !template.assignments || template.assignments.length === 0) {
+      log('info', `No assignments found for workout plan template ${templateId} or template not found.`);
+      return;
+    }
+
+    const entriesToInsert = [];
+    const startDate = new Date(template.start_date);
+    // If end_date is not provided, default to one year from start_date
+    const endDate = template.end_date ? new Date(template.end_date) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
+
+    log('info', `createExerciseEntriesFromTemplate - Plan start_date: ${startDate.toISOString().split('T')[0]}, end_date: ${endDate.toISOString().split('T')[0]}`);
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const currentDayOfWeek = d.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
+      const entryDate = d.toISOString().split('T')[0];
+
+      for (const assignment of template.assignments) {
+        if (assignment.day_of_week === currentDayOfWeek) {
+          if (assignment.exercise_id) {
+            log('info', `createExerciseEntriesFromTemplate - Assignment day_of_week (${assignment.day_of_week}) matches currentDayOfWeek (${currentDayOfWeek}) for date ${entryDate}. Adding to entriesToInsert.`);
+            entriesToInsert.push([
+              userId,
+              assignment.exercise_id,
+              assignment.duration,
+              0, // calories_burned - will be calculated or left null
+              entryDate, // Use the iterated date
+              assignment.notes,
+              assignment.sets,
+              assignment.reps,
+              assignment.weight,
+              assignment.id, // workout_plan_assignment_id
+              null, // image_url
+            ]);
+          } else if (assignment.workout_preset_id) {
+            log('info', `createExerciseEntriesFromTemplate - Found workout_preset_id ${assignment.workout_preset_id} for date ${entryDate}.`);
+            const preset = await workoutPresetRepository.getWorkoutPresetById(assignment.workout_preset_id);
+            if (preset && preset.exercises) {
+              for (const exercise of preset.exercises) {
+                log('info', `Adding exercise ${exercise.exercise_id} from preset ${preset.id} to entriesToInsert.`);
+                entriesToInsert.push([
+                  userId,
+                  exercise.exercise_id,
+                  exercise.duration,
+                  0, // calories_burned
+                  entryDate,
+                  exercise.notes,
+                  exercise.sets,
+                  exercise.reps,
+                  exercise.weight,
+                  assignment.id, // workout_plan_assignment_id
+                  null, // image_url
+                ]);
+              }
+            }
+          }
+        }
+      }
+    }
+    log('info', `createExerciseEntriesFromTemplate - Total entries to insert: ${entriesToInsert.length}`);
+
+    if (entriesToInsert.length > 0) {
+      const insertQuery = format(
+        `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, workout_plan_assignment_id, image_url)
+         VALUES %L RETURNING *`,
+        entriesToInsert
+      );
+      await client.query(insertQuery);
+      log('info', `Created ${entriesToInsert.length} exercise entries from workout plan template ${templateId} for user ${userId}.`);
+    } else {
+      log('info', `No exercise entries to create from workout plan template ${templateId} for user ${userId}.`);
+    }
+  } catch (error) {
+    log('error', `Error creating exercise entries from template ${templateId} for user ${userId}: ${error.message}`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteExerciseEntriesByTemplateId(templateId, userId) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      `DELETE FROM exercise_entries
+       WHERE user_id = $1
+         AND workout_plan_assignment_id IN (
+             SELECT id FROM workout_plan_template_assignments
+             WHERE template_id = $2
+         ) RETURNING id`,
+      [userId, templateId]
+    );
+    log('info', `Deleted ${result.rowCount} exercise entries associated with workout plan template ${templateId} for user ${userId}.`);
+    return result.rowCount;
+  } catch (error) {
+    log('error', `Error deleting exercise entries for template ${templateId} for user ${userId}: ${error.message}`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 async function getExerciseBySourceAndSourceId(source, sourceId) {
   const client = await getPool().connect();

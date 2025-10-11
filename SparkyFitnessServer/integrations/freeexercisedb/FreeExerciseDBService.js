@@ -52,17 +52,10 @@ class FreeExerciseDBService {
         }
 
         try {
-            const directoryUrl = `${GITHUB_API_BASE_URL}/${EXERCISES_PATH}`;
-            console.log(`[FreeExerciseDBService] Fetching directory contents from: ${directoryUrl}`);
-            const response = await axios.get(directoryUrl);
-            const files = response.data;
-
-            const allExercisePromises = files.filter(file => file.name.toLowerCase().endsWith('.json')).map(async (file) => {
-                const exerciseId = file.name.replace('.json', '');
-                return this.getExerciseById(exerciseId);
-            });
-
-            const allExercises = (await Promise.all(allExercisePromises)).filter(Boolean);
+            const exercisesJsonUrl = 'https://api.github.com/repos/yuhonas/free-exercise-db/contents/dist/exercises.json';
+            console.log(`[FreeExerciseDBService] Fetching exercises from: ${exercisesJsonUrl}`);
+            const response = await axios.get(exercisesJsonUrl, { headers: { Accept: 'application/vnd.github.raw+json' }});
+            const allExercises = response.data;
 
             let filteredExercises = allExercises.filter(exercise => {
                 const matchesQuery = !query || exercise.name.toLowerCase().includes(query.toLowerCase());

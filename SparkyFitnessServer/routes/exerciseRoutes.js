@@ -61,16 +61,42 @@ router.get('/suggested', authenticateToken, authorizeAccess('exercise_list', (re
     next(error);
   }
 });
+
+// Endpoint to get recent exercises
+router.get('/recent', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  const { limit } = req.query;
+  try {
+    const recentExercises = await exerciseService.getRecentExercises(req.userId, limit);
+    res.status(200).json(recentExercises);
+  } catch (error) {
+    if (error.message.startsWith('Forbidden')) {
+      return res.status(403).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+// Endpoint to get top exercises
+router.get('/top', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  const { limit } = req.query;
+  try {
+    const topExercises = await exerciseService.getTopExercises(req.userId, limit);
+    res.status(200).json(topExercises);
+  } catch (error) {
+    if (error.message.startsWith('Forbidden')) {
+      return res.status(403).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 // Endpoint to search for exercises
 router.get('/search', authenticateToken, authorizeAccess('exercise_list', (req) => req.userId), async (req, res, next) => {
   const { searchTerm, equipmentFilter, muscleGroupFilter } = req.query;
   const equipmentFilterArray = equipmentFilter ? equipmentFilter.split(',') : [];
   const muscleGroupFilterArray = muscleGroupFilter ? muscleGroupFilter.split(',') : [];
 
-  if (!searchTerm && equipmentFilterArray.length === 0 && muscleGroupFilterArray.length === 0) {
-    return res.status(400).json({ error: 'Search term or filters are required.' });
-  }
- 
+  // Allow broad search for internal exercises even if searchTerm and filters are empty
   try {
     const exercises = await exerciseService.searchExercises(req.userId, searchTerm, req.userId, equipmentFilterArray, muscleGroupFilterArray);
     res.status(200).json(exercises);

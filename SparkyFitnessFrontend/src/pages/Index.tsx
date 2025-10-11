@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import FoodDiary from "@/components/FoodDiary";
 import FoodDatabaseManager from "@/components/FoodDatabaseManager";
 import ExerciseDatabaseManager from "@/components/ExerciseDatabaseManager";
+import { PresetExercise } from "@/types/workout"; // Import PresetExercise
 import Reports from "@/components/Reports";
 import AddComp from "@/components/AddComp";
 import CheckIn from "@/components/CheckIn";
@@ -63,6 +64,7 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
 
   const [appVersion, setAppVersion] = useState("Loading...");
   const [isAddCompOpen, setIsAddCompOpen] = useState(false); // Renamed from showAddComp
+  const [exercisesToLogFromPreset, setExercisesToLogFromPreset] = useState<PresetExercise[] | undefined>(undefined);
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -466,6 +468,8 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
                 refreshTrigger={foodDiaryRefreshTrigger}
+                initialExercisesToLog={exercisesToLogFromPreset}
+                onExercisesLogged={() => setExercisesToLogFromPreset(undefined)} // Clear after logging
               />
             </TabsContent>
             <TabsContent value="checkin" className="space-y-6">
@@ -478,7 +482,7 @@ const Index: React.FC<IndexProps> = ({ onShowAboutDialog }) => {
               <FoodDatabaseManager />
             </TabsContent>
             <TabsContent value="exercises" className="space-y-6">
-              <ExerciseDatabaseManager />
+              <ExerciseDatabaseManager onPresetExercisesSelected={setExercisesToLogFromPreset} />
             </TabsContent>
             <TabsContent value="goals" className="space-y-6">
               <GoalsSettings />

@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AddExerciseDialog from "./AddExerciseDialog";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Plus, Edit, Trash2, Share2, Lock, Settings, XCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Share2, Lock, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,13 +24,21 @@ import {
   getExerciseDeletionImpact,
   ExerciseDeletionImpact,
 } from '@/services/exerciseService';
-import { Exercise as ExerciseInterface } from '@/services/exerciseSearchService'; // Import the comprehensive Exercise interface
+import { Exercise as ExerciseInterface } from '@/services/exerciseSearchService';
+import WorkoutPresetsManager from './WorkoutPresetsManager'; // Import the new component
+import WorkoutPlansManager from './WorkoutPlansManager'; // Import the new component
+import { PresetExercise } from "@/types/workout"; // Import PresetExercise
 
+interface ExerciseDatabaseManagerProps {
+  onPresetExercisesSelected: (exercises: PresetExercise[]) => void;
+}
 
-const ExerciseDatabaseManager = () => {
+const ExerciseDatabaseManager: React.FC<ExerciseDatabaseManagerProps> = ({ onPresetExercisesSelected }) => {
   const { user } = useAuth();
+  const { loggingLevel } = usePreferences();
+  // Existing states for Exercise management
   const [exercises, setExercises] = useState<ExerciseInterface[]>([]);
-  const [totalExercisesCount, setTotalExercisesCount] = useState(0); // New state for total count
+  const [totalExercisesCount, setTotalExercisesCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [ownershipFilter, setOwnershipFilter] = useState("all");
@@ -49,10 +58,10 @@ const ExerciseDatabaseManager = () => {
   const [editExercisePrimaryMuscles, setEditExercisePrimaryMuscles] = useState<string[]>([]);
   const [editExerciseSecondaryMuscles, setEditExerciseSecondaryMuscles] = useState<string[]>([]);
   const [editExerciseInstructions, setEditExerciseInstructions] = useState<string[]>([]);
-  const [editExerciseImages, setEditExerciseImages] = useState<string[]>([]); // Existing image URLs
-  const [newExerciseImageFiles, setNewExerciseImageFiles] = useState<File[]>([]); // New image files to upload
-  const [newExerciseImageUrls, setNewExerciseImageUrls] = useState<string[]>([]); // URLs for new image previews
-  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null); // For reordering
+  const [editExerciseImages, setEditExerciseImages] = useState<string[]>([]);
+  const [newExerciseImageFiles, setNewExerciseImageFiles] = useState<File[]>([]);
+  const [newExerciseImageUrls, setNewExerciseImageUrls] = useState<string[]>([]);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deletionImpact, setDeletionImpact] = useState<ExerciseDeletionImpact | null>(null);
   const [exerciseToDelete, setExerciseToDelete] = useState<ExerciseInterface | null>(null);
@@ -75,9 +84,9 @@ const ExerciseDatabaseManager = () => {
         itemsPerPage
       );
       setExercises(response.exercises);
-      setTotalExercisesCount(response.totalCount); // Set total count for pagination
-    } catch (error) {
-      console.error("Error loading exercises:", error);
+      setTotalExercisesCount(response.totalCount);
+    } catch (err) {
+      error(loggingLevel, "Error loading exercises:", err);
       toast({
         title: "Error",
         description: "Failed to load exercises",
@@ -94,13 +103,8 @@ const ExerciseDatabaseManager = () => {
     setCurrentPage(1);
   }, [searchTerm, categoryFilter, ownershipFilter, itemsPerPage]);
 
-
-  // Remove applyFilters as filtering is now handled by the backend
-  // const applyFilters = () => { ... };
-
-  const totalPages = Math.ceil(totalExercisesCount / itemsPerPage); // Use totalExercisesCount
-  const currentExercises = exercises; // exercises state now holds the already filtered and paginated data
-
+  const totalPages = Math.ceil(totalExercisesCount / itemsPerPage);
+  const currentExercises = exercises;
 
   const handleEditExercise = async () => {
     if (!selectedExercise) return;
@@ -119,12 +123,12 @@ const ExerciseDatabaseManager = () => {
         primary_muscles: editExercisePrimaryMuscles,
         secondary_muscles: editExerciseSecondaryMuscles,
         instructions: editExerciseInstructions,
-        images: editExerciseImages, // Send existing image URLs
+        images: editExerciseImages,
       };
 
       formData.append('exerciseData', JSON.stringify(updatedExerciseData));
       newExerciseImageFiles.forEach((file) => {
-        formData.append('images', file); // Append new image files
+        formData.append('images', file);
       });
 
       await updateExercise(selectedExercise.id, formData);
@@ -135,10 +139,10 @@ const ExerciseDatabaseManager = () => {
       loadExercisesData();
       setIsEditDialogOpen(false);
       setSelectedExercise(null);
-      setNewExerciseImageFiles([]); // Clear new image files
-      setNewExerciseImageUrls([]); // Clear new image URLs
-    } catch (error) {
-      console.error("Error editing exercise:", error);
+      setNewExerciseImageFiles([]);
+      setNewExerciseImageUrls([]);
+    } catch (err) {
+      error(loggingLevel, "Error editing exercise:", err);
       toast({
         title: "Error",
         description: "Failed to edit exercise",
@@ -154,8 +158,8 @@ const ExerciseDatabaseManager = () => {
       setDeletionImpact(impact);
       setExerciseToDelete(exercise);
       setShowDeleteConfirmation(true);
-    } catch (error) {
-      console.error("Error fetching deletion impact:", error);
+    } catch (err) {
+      error(loggingLevel, "Error fetching deletion impact:", err);
       toast({
         title: "Error",
         description: "Could not fetch deletion impact. Please try again.",
@@ -173,8 +177,8 @@ const ExerciseDatabaseManager = () => {
         description: "Exercise deleted successfully.",
       });
       loadExercisesData();
-    } catch (error) {
-      console.error("Error deleting exercise:", error);
+    } catch (err) {
+      error(loggingLevel, "Error deleting exercise:", err);
       toast({
         title: "Error",
         description: "Failed to delete exercise.",
@@ -195,8 +199,8 @@ const ExerciseDatabaseManager = () => {
         description: `Exercise ${share ? 'shared' : 'unshared'} successfully`,
       });
       loadExercisesData();
-    } catch (error) {
-      console.error("Error sharing exercise:", error);
+    } catch (err) {
+      error(loggingLevel, "Error sharing exercise:", err);
       toast({
         title: "Error",
         description: "Failed to share exercise",
@@ -207,10 +211,13 @@ const ExerciseDatabaseManager = () => {
 
   return (
     <div className="space-y-6">
+      {/* Exercises Section */}
       <Card>
+        <CardHeader>
+          <CardTitle>Exercises</CardTitle>
+        </CardHeader>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-            {/* This div will contain the search and category filter. On mobile, it will be the first "row". On desktop, it will be part of the single row. */}
             <div className="flex flex-wrap items-center gap-2 flex-1">
               <Input
                 type="text"
@@ -233,7 +240,6 @@ const ExerciseDatabaseManager = () => {
               </Select>
             </div>
 
-            {/* This div will contain the ownership filter and add button. On mobile, it will be the second "row". On desktop, it will be part of the single row. */}
             <div className="flex flex-wrap items-center gap-2">
               <Select onValueChange={setOwnershipFilter} defaultValue={ownershipFilter}>
                 <SelectTrigger className="w-32">
@@ -348,8 +354,8 @@ const ExerciseDatabaseManager = () => {
                       setEditExerciseSecondaryMuscles(Array.isArray(exercise.secondary_muscles) ? exercise.secondary_muscles : []);
                       setEditExerciseInstructions(Array.isArray(exercise.instructions) ? exercise.instructions : []);
                       setEditExerciseImages(Array.isArray(exercise.images) ? exercise.images : []);
-                      setNewExerciseImageFiles([]); // Clear any previous new files
-                      setNewExerciseImageUrls([]); // Clear any previous new file URLs
+                      setNewExerciseImageFiles([]);
+                      setNewExerciseImageUrls([]);
                       setIsEditDialogOpen(true);
                     }}
                     className="h-8 w-8"
@@ -388,7 +394,7 @@ const ExerciseDatabaseManager = () => {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious 
+                    <PaginationPrevious
                       onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                       className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
@@ -420,7 +426,7 @@ const ExerciseDatabaseManager = () => {
                   })}
                   
                   <PaginationItem>
-                    <PaginationNext 
+                    <PaginationNext
                       onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                       className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
@@ -432,10 +438,38 @@ const ExerciseDatabaseManager = () => {
         </CardContent>
       </Card>
 
+      {/* Workout Presets Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Workout Presets</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <WorkoutPresetsManager onUsePreset={(preset) => {
+            info(loggingLevel, `Using preset: ${preset.name}`);
+            toast({
+              title: "Preset Loaded",
+              description: `Workout preset "${preset.name}" loaded to diary.`,
+            });
+            onPresetExercisesSelected(preset.exercises);
+          }} />
+        </CardContent>
+      </Card>
+
+      {/* Workout Plans Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Workout Plans</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <WorkoutPlansManager />
+        </CardContent>
+      </Card>
+
       <AddExerciseDialog
         open={isAddExerciseDialogOpen}
         onOpenChange={setIsAddExerciseDialogOpen}
         onExerciseAdded={loadExercisesData}
+        mode="database-manager"
       />
       {/* Edit Exercise Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
