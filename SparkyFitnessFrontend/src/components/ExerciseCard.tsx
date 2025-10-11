@@ -30,6 +30,7 @@ import {
   fetchExerciseEntries,
   deleteExerciseEntry,
   ExerciseEntry,
+  logWorkoutPreset, // Import the new function
 } from "@/services/exerciseEntryService";
 import {
   getSuggestedExercises,
@@ -37,16 +38,32 @@ import {
   createExercise,
   Exercise,
 } from "@/services/exerciseService";
+
+// Extend Exercise with optional logging fields for pre-population
+interface ExerciseToLog extends Exercise {
+  sets?: number;
+  reps?: number;
+  weight?: number;
+  duration?: number; // Duration in minutes (optional) - Changed from duration_minutes
+  notes?: string;
+  image_url?: string;
+  exercise_name?: string; // Added to match PresetExercise
+}
+import { PresetExercise } from "@/types/workout"; // Import PresetExercise
 import ExerciseSearch from "./ExerciseSearch"; // New import for ExerciseSearch
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // New import for tabs
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import AddExerciseDialog from "./AddExerciseDialog"; // Import AddExerciseDialog
+import { WorkoutPreset } from "@/types/workout"; // Import WorkoutPreset
 
 import LogExerciseEntryDialog from "./LogExerciseEntryDialog"; // Import LogExerciseEntryDialog
 
 interface ExerciseCardProps {
   selectedDate: string;
   onExerciseChange: () => void;
+  initialExercisesToLog?: PresetExercise[]; // Changed to PresetExercise[]
+  onExercisesLogged: () => void; // New prop to signal that exercises have been logged
 }
 
 // Extend ExerciseEntry to include sets, reps, weight
@@ -59,6 +76,8 @@ interface ExpandedExerciseEntry extends ExerciseEntry {
 const ExerciseCard = ({
   selectedDate,
   onExerciseChange,
+  initialExercisesToLog, // Destructure new prop
+  onExercisesLogged, // Destructure new prop
 }: ExerciseCardProps) => {
   const { user } = useAuth();
   const { activeUserId } = useActiveUser();
@@ -98,7 +117,8 @@ const ExerciseCard = ({
   const [isPlaybackModalOpen, setIsPlaybackModalOpen] = useState(false); // State for playback modal
   const [exerciseToPlay, setExerciseToPlay] = useState<Exercise | null>(null); // State for exercise to play
   const [isLogExerciseDialogOpen, setIsLogExerciseDialogOpen] = useState(false); // State for LogExerciseEntryDialog
-  const [selectedExerciseToLog, setSelectedExerciseToLog] = useState<Exercise | null>(null); // State for exercise to log
+  const [exercisesToLogQueue, setExercisesToLogQueue] = useState<ExerciseToLog[]>([]); // Queue for multiple exercises
+  const [currentExerciseToLog, setCurrentExerciseToLog] = useState<ExerciseToLog | null>(null); // Current exercise being logged
   const [exerciseEntriesRefreshTrigger, setExerciseEntriesRefreshTrigger] = useState(0); // New state for refreshing exercise entries
 
   const currentUserId = activeUserId || user?.id;
@@ -129,6 +149,26 @@ const ExerciseCard = ({
       _fetchExerciseEntries();
     }
   }, [currentUserId, selectedDate, _fetchExerciseEntries, exerciseEntriesRefreshTrigger]); // Add refresh trigger to dependencies
+
+  // Effect to handle initialExercisesToLog prop
+  useEffect(() => {
+    if (initialExercisesToLog && initialExercisesToLog.length > 0) {
+      debug(loggingLevel, "ExerciseCard: Received initial exercises to log:", initialExercisesToLog);
+      // Map PresetExercise to ExerciseToLog, ensuring all fields are present
+      const mappedExercises: ExerciseToLog[] = initialExercisesToLog.map(presetEx => ({
+        id: presetEx.exercise_id, // Use exercise_id as the main ID for ExerciseToLog
+        name: presetEx.exercise_name || '', // Ensure name is present
+        category: '', // Placeholder, as category is not in PresetExercise
+        calories_per_hour: 0, // Placeholder, as calories_per_hour is not in PresetExercise
+        ...presetEx,
+        duration: presetEx.duration, // Map duration to duration
+      }));
+      setExercisesToLogQueue(mappedExercises);
+      setCurrentExerciseToLog(mappedExercises[0]);
+      setIsLogExerciseDialogOpen(true);
+      setIsAddDialogOpen(false); // Close the add dialog if it's open
+    }
+  }, [initialExercisesToLog, loggingLevel]);
 
   useEffect(() => {
     const performInternalSearch = async () => {
@@ -198,23 +238,57 @@ const ExerciseCard = ({
     setNotes("");
   };
 
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = useCallback(() => {
     debug(loggingLevel, "Closing add exercise dialog.");
     setIsAddDialogOpen(false);
     setSelectedExerciseId(null);
     setSelectedExercise(null);
     setDuration(30);
     setNotes("");
-  };
+  }, [loggingLevel]);
 
-  const handleExerciseSelect = (exercise: Exercise) => {
-    debug(loggingLevel, "Exercise selected in search:", exercise.id);
-    setSelectedExerciseToLog(exercise);
+  const handleExerciseSelect = (exercise: Exercise, sourceMode: 'internal' | 'external' | 'custom' | 'preset') => {
+    debug(loggingLevel, `Exercise selected in search from ${sourceMode}:`, exercise.id);
+    // When selecting from search, it's a single exercise, so clear queue and set current
+    setExercisesToLogQueue([{ ...exercise, duration: 0 }]); // Create a new ExerciseToLog from Exercise, add default duration
+    setCurrentExerciseToLog({ ...exercise, duration: 0 });
     setIsLogExerciseDialogOpen(true);
     setIsAddDialogOpen(false);
   };
 
-  const handleAddCustomExercise = async () => {
+  const handleDataChange = useCallback(() => {
+    debug(
+      loggingLevel,
+      "Handling data change, incrementing refresh trigger.",
+    );
+    setExerciseEntriesRefreshTrigger(prev => prev + 1); // Increment trigger to force refresh
+    onExerciseChange(); // Still call parent's onExerciseChange for broader diary refresh if needed
+    handleCloseAddDialog(); // Close the add exercise dialog
+  }, [loggingLevel, onExerciseChange, handleCloseAddDialog]);
+
+  const handleWorkoutPresetSelected = useCallback(async (preset: WorkoutPreset) => {
+    debug(loggingLevel, "Workout preset selected in ExerciseCard:", preset);
+    try {
+      await logWorkoutPreset(preset.id, selectedDate);
+      toast({
+        title: "Success",
+        description: `Workout preset "${preset.name}" logged successfully.`,
+      });
+      handleDataChange(); // Refresh exercise entries
+      onExercisesLogged(); // Signal to parent that exercises have been logged
+    } catch (err) {
+      error(loggingLevel, `Error logging workout preset "${preset.name}":`, err);
+      toast({
+        title: "Error",
+        description: `Failed to log workout preset "${preset.name}".`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddDialogOpen(false); // Close the add dialog
+    }
+  }, [loggingLevel, selectedDate, handleDataChange, onExercisesLogged]);
+
+  const handleAddCustomExercise = async (sourceMode: 'custom') => {
     if (!user) return;
     try {
       const newExercise = {
@@ -230,9 +304,11 @@ const ExerciseCard = ({
         title: "Success",
         description: "Exercise added successfully",
       });
-      setSelectedExerciseToLog(createdExercise); // Set the newly created exercise for logging
-      setIsLogExerciseDialogOpen(true); // Open the LogExerciseEntryDialog
-      setIsAddDialogOpen(false); // Close the Add Exercise dialog
+      // When adding custom, it's a single exercise, so clear queue and set current
+      setExercisesToLogQueue([{ ...createdExercise, duration: 0 }]); // Add default duration
+      setCurrentExerciseToLog({ ...createdExercise, duration: 0 });
+      setIsLogExerciseDialogOpen(true);
+      setIsAddDialogOpen(false);
       setNewExerciseName("");
       setNewExerciseCategory("general");
       setNewExerciseCalories(300);
@@ -331,14 +407,24 @@ const ExerciseCard = ({
     // TODO: Implement navigation or dialog for editing exercise database entry
   };
 
-  const handleDataChange = () => {
-    debug(
-      loggingLevel,
-      "Handling data change, incrementing refresh trigger.",
-    );
-    setExerciseEntriesRefreshTrigger(prev => prev + 1); // Increment trigger to force refresh
-    onExerciseChange(); // Still call parent's onExerciseChange for broader diary refresh if needed
-    handleCloseAddDialog(); // Close the add exercise dialog
+
+  const handleLogSuccess = () => {
+    debug(loggingLevel, "Exercise logged successfully. Processing queue.");
+    // Remove the current exercise from the queue
+    const updatedQueue = exercisesToLogQueue.slice(1);
+    setExercisesToLogQueue(updatedQueue);
+
+    if (updatedQueue.length > 0) {
+      // Open the dialog for the next exercise in the queue
+      setCurrentExerciseToLog(updatedQueue[0]);
+      setIsLogExerciseDialogOpen(true);
+    } else {
+      // All exercises logged, close the dialog
+      setCurrentExerciseToLog(null);
+      setIsLogExerciseDialogOpen(false);
+      onExercisesLogged(); // Signal to parent that exercises have been logged
+    }
+    handleDataChange(); // Refresh exercise entries
   };
 
   if (loading) {
@@ -364,226 +450,14 @@ const ExerciseCard = ({
                 <Dumbbell className="w-4 h-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add Exercise</DialogTitle>
-                <DialogDescription>
-                  Search for an exercise or add a custom one.
-                </DialogDescription>
-              </DialogHeader>
-              <Tabs
-                value={searchMode}
-                onValueChange={(value) =>
-                  setSearchMode(value as "internal" | "external" | "custom")
-                }
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="internal">My Exercises</TabsTrigger>
-                  <TabsTrigger value="external">Online</TabsTrigger>
-                  <TabsTrigger value="custom">Add Custom</TabsTrigger>
-                </TabsList>
-                <TabsContent value="internal" className="mt-4 space-y-4">
-                  <div className="mb-4">
-                    <Input
-                      type="text"
-                      placeholder="Search your exercises..."
-                      value={searchTerm}
-                      onChange={(e) => {
-                        debug(
-                          loggingLevel,
-                          "Exercise search term changed:",
-                          e.target.value,
-                        );
-                        setSearchTerm(e.target.value);
-                      }}
-                      className="mb-2"
-                    />
-                    <Select
-                      value={filterType}
-                      onValueChange={(value) => {
-                        debug(
-                          loggingLevel,
-                          "Exercise filter type changed:",
-                          value,
-                        );
-                        setFilterType(value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter exercises" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Exercises</SelectItem>
-                        <SelectItem value="my_own">My Own</SelectItem>
-                        <SelectItem value="family">Family</SelectItem>
-                        <SelectItem value="public">Public</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {searchLoading && <div>Searching...</div>}
-
-                  <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
-                    {searchTerm.trim() === "" ? (
-                      <>
-                        {recentExercises.length > 0 && (
-                          <div className="mb-4">
-                            <h3 className="text-lg font-semibold mb-2">
-                              Recent Exercises
-                            </h3>
-                            {recentExercises.map((exercise) => (
-                              <Card
-                                key={exercise.id}
-                                className="mb-2 cursor-pointer"
-                                onClick={() => handleExerciseSelect(exercise)}
-                              >
-                                <CardContent className="p-3">
-                                  <p className="font-semibold">{exercise.name}</p>
-                                  <p className="text-sm text-gray-500">
-                                    {exercise.category}
-                                  </p>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        )}
-                        {topExercises.length > 0 && (
-                          <div>
-                            <h3 className="text-lg font-semibold mb-2">
-                              Top Exercises
-                            </h3>
-                            {topExercises.map((exercise) => (
-                              <Card
-                                key={exercise.id}
-                                className="mb-2 cursor-pointer"
-                                onClick={() => handleExerciseSelect(exercise)}
-                              >
-                                <CardContent className="p-3">
-                                  <p className="font-semibold">{exercise.name}</p>
-                                  <p className="text-sm text-gray-500">
-                                    {exercise.category}
-                                  </p>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        )}
-                        {topExercises.length === 0 &&
-                          recentExercises.length === 0 && (
-                            <div className="text-center text-gray-500">
-                              No recent or top exercises found.
-                            </div>
-                          )}
-                      </>
-                    ) : (
-                      <>
-                        {searchResults.map((exercise) => (
-                          <div
-                            key={exercise.id}
-                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
-                              selectedExerciseId === exercise.id
-                                ? "bg-accent text-accent-foreground"
-                                : "hover:bg-accent/90"
-                            }`}
-                            onClick={() => handleExerciseSelect(exercise)}
-                          >
-                            <div>
-                              <div className="font-medium">{exercise.name}</div>
-                              <div className="text-sm text-gray-500">
-                                {exercise.category} • {exercise.calories_per_hour}{" "}
-                                cal/hour
-                              </div>
-                              {exercise.description && (
-                                <div className="text-xs text-gray-400">
-                                  {exercise.description}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {searchTerm &&
-                          !searchLoading &&
-                          searchResults.length === 0 && (
-                            <div className="text-center text-gray-500 mb-4">
-                              No exercises found
-                            </div>
-                          )}
-                      </>
-                    )}
-                  </div>
-                </TabsContent>
-                <TabsContent value="external" className="mt-4 space-y-4">
-                  <ExerciseSearch
-                    onExerciseSelect={handleExerciseSelect}
-                    showInternalTab={false}
-                    selectedDate={selectedDate}
-                    onLogSuccess={handleDataChange}
-                  />{" "}
-                  {/* Now expects Exercise object */}
-                </TabsContent>
-                <TabsContent value="custom">
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="name" className="text-right">
-                        Name
-                      </Label>
-                      <Input
-                        id="name"
-                        value={newExerciseName}
-                        onChange={(e) => setNewExerciseName(e.target.value)}
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="category" className="text-right">
-                        Category
-                      </Label>
-                      <Select
-                        onValueChange={setNewExerciseCategory}
-                        defaultValue={newExerciseCategory}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general">General</SelectItem>
-                          <SelectItem value="strength">Strength</SelectItem>
-                          <SelectItem value="cardio">Cardio</SelectItem>
-                          <SelectItem value="yoga">Yoga</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="calories" className="text-right">
-                        Calories/Hour
-                      </Label>
-                      <Input
-                        id="calories"
-                        type="number"
-                        value={newExerciseCalories.toString()}
-                        onChange={(e) =>
-                          setNewExerciseCalories(Number(e.target.value))
-                        }
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-start gap-4">
-                      <Label htmlFor="description" className="text-right mt-1">
-                        Description
-                      </Label>
-                      <Textarea
-                        id="description"
-                        value={newExerciseDescription}
-                        onChange={(e) =>
-                          setNewExerciseDescription(e.target.value)
-                        }
-                        className="col-span-3"
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={handleAddCustomExercise}>Add Exercise</Button>
-                </TabsContent>
-              </Tabs>
+            <DialogContent className="sm:max-w-[625px] overflow-y-auto max-h-[90vh]">
+              <AddExerciseDialog
+                open={isAddDialogOpen}
+                onOpenChange={setIsAddDialogOpen}
+                onExerciseAdded={handleExerciseSelect} // Use handleExerciseSelect for single exercises
+                onWorkoutPresetSelected={handleWorkoutPresetSelected} // Handle preset selection
+                mode="diary" // Indicate that it's opened from the diary
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -744,13 +618,23 @@ const ExerciseCard = ({
         />
 
         {/* Log Exercise Entry Dialog */}
-        {selectedExerciseToLog && (
+        {currentExerciseToLog && (
           <LogExerciseEntryDialog
             isOpen={isLogExerciseDialogOpen}
-            onClose={() => setIsLogExerciseDialogOpen(false)}
-            exercise={selectedExerciseToLog}
+            onClose={() => {
+              setIsLogExerciseDialogOpen(false);
+              setCurrentExerciseToLog(null); // Clear current exercise if dialog is closed manually
+              setExercisesToLogQueue([]); // Clear the queue as well
+            }}
+            exercise={currentExerciseToLog}
             selectedDate={selectedDate}
-            onSaveSuccess={handleDataChange}
+            onSaveSuccess={handleLogSuccess} // Use the new handler
+            initialSets={currentExerciseToLog.sets}
+            initialReps={currentExerciseToLog.reps}
+            initialWeight={currentExerciseToLog.weight}
+            initialDuration={currentExerciseToLog.duration} // Use duration from PresetExercise
+            initialNotes={currentExerciseToLog.notes}
+            initialImageUrl={currentExerciseToLog.image_url}
           />
         )}
 

@@ -13,7 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ExerciseSearch from "./ExerciseSearch";
+import WorkoutPresetSelector from "./WorkoutPresetSelector"; // Import WorkoutPresetSelector
 import { createExercise, Exercise } from "@/services/exerciseService";
+import { WorkoutPreset } from "@/types/workout"; // Import WorkoutPreset type
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { PlusCircle, XCircle } from "lucide-react";
@@ -21,10 +23,12 @@ import { PlusCircle, XCircle } from "lucide-react";
 interface AddExerciseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExerciseAdded: () => void;
+  onExerciseAdded: (exercise: Exercise, sourceMode: 'internal' | 'external' | 'custom' | 'preset') => void;
+  onWorkoutPresetSelected?: (preset: WorkoutPreset) => void; // New prop for selecting a workout preset
+  mode: 'preset' | 'workout-plan' | 'diary' | 'database-manager';
 }
 
-const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded }: AddExerciseDialogProps) => {
+const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkoutPresetSelected }: AddExerciseDialogProps) => {
   const { user } = useAuth();
   const [newExerciseName, setNewExerciseName] = useState("");
   const [newExerciseCategory, setNewExerciseCategory] = useState("general");
@@ -43,12 +47,12 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded }: AddExerciseD
   const [newExerciseImageUrls, setNewExerciseImageUrls] = useState<string[]>([]); // State to hold image URLs for display
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null); // For reordering
 
-  const handleExerciseSelect = (exercise: Exercise) => {
+  const handleExerciseSelect = (exercise: Exercise, sourceMode: 'internal' | 'external') => {
     toast({
       title: "Success",
       description: `${exercise.name} added to your exercises.`,
     });
-    onExerciseAdded();
+    onExerciseAdded(exercise, sourceMode); // Pass the selected exercise and source mode
     onOpenChange(false);
   };
 
@@ -84,7 +88,10 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded }: AddExerciseD
         title: "Success",
         description: "Exercise added successfully",
       });
-      onExerciseAdded();
+      // Assuming the newly created exercise is returned by createExercise
+      // For now, we'll just pass a placeholder or refetch if necessary.
+      // A more robust solution would be to return the created exercise from createExercise.
+      onExerciseAdded({ id: 'temp-id', name: newExerciseName, category: newExerciseCategory, calories_per_hour: manualCaloriesPerHour !== undefined ? manualCaloriesPerHour : newExerciseCalories }, 'custom');
       onOpenChange(false);
       setNewExerciseName("");
       setNewExerciseCategory("general");
@@ -161,19 +168,41 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded }: AddExerciseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[625px] overflow-y-auto max-h-[80vh]">
+      <DialogContent className="sm:max-w-[625px] overflow-y-auto max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Add Exercise</DialogTitle>
           <DialogDescription>
             Add a new exercise to your database, either by creating a custom one or importing from an external source.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="online">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue={mode === 'database-manager' ? 'online' : 'my-exercises'}>
+          <TabsList className={`grid w-full grid-cols-${mode === 'database-manager' ? 2 : (mode === 'diary' || mode === 'workout-plan') ? 4 : 3}`}>
+            {mode !== 'database-manager' && <TabsTrigger value="my-exercises">My Exercises</TabsTrigger>}
+            {(mode === 'diary' || mode === 'workout-plan') && <TabsTrigger value="workout-preset">Workout Preset</TabsTrigger>}
             <TabsTrigger value="online">Online</TabsTrigger>
             <TabsTrigger value="custom">Add Custom</TabsTrigger>
           </TabsList>
-          <TabsContent value="custom">
+          {mode !== 'database-manager' && (
+            <TabsContent value="my-exercises">
+              <div className="pt-4">
+                <ExerciseSearch
+                  onExerciseSelect={(exercise, source) => handleExerciseSelect(exercise, source)}
+                  disableTabs={true}
+                  initialSearchSource="internal"
+                />
+              </div>
+            </TabsContent>
+          )}
+          <TabsContent value="online">
+            <div className="pt-4">
+              <ExerciseSearch
+                onExerciseSelect={(exercise, source) => handleExerciseSelect(exercise, source)}
+                disableTabs={true}
+                initialSearchSource="external"
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="custom" className="overflow-y-auto max-h-full">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">
@@ -358,11 +387,20 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded }: AddExerciseD
               </div>
             <Button onClick={handleAddCustomExercise}>Add Exercise</Button>
           </TabsContent>
-          <TabsContent value="online">
-            <div className="pt-4">
-              <ExerciseSearch onExerciseSelect={handleExerciseSelect} showInternalTab={false} />
-            </div>
-          </TabsContent>
+          {(mode === 'diary' || mode === 'workout-plan') && (
+            <TabsContent value="workout-preset">
+              <div className="pt-4">
+                <WorkoutPresetSelector
+                  onPresetSelected={(preset) => {
+                    if (onWorkoutPresetSelected) {
+                      onWorkoutPresetSelected(preset);
+                    }
+                    onOpenChange(false); // Close the dialog after selecting a preset
+                  }}
+                />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </DialogContent>
     </Dialog>

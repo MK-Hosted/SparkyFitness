@@ -72,6 +72,15 @@ export async function apiCall(endpoint: string, options?: ApiCallOptions): Promi
       }
       const errorMessage = errorData.error || errorData.message || `API call failed with status ${response.status}`;
 
+      // Special handling for 400 errors on recent/top endpoints
+      if (
+        response.status === 400 &&
+        (endpoint === '/exercises/recent' || endpoint === '/exercises/top')
+      ) {
+        debug(userLoggingLevel, `Frontend workaround triggered for ${endpoint}: Backend returned 400. Returning empty array.`);
+        return []; // Return empty array to gracefully handle 400 errors on these endpoints
+      }
+
       // Suppress toast for 404 errors if suppress404Toast is true
       if (response.status === 404 && options?.suppress404Toast) {
         debug(userLoggingLevel, `API call returned 404 for ${endpoint}, toast suppressed. Returning null.`);

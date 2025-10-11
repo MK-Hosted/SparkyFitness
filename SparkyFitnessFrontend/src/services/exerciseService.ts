@@ -166,3 +166,18 @@ export const getSuggestedExercises = async (limit: number): Promise<{ recentExer
     method: 'GET',
   });
 };
+
+export const getExerciseById = async (id: string): Promise<Exercise> => {
+  const response = await apiCall(`/exercises/${id}`, {
+    method: 'GET',
+  });
+  // Ensure arrays are parsed correctly
+  return {
+    ...response,
+    equipment: parseJsonArray(response.equipment),
+    primary_muscles: parseJsonArray(response.primary_muscles),
+    secondary_muscles: parseJsonArray(response.secondary_muscles),
+    instructions: parseJsonArray(response.instructions),
+    images: parseJsonArray(response.images),
+  };
+};

@@ -224,6 +224,8 @@ log('debug', 'Registering /openid routes');
 app.use('/openid', openidRoutes); // Import OpenID routes
 app.use('/water-containers', waterContainerRoutes);
 app.use('/admin/backup', backupRoutes); // Add backup routes
+app.use('/workout-presets', require('./routes/workoutPresetRoutes')); // Add workout preset routes
+app.use('/workout-plan-templates', require('./routes/workoutPlanTemplateRoutes')); // Add workout plan template routes
 
 // Temporary debug route to log incoming requests for meal plan templates
 app.use('/meal-plan-templates', (req, res, next) => {

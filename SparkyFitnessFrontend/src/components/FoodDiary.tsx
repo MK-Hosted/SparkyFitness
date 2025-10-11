@@ -36,6 +36,9 @@ import { FoodEntry } from "@/types/food";
 import { ExpandedGoals } from "@/types/goals";
 import { Exercise } from "@/services/exerciseSearchService"; // Import Exercise interface
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Import Dialog components
+import { PresetExercise, WorkoutPreset } from "@/types/workout"; // Import PresetExercise and WorkoutPreset types
+import AddExerciseDialog from "./AddExerciseDialog"; // Import AddExerciseDialog
+import AddWorkoutPresetDialog from "./AddWorkoutPresetDialog"; // Import AddWorkoutPresetDialog
 
 import { Meal as MealType } from "@/types/meal"; // Import MealType from types/meal.d.ts
 
@@ -69,12 +72,16 @@ interface FoodDiaryProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
   refreshTrigger: number; // New prop for external refresh trigger
+  initialExercisesToLog?: PresetExercise[]; // New prop to receive exercises from preset/plan
+  onExercisesLogged: () => void; // New prop to signal that exercises have been logged
 }
 
 const FoodDiary = ({
   selectedDate,
   onDateChange,
   refreshTrigger: externalRefreshTrigger,
+  initialExercisesToLog,
+  onExercisesLogged,
 }: FoodDiaryProps) => {
   const { activeUserId } = useActiveUser();
   const {
@@ -110,7 +117,8 @@ const FoodDiary = ({
   const [isUnitSelectorOpen, setIsUnitSelectorOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false); // State for copy dialog
   const [copySourceMealType, setCopySourceMealType] = useState<string>(""); // State to hold the meal type from which copy was initiated
-  const [isExerciseSearchOpen, setIsExerciseSearchOpen] = useState(false); // State for ExerciseSearch dialog
+  const [exercisesToLogFromPreset, setExercisesToLogFromPreset] = useState<PresetExercise[]>([]); // State to hold exercises from a selected preset
+  // Use initialExercisesToLog directly, no need for a separate state if it's only passed down
 
   const currentUserId = activeUserId;
   debug(loggingLevel, "Current user ID:", currentUserId);
@@ -121,6 +129,17 @@ const FoodDiary = ({
     // based on the user's timezone, ensuring the date object reflects the intended calendar day.
     setDate(parseDateInUserTimezone(selectedDate));
   }, [selectedDate, parseDateInUserTimezone]); // Add parseDateInUserTimezone to dependency array
+
+  const normalizeGlycemicIndex = useCallback((value: any): GlycemicIndex => {
+    if (value === null || value === undefined || value === '' || value === '0.0' || value === 0) {
+      return 'None';
+    }
+    const validGlycemicIndexes: GlycemicIndex[] = ['None', 'Very Low', 'Low', 'Medium', 'High', 'Very High'];
+    if (validGlycemicIndexes.includes(value as GlycemicIndex)) {
+      return value as GlycemicIndex;
+    }
+    return 'None';
+  }, []);
 
   const _calculateDayTotals = useCallback(
     (entries: FoodEntry[]) => {
@@ -175,9 +194,7 @@ const FoodDiary = ({
           ...entry,
           food_variants: entry.food_variants ? {
             ...entry.food_variants,
-            glycemic_index: (entry.food_variants.glycemic_index === "0.0" || entry.food_variants.glycemic_index === null || entry.food_variants.glycemic_index === undefined || entry.food_variants.glycemic_index === "" || entry.food_variants.glycemic_index === 0)
-              ? 'None'
-              : entry.food_variants.glycemic_index
+            glycemic_index: normalizeGlycemicIndex(entry.food_variants.glycemic_index)
           } : entry.food_variants
         };
       });
@@ -533,6 +550,16 @@ const FoodDiary = ({
     [debug, loggingLevel, handleDataChange],
   );
 
+  const handleExerciseAdded = useCallback(() => {
+    debug(loggingLevel, "Exercise added, triggering data change.");
+    handleDataChange();
+  }, [debug, loggingLevel, handleDataChange]);
+
+  const handleWorkoutPresetSelected = useCallback((preset: WorkoutPreset) => {
+    debug(loggingLevel, "Workout preset selected:", preset);
+    setExercisesToLogFromPreset(preset.exercises || []); // Directly use preset.exercises
+  }, [debug, loggingLevel]);
+
   return (
     <div className="space-y-6">
       {/* Date Navigation */}
@@ -657,6 +684,8 @@ const FoodDiary = ({
             <ExerciseCard
               selectedDate={selectedDate}
               onExerciseChange={handleDataChange}
+              initialExercisesToLog={initialExercisesToLog} // Pass the new prop directly
+              onExercisesLogged={onExercisesLogged} // Pass the new prop directly
               key={`exercise-${externalRefreshTrigger}`}
             />
           </div>
@@ -693,6 +722,7 @@ const FoodDiary = ({
           sourceMealType={copySourceMealType}
         />
       )}
+
     </div>
   );
 };

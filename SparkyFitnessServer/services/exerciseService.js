@@ -1,6 +1,7 @@
 const { getPool } = require('../db/poolManager'); // Import the database connection pool
 const exerciseRepository = require('../models/exerciseRepository');
 const userRepository = require('../models/userRepository');
+const preferenceRepository = require('../models/preferenceRepository');
 const { v4: uuidv4 } = require('uuid'); // New import for UUID generation
 const { log } = require('../config/logging');
 const wgerService = require('../integrations/wger/wgerService');
@@ -11,6 +12,7 @@ const { downloadImage } = require('../utils/imageDownloader'); // Import image d
 const calorieCalculationService = require('./CalorieCalculationService'); // Import calorie calculation service
 const fs = require('fs'); // Import file system module
 const path = require('path'); // Import path module
+const { isValidUuid, resolveExerciseIdToUuid } = require('../utils/uuidUtils'); // Import uuidUtils
 
 async function getExercisesWithPagination(authenticatedUserId, targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter, currentPage, itemsPerPage) {
   try {
@@ -76,27 +78,34 @@ async function createExercise(authenticatedUserId, exerciseData) {
 
 async function createExerciseEntry(authenticatedUserId, entryData) {
   try {
-    // Ensure the entry is created for the authenticated user
     entryData.user_id = authenticatedUserId;
 
-    // If calories_burned is not provided, calculate it based on exercise's calories_per_hour and duration
-    if (!entryData.calories_burned && entryData.exercise_id && entryData.duration_minutes) {
+    // Resolve exercise_id to a UUID
+    const resolvedExerciseId = await resolveExerciseIdToUuid(entryData.exercise_id);
+    entryData.exercise_id = resolvedExerciseId;
+
+    // If calories_burned is not provided, calculate it using the calorieCalculationService
+    if (!entryData.calories_burned && entryData.exercise_id && entryData.duration_minutes !== null && entryData.duration_minutes !== undefined) {
       const exercise = await exerciseRepository.getExerciseById(entryData.exercise_id);
-      if (exercise && exercise.calories_per_hour) {
-        entryData.calories_burned = (exercise.calories_per_hour / 60) * entryData.duration_minutes;
+      if (exercise) {
+        const caloriesPerHour = await calorieCalculationService.estimateCaloriesBurnedPerHour(exercise, authenticatedUserId);
+        entryData.calories_burned = (caloriesPerHour / 60) * entryData.duration_minutes;
       } else {
-        log('warn', `Exercise ${entryData.exercise_id} not found or calories_per_hour not set. Cannot auto-calculate calories_burned.`);
-        entryData.calories_burned = 0; // Default to 0 if calculation not possible
+        log('warn', `Exercise ${entryData.exercise_id} not found. Cannot auto-calculate calories_burned.`);
+        entryData.calories_burned = 0;
       }
     } else if (!entryData.calories_burned) {
-      entryData.calories_burned = 0; // Default to 0 if no duration or exercise_id
+      entryData.calories_burned = 0;
     }
 
     const newEntry = await exerciseRepository.createExerciseEntry(authenticatedUserId, {
       ...entryData,
+      duration_minutes: typeof entryData.duration_minutes === 'number' ? entryData.duration_minutes : 0,
       sets: entryData.sets || null,
       reps: entryData.reps || null,
       weight: entryData.weight || null,
+      workout_plan_assignment_id: entryData.workout_plan_assignment_id || null,
+      image_url: entryData.image_url || null,
     });
     return newEntry;
   } catch (error) {
@@ -129,12 +138,29 @@ async function updateExerciseEntry(authenticatedUserId, id, updateData) {
     if (entryOwnerId !== authenticatedUserId) {
       throw new Error('Forbidden: You do not have permission to update this exercise entry.');
     }
+ 
+    // If calories_burned is not provided, calculate it using the calorieCalculationService
+    if (updateData.exercise_id && updateData.duration_minutes !== null && updateData.duration_minutes !== undefined && updateData.calories_burned === undefined) {
+      const exercise = await exerciseRepository.getExerciseById(updateData.exercise_id);
+      if (exercise) {
+        const caloriesPerHour = await calorieCalculationService.estimateCaloriesBurnedPerHour(exercise, authenticatedUserId);
+        updateData.calories_burned = (caloriesPerHour / 60) * updateData.duration_minutes;
+      } else {
+        log('warn', `Exercise ${updateData.exercise_id} not found. Cannot auto-calculate calories_burned.`);
+        updateData.calories_burned = 0;
+      }
+    } else if (updateData.calories_burned === undefined) {
+      updateData.calories_burned = 0;
+    }
 
     const updatedEntry = await exerciseRepository.updateExerciseEntry(id, authenticatedUserId, {
       ...updateData,
+      duration_minutes: updateData.duration_minutes || 0,
       sets: updateData.sets || null,
       reps: updateData.reps || null,
       weight: updateData.weight || null,
+      workout_plan_assignment_id: updateData.workout_plan_assignment_id || null,
+      image_url: updateData.image_url || null,
     });
     if (!updatedEntry) {
       throw new Error('Exercise entry not found or not authorized to update.');
@@ -491,20 +517,58 @@ async function addFreeExerciseDBExerciseToUserExercises(authenticatedUserId, fre
 
 async function getSuggestedExercises(authenticatedUserId, limit) {
   try {
-    const recentExercises = await exerciseRepository.getRecentExercises(authenticatedUserId, limit);
-    const topExercises = await exerciseRepository.getTopExercises(authenticatedUserId, limit);
+    const preferences = await preferenceRepository.getUserPreferences(authenticatedUserId);
+    const displayLimit = preferences?.item_display_limit || limit;
+    const recentExercises = await exerciseRepository.getRecentExercises(authenticatedUserId, displayLimit);
+    const topExercises = await exerciseRepository.getTopExercises(authenticatedUserId, displayLimit);
     return { recentExercises, topExercises };
   } catch (error) {
     log('error', `Error fetching suggested exercises for user ${authenticatedUserId}:`, error);
     throw error;
   }
 }
+
+async function getRecentExercises(authenticatedUserId, limit) {
+  try {
+    const preferences = await preferenceRepository.getUserPreferences(authenticatedUserId);
+    const displayLimit = preferences?.item_display_limit || limit;
+    const recentExercises = await exerciseRepository.getRecentExercises(authenticatedUserId, displayLimit);
+    return recentExercises;
+  } catch (error) {
+    log('error', `Error fetching recent exercises for user ${authenticatedUserId}:`, error);
+    throw error;
+  }
+}
+
+async function getTopExercises(authenticatedUserId, limit) {
+  try {
+    const preferences = await preferenceRepository.getUserPreferences(authenticatedUserId);
+    const displayLimit = preferences?.item_display_limit || limit;
+    const topExercises = await exerciseRepository.getTopExercises(authenticatedUserId, displayLimit);
+    return topExercises;
+  } catch (error) {
+    log('error', `Error fetching top exercises for user ${authenticatedUserId}:`, error);
+    throw error;
+  }
+}
+
 async function getExerciseProgressData(authenticatedUserId, exerciseId, startDate, endDate) {
   try {
     const progressData = await exerciseRepository.getExerciseProgressData(authenticatedUserId, exerciseId, startDate, endDate);
     return progressData;
   } catch (error) {
     log('error', `Error fetching exercise progress data for user ${authenticatedUserId}, exercise ${exerciseId}:`, error);
+    throw error;
+  }
+}
+ 
+async function getExerciseHistory(authenticatedUserId, exerciseId, limit) {
+  try {
+    const resolvedExerciseId = await resolveExerciseIdToUuid(exerciseId);
+    const history = await exerciseRepository.getExerciseHistory(authenticatedUserId, resolvedExerciseId, limit);
+    return history;
+  } catch (error) {
+    log('error', `Error fetching exercise history for user ${authenticatedUserId}, exercise ${exerciseId}:`, error);
     throw error;
   }
 }
@@ -531,9 +595,12 @@ module.exports = {
   addExternalExerciseToUserExercises,
   addNutritionixExerciseToUserExercises,
   getExerciseDeletionImpact,
-  getExerciseProgressData, // New export
+  getExerciseProgressData,
+  getExerciseHistory, // New export
+  getRecentExercises,
+  getTopExercises,
 };
-
+ 
 async function getExerciseDeletionImpact(exerciseId) {
     const client = await getPool().connect();
     try {

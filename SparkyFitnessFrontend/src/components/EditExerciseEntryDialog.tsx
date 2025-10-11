@@ -26,14 +26,22 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
  const { loggingLevel } = usePreferences();
  debug(loggingLevel, "EditExerciseEntryDialog: Component rendered for entry:", entry.id);
 
- const [duration, setDuration] = useState(entry.duration_minutes);
+ const [duration, setDuration] = useState<number | undefined>(entry.duration_minutes);
+ const [sets, setSets] = useState<number | undefined>(entry.sets);
+ const [reps, setReps] = useState<number | undefined>(entry.reps);
+ const [weight, setWeight] = useState<number | undefined>(entry.weight);
  const [notes, setNotes] = useState(entry.notes || "");
+ const [imageUrl, setImageUrl] = useState(entry.image_url || "");
  const [loading, setLoading] = useState(false);
 
  useEffect(() => {
    debug(loggingLevel, "EditExerciseEntryDialog: entry useEffect triggered.", entry);
    setDuration(entry.duration_minutes);
+   setSets(entry.sets);
+   setReps(entry.reps);
+   setWeight(entry.weight);
    setNotes(entry.notes || "");
+   setImageUrl(entry.image_url || "");
  }, [entry, loggingLevel]);
 
  const handleSave = async () => {
@@ -53,6 +61,10 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
        duration_minutes: duration,
        calories_burned: caloriesBurned,
        notes: notes,
+       sets: sets,
+       reps: reps,
+       weight: weight,
+       image_url: imageUrl,
      });
 
      info(loggingLevel, "EditExerciseEntryDialog: Exercise entry updated successfully:", entry.id);
@@ -109,7 +121,41 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
                debug(loggingLevel, "EditExerciseEntryDialog: Duration input changed:", e.target.value);
                setDuration(Number(e.target.value));
              }}
-             min="1"
+             min="0"
+           />
+         </div>
+
+         <div>
+           <Label htmlFor="sets">Sets</Label>
+           <Input
+             id="sets"
+             type="number"
+             value={sets ?? ''}
+             onChange={(e) => setSets(Number(e.target.value) || undefined)}
+             min="0"
+           />
+         </div>
+
+         <div>
+           <Label htmlFor="reps">Reps</Label>
+           <Input
+             id="reps"
+             type="number"
+             value={reps ?? ''}
+             onChange={(e) => setReps(Number(e.target.value) || undefined)}
+             min="0"
+           />
+         </div>
+
+         <div>
+           <Label htmlFor="weight">Weight (kg/lbs)</Label>
+           <Input
+             id="weight"
+             type="number"
+             value={weight ?? ''}
+             onChange={(e) => setWeight(Number(e.target.value) || undefined)}
+             min="0"
+             step="0.1"
            />
          </div>
          
@@ -123,6 +169,17 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
                setNotes(e.target.value);
              }}
              placeholder="Add any notes about this exercise..."
+           />
+         </div>
+
+         <div>
+           <Label htmlFor="imageUrl">Image URL</Label>
+           <Input
+             id="imageUrl"
+             type="text"
+             value={imageUrl}
+             onChange={(e) => setImageUrl(e.target.value)}
+             placeholder="Optional image URL"
            />
          </div>
        </div>

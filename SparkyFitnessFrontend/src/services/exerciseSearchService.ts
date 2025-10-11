@@ -25,16 +25,20 @@ export interface Exercise {
 }
 
 export const searchExercises = async (query: string, equipmentFilter: string[] = [], muscleGroupFilter: string[] = []): Promise<Exercise[]> => {
-  let url = `/exercises?searchTerm=${encodeURIComponent(query)}`;
+  const params: Record<string, any> = {
+    searchTerm: query,
+  };
   if (equipmentFilter.length > 0) {
-    url += `&equipmentFilter=${equipmentFilter.join(',')}`;
+    params.equipmentFilter = equipmentFilter.join(',');
   }
   if (muscleGroupFilter.length > 0) {
-    url += `&muscleGroupFilter=${muscleGroupFilter.join(',')}`;
+    params.muscleGroupFilter = muscleGroupFilter.join(',');
   }
-  return apiCall(url, {
+  const result = await apiCall('/exercises/search', {
     method: 'GET',
+    params: params,
   });
+  return Array.isArray(result) ? result : [];
 };
 
 export const searchExternalExercises = async (query: string, providerId: string, providerType: string, equipmentFilter: string[] = [], muscleGroupFilter: string[] = [], limit?: number): Promise<Exercise[]> => {
@@ -50,10 +54,11 @@ export const searchExternalExercises = async (query: string, providerId: string,
     params.limit = limit;
   }
 
-  return apiCall('/exercises/search-external', {
+  const result = await apiCall('/exercises/search-external', {
     method: 'GET',
     params: params,
   });
+  return Array.isArray(result) ? result : [];
 };
 
 export const addExternalExerciseToUserExercises = async (wgerExerciseId: string): Promise<Exercise> => {
@@ -75,4 +80,20 @@ export const addFreeExerciseDBExercise = async (freeExerciseDBId: string): Promi
     method: 'POST',
     body: JSON.stringify({ exerciseId: freeExerciseDBId }),
   });
+};
+
+export const getRecentExercises = async (userId: string, limit: number = 5): Promise<Exercise[]> => {
+  const result = await apiCall('/exercises/recent', {
+    method: 'GET',
+    params: { userId, limit },
+  });
+  return Array.isArray(result) ? result : [];
+};
+
+export const getTopExercises = async (userId: string, limit: number = 5): Promise<Exercise[]> => {
+  const result = await apiCall('/exercises/top', {
+    method: 'GET',
+    params: { userId, limit },
+  });
+  return Array.isArray(result) ? result : [];
 };
