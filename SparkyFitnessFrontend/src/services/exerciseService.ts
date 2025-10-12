@@ -181,3 +181,11 @@ export const getExerciseById = async (id: string): Promise<Exercise> => {
     images: parseJsonArray(response.images),
   };
 };
+
+export const importExercisesFromCSV = async (formData: FormData): Promise<{ created: number; updated: number; failed: number; failedRows: any[] }> => {
+  return apiCall('/exercises/import', {
+    method: 'POST',
+    body: formData,
+    isFormData: true,
+  });
+};

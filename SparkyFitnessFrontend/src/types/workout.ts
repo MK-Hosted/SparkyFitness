@@ -1,9 +1,9 @@
 export interface PresetExercise {
   id?: string; // Make id optional as it might not exist when creating a new entry
   exercise_id: string;
-  sets: number;
-  reps: number;
-  weight: number;
+  sets?: number;
+  reps?: number;
+  weight?: number;
   duration?: number; // Duration in minutes (optional)
   notes?: string; // (optional)
   image_url?: string;
@@ -19,7 +19,7 @@ export interface ExerciseInPreset {
   duration?: number; // Duration in minutes (optional)
   notes?: string; // (optional)
   image_url?: string;
-  exercise_name?: string; // Populated from backend join
+  exercise_name: string; // Populated from backend join
 }
 
 export interface WorkoutPresetExercise extends ExerciseInPreset {
@@ -34,7 +34,7 @@ export interface WorkoutPreset {
   is_public?: boolean;
   created_at?: string;
   updated_at?: string;
-  exercises?: PresetExercise[]; // Changed to PresetExercise[]
+  exercises?: WorkoutPresetExercise[];
 }
 
 export interface WorkoutPlanAssignment extends Partial<ExerciseInPreset> {

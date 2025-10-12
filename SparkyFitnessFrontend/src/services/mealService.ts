@@ -5,8 +5,8 @@ export const createMeal = async (userId: string, mealData: MealPayload): Promise
   return await api.post(`/meals`, { body: mealData });
 };
 
-export const getMeals = async (userId: string, isPublic: boolean = false, isRecent: boolean = false, isTop: boolean = false, limit: number | null = null): Promise<Meal[]> => {
-  return await api.get(`/meals`, { params: { is_public: isPublic, is_recent: isRecent, is_top: isTop, limit: limit } });
+export const getMeals = async (userId: string, isPublic: boolean = false, searchTerm: string = ""): Promise<Meal[]> => {
+  return await api.get(`/meals`, { params: { is_public: isPublic, search: searchTerm } });
 };
 
 export const getMealById = async (userId: string, mealId: string): Promise<Meal> => {

@@ -69,44 +69,54 @@ const CustomFoodForm = ({ onSave }: CustomFoodFormProps) => {
    is_quick_food: false,
    glycemic_index: "None", // Default to 'None'
  });
+ const [servingSizeError, setServingSizeError] = useState<string | null>(null);
 
- const handleSubmit = (e: React.FormEvent) => {
-   e.preventDefault();
-   debug(loggingLevel, "CustomFoodForm: Handling form submission.");
-   if (!formData.name.trim()) {
-     warn(loggingLevel, "CustomFoodForm: Food name is empty, submission aborted.");
-     return;
-   }
-   
-   info(loggingLevel, "CustomFoodForm: Saving custom food:", formData);
-   onSave(formData);
-   setFormData({
-     name: "",
-     brand: "",
-     calories: 0,
-     protein: 0,
-     carbs: 0,
-     fat: 0,
-     saturated_fat: 0,
-     polyunsaturated_fat: 0,
-     monounsaturated_fat: 0,
-     trans_fat: 0,
-     cholesterol: 0,
-     sodium: 0,
-     potassium: 0,
-     dietary_fiber: 0,
-     sugars: 0,
-     vitamin_a: 0,
-     vitamin_c: 0,
-     calcium: 0,
-     iron: 0,
-     servingSize: 100,
-     servingUnit: "g",
-     is_quick_food: false,
-     glycemic_index: "None",
-   });
-   info(loggingLevel, "CustomFoodForm: Form data reset.");
- };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    debug(loggingLevel, "CustomFoodForm: Handling form submission.");
+
+    if (!formData.name.trim()) {
+      warn(loggingLevel, "CustomFoodForm: Food name is empty, submission aborted.");
+      return;
+    }
+
+    if (formData.servingSize <= 0 || isNaN(formData.servingSize)) {
+      setServingSizeError("Serving size must be a positive number.");
+      warn(loggingLevel, "CustomFoodForm: Serving size is invalid, submission aborted.");
+      return;
+    }
+
+    setServingSizeError(null); // Clear any previous error
+    
+    info(loggingLevel, "CustomFoodForm: Saving custom food:", formData);
+    onSave(formData);
+    setFormData({
+      name: "",
+      brand: "",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      saturated_fat: 0,
+      polyunsaturated_fat: 0,
+      monounsaturated_fat: 0,
+      trans_fat: 0,
+      cholesterol: 0,
+      sodium: 0,
+      potassium: 0,
+      dietary_fiber: 0,
+      sugars: 0,
+      vitamin_a: 0,
+      vitamin_c: 0,
+      calcium: 0,
+      iron: 0,
+      servingSize: 100,
+      servingUnit: "g",
+      is_quick_food: false,
+      glycemic_index: "None",
+    });
+    info(loggingLevel, "CustomFoodForm: Form data reset.");
+  };
 
  const handleInputChange = (field: keyof CustomFood, value: string | number | boolean | GlycemicIndex) => {
    debug(loggingLevel, `CustomFoodForm: Input change for field "${field}":`, value);
@@ -184,6 +194,7 @@ const CustomFoodForm = ({ onSave }: CustomFoodFormProps) => {
                min="0"
                step="0.1"
              />
+             {servingSizeError && <p className="text-red-500 text-sm">{servingSizeError}</p>}
            </div>
            
            <div className="space-y-2">

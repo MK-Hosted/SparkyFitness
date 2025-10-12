@@ -370,7 +370,7 @@ const FoodDatabaseManager: React.FC = () => {
               {/* Filter dropdown */}
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <Filter className="h-4 w-4 text-gray-500" />
-                <Select value={foodFilter} onValueChange={(value) => setFoodFilter(value)}>
+                <Select value={foodFilter} onValueChange={(value: FoodFilter) => setFoodFilter(value)}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -668,6 +668,7 @@ const FoodDatabaseManager: React.FC = () => {
         title="Add Food to Database"
         description="Search for foods to add to your personal database."
         hideDatabaseTab={true}
+        hideMealTab={true}
       />
     </div>
   );

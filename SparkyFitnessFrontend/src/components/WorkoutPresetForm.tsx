@@ -31,7 +31,9 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
   const [name, setName] = useState(initialPreset?.name || "");
   const [description, setDescription] = useState(initialPreset?.description || "");
   const [isPublic, setIsPublic] = useState(initialPreset?.is_public || false);
-  const [exercises, setExercises] = useState<WorkoutPresetExercise[]>(initialPreset?.exercises || []);
+  const [exercises, setExercises] = useState<WorkoutPresetExercise[]>(
+    initialPreset?.exercises?.map(ex => ({ ...ex, exercise: undefined })) || []
+  );
   const [isAddExerciseDialogOpen, setIsAddExerciseDialogOpen] = useState(false); // State for AddExerciseDialog
 
   useEffect(() => {
@@ -39,7 +41,7 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
       setName(initialPreset?.name || "");
       setDescription(initialPreset?.description || "");
       setIsPublic(initialPreset?.is_public || false);
-      setExercises(initialPreset?.exercises || []);
+      setExercises(initialPreset?.exercises?.map(ex => ({ ...ex, exercise: undefined })) || []);
     }
   }, [isOpen, initialPreset]);
 
@@ -145,62 +147,58 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
             <div className="space-y-2">
               {exercises.map((ex, index) => (
                 <div key={index} className="flex items-center space-x-2 border p-2 rounded-md">
-                  <div className="flex-grow grid grid-cols-2 gap-2">
-                    <Label className="col-span-2 font-medium">{ex.exercise_name}</Label>
-                    <div className="flex items-center gap-2">
-                      <ListOrdered className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1">
-                        <Label htmlFor={`sets-${index}`}>Sets</Label>
-                        <Input
-                          id={`sets-${index}`}
-                          type="number"
-                          value={ex.sets ?? ''}
-                          onChange={(e) => handleExerciseChange(index, "sets", Number(e.target.value))}
-                          min="0"
-                        />
-                      </div>
+                  <div className="flex-grow grid grid-cols-4 gap-2">
+                    <Label className="col-span-4 font-medium">{ex.exercise_name}</Label>
+                    <div>
+                      <Label htmlFor={`sets-${index}`} className="flex items-center gap-1">
+                        <ListOrdered className="h-4 w-4 text-blue-500" /> Sets
+                      </Label>
+                      <Input
+                        id={`sets-${index}`}
+                        type="number"
+                        value={ex.sets ?? ''}
+                        onChange={(e) => handleExerciseChange(index, "sets", Number(e.target.value))}
+                        min="0"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Repeat className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1">
-                        <Label htmlFor={`reps-${index}`}>Reps</Label>
-                        <Input
-                          id={`reps-${index}`}
-                          type="number"
-                          value={ex.reps ?? ''}
-                          onChange={(e) => handleExerciseChange(index, "reps", Number(e.target.value))}
-                          min="0"
-                        />
-                      </div>
+                    <div>
+                      <Label htmlFor={`reps-${index}`} className="flex items-center gap-1">
+                        <Repeat className="h-4 w-4 text-green-500" /> Reps
+                      </Label>
+                      <Input
+                        id={`reps-${index}`}
+                        type="number"
+                        value={ex.reps ?? ''}
+                        onChange={(e) => handleExerciseChange(index, "reps", Number(e.target.value))}
+                        min="0"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Weight className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1">
-                        <Label htmlFor={`weight-${index}`}>Weight</Label>
-                        <Input
-                          id={`weight-${index}`}
-                          type="number"
-                          value={ex.weight ?? ''}
-                          onChange={(e) => handleExerciseChange(index, "weight", Number(e.target.value))}
-                          min="0"
-                          step="0.1"
-                        />
-                      </div>
+                    <div>
+                      <Label htmlFor={`weight-${index}`} className="flex items-center gap-1">
+                        <Weight className="h-4 w-4 text-yellow-500" /> Weight
+                      </Label>
+                      <Input
+                        id={`weight-${index}`}
+                        type="number"
+                        value={ex.weight ?? ''}
+                        onChange={(e) => handleExerciseChange(index, "weight", Number(e.target.value))}
+                        min="0"
+                        step="0.1"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Timer className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1">
-                        <Label htmlFor={`duration-${index}`}>Duration (minutes)</Label>
-                        <Input
-                          id={`duration-${index}`}
-                          type="number"
-                          value={ex.duration ?? ''}
-                          onChange={(e) => handleExerciseChange(index, "duration", Number(e.target.value))}
-                          min="0"
-                        />
-                      </div>
+                    <div>
+                      <Label htmlFor={`duration-${index}`} className="flex items-center gap-1">
+                        <Timer className="h-4 w-4 text-red-500" /> Duration (min)
+                      </Label>
+                      <Input
+                        id={`duration-${index}`}
+                        type="number"
+                        value={ex.duration ?? ''}
+                        onChange={(e) => handleExerciseChange(index, "duration", Number(e.target.value))}
+                        min="0"
+                      />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-4">
                       <Label htmlFor={`notes-${index}`}>Notes</Label>
                       <Textarea
                         id={`notes-${index}`}

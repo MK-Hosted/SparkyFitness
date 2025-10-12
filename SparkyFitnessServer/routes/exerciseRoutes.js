@@ -215,6 +215,32 @@ router.post('/', authenticateToken, authorizeAccess('exercise_list'), upload.arr
     next(error);
   }
 });
+// Endpoint to import exercises from CSV (file upload)
+router.post('/import', authenticateToken, authorizeAccess('exercise_list'), upload.single('file'), async (req, res, next) => {
+  try {
+    const result = await exerciseService.importExercisesFromCSV(req.userId, req.file.path);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Endpoint to import exercises from JSON (from frontend table)
+router.post('/import-json', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const { exercises } = req.body;
+    if (!exercises || !Array.isArray(exercises)) {
+      return res.status(400).json({ error: 'Invalid data format. Expected an array of exercises.' });
+    }
+    const result = await exerciseService.importExercisesFromJson(req.userId, exercises);
+    res.status(201).json(result);
+  } catch (error) {
+    if (error.status === 409) {
+      return res.status(409).json({ error: error.message, duplicates: error.data.duplicates });
+    }
+    next(error);
+  }
+});
 
 // Endpoint to update an exercise
 router.put('/:id', authenticateToken, authorizeAccess('exercise_list'), upload.array('images', 10), async (req, res, next) => {

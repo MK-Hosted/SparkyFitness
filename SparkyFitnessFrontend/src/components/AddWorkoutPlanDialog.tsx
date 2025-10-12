@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -28,7 +18,7 @@ import { loadExercises } from "@/services/exerciseService";
 import { Exercise } from "@/services/exerciseSearchService";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AddExerciseDialog from "@/components/AddExerciseDialog"; // Import the unified AddExerciseDialog
 
 interface AddWorkoutPlanDialogProps {
@@ -220,15 +210,15 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <TooltipProvider>
-      <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{initialData ? "Edit Workout Plan" : "Add New Workout Plan"}</AlertDialogTitle>
-          <AlertDialogDescription>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initialData ? "Edit Workout Plan" : "Add New Workout Plan"}</DialogTitle>
+          <DialogDescription>
             {initialData ? "Edit the details for your workout plan and its assignments." : "Enter the details for your new workout plan and assign workouts to days."}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="planName">
@@ -263,7 +253,6 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
                   onChange={(e) => setStartDate(e.target.value)}
                   className="pr-8"
                 />
-                <CalendarDays className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
             <div className="space-y-2">
@@ -278,24 +267,9 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
                   onChange={(e) => setEndDate(e.target.value)}
                   className="pr-8"
                 />
-                <CalendarDays className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
           </div>
-          {(startDate || endDate) && (
-            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-              {startDate && (
-                <span className="flex items-center">
-                  <CalendarDays className="h-4 w-4 mr-1" /> Starts: {new Date(startDate).toLocaleDateString()}
-                </span>
-              )}
-              {endDate && (
-                <span className="flex items-center">
-                  <CalendarDays className="h-4 w-4 mr-1" /> Ends: {new Date(endDate).toLocaleDateString()}
-                </span>
-              )}
-            </div>
-          )}
           <div className="flex items-center space-x-2">
             <Checkbox
               id="isActive"
@@ -378,7 +352,7 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
                                      </Tooltip>
                                    )}
                                  </div>
-                               ))}
+                                ))}
                              </div>
                            ) : (
                              <div className="flex-grow space-y-2">
@@ -494,11 +468,13 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
              ))}
            </div>
          </div>
-         <AlertDialogFooter>
-           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-           <AlertDialogAction onClick={handleSave}>Save Plan</AlertDialogAction>
-         </AlertDialogFooter>
-       </AlertDialogContent>
+         <DialogFooter>
+           <DialogClose asChild>
+             <Button variant="outline" onClick={onClose}>Cancel</Button>
+           </DialogClose>
+           <Button onClick={handleSave}>Save Plan</Button>
+         </DialogFooter>
+       </DialogContent>
  
        <AddExerciseDialog
          open={isAddExerciseDialogOpen}
@@ -508,8 +484,8 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
          mode="workout-plan"
        />
       </TooltipProvider>
-    </AlertDialog>
-   );
- };
+    </Dialog>
+    );
+  };
 
 export default AddWorkoutPlanDialog;

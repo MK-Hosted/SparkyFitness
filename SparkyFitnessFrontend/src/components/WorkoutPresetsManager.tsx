@@ -16,6 +16,7 @@ import WorkoutPresetForm from "./WorkoutPresetForm"; // Import the new form comp
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface WorkoutPresetsManagerProps {
+  onUsePreset: (preset: WorkoutPreset) => void;
 }
 
 const WorkoutPresetsManager: React.FC<WorkoutPresetsManagerProps> = ({ }) => {
