@@ -13,6 +13,7 @@ import {
   updateExerciseEntry,
   ExerciseEntry,
 } from '@/services/editExerciseEntryService';
+import { WorkoutPresetSet } from "@/types/workout";
 
 
 interface EditExerciseEntryDialogProps {
@@ -27,7 +28,7 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
  debug(loggingLevel, "EditExerciseEntryDialog: Component rendered for entry:", entry.id);
 
  const [duration, setDuration] = useState<number | undefined>(entry.duration_minutes);
- const [sets, setSets] = useState<number | undefined>(entry.sets);
+ const [sets, setSets] = useState<WorkoutPresetSet[] | undefined>(entry.sets as WorkoutPresetSet[] | undefined);
  const [reps, setReps] = useState<number | undefined>(entry.reps);
  const [weight, setWeight] = useState<number | undefined>(entry.weight);
  const [notes, setNotes] = useState(entry.notes || "");
@@ -37,7 +38,7 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
  useEffect(() => {
    debug(loggingLevel, "EditExerciseEntryDialog: entry useEffect triggered.", entry);
    setDuration(entry.duration_minutes);
-   setSets(entry.sets);
+   setSets(entry.sets as WorkoutPresetSet[] | undefined);
    setReps(entry.reps);
    setWeight(entry.weight);
    setNotes(entry.notes || "");
@@ -125,14 +126,16 @@ const EditExerciseEntryDialog = ({ entry, open, onOpenChange, onSave }: EditExer
            />
          </div>
 
+         {/* The sets are now an array of objects, so we can't just display a single number.
+             This part of the UI will need to be updated to handle multiple sets if that's the desired functionality.
+             For now, I will just display the number of sets. */}
          <div>
            <Label htmlFor="sets">Sets</Label>
            <Input
              id="sets"
              type="number"
-             value={sets ?? ''}
-             onChange={(e) => setSets(Number(e.target.value) || undefined)}
-             min="0"
+             value={sets?.length ?? ''}
+             disabled
            />
          </div>
 

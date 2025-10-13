@@ -136,10 +136,7 @@ const WorkoutPresetsManager: React.FC<WorkoutPresetsManagerProps> = ({ }) => {
                     {preset.exercises.map((ex, idx) => (
                       <p key={idx} className="flex flex-wrap items-center gap-x-4 gap-y-1">
                         <span className="font-medium">{ex.exercise_name}</span>
-                        {ex.sets && <span className="flex items-center gap-1"><ListOrdered className="h-3 w-3" /> {ex.sets} sets</span>}
-                        {ex.reps && <span className="flex items-center gap-1"><Repeat className="h-3 w-3" /> {ex.reps} reps</span>}
-                        {ex.weight && <span className="flex items-center gap-1"><Weight className="h-3 w-3" /> {ex.weight} kg</span>}
-                        {ex.duration && <span className="flex items-center gap-1"><Timer className="h-3 w-3" /> {ex.duration} min</span>}
+                        {ex.sets && <span className="flex items-center gap-1"><ListOrdered className="h-3 w-3" /> {ex.sets.length} sets</span>}
                       </p>
                     ))}
                   </div>

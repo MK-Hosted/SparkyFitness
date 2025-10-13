@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { WorkoutPreset, WorkoutPresetExercise } from "@/types/workout";
+import { WorkoutPreset, WorkoutPresetExercise, WorkoutPresetSet } from "@/types/workout";
 import { Exercise } from "@/services/exerciseService";
-import AddExerciseDialog from "./AddExerciseDialog"; // Import AddExerciseDialog
-import { Plus, X, Repeat, Weight, Timer, ListOrdered } from "lucide-react"; // Added Repeat, Weight, Timer, ListOrdered
+import AddExerciseDialog from "./AddExerciseDialog";
+import { Plus, X, Repeat, Weight, Timer, ListOrdered, GripVertical, Copy } from "lucide-react";
 import { usePreferences } from "@/contexts/PreferencesContext";
-import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useToast } from "@/hooks/use-toast";
 import { debug } from "@/utils/logging";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, arrayMove, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface WorkoutPresetFormProps {
   isOpen: boolean;
@@ -20,6 +24,91 @@ interface WorkoutPresetFormProps {
   initialPreset?: WorkoutPreset | null;
 }
 
+const SortableSetItem = React.memo(({ set, exerciseIndex, setIndex, onSetChange, onDuplicateSet, onRemoveSet }: { set: WorkoutPresetSet, exerciseIndex: number, setIndex: number, onSetChange: Function, onDuplicateSet: Function, onRemoveSet: Function }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: set.id! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex flex-col space-y-2" {...attributes}>
+      <div className="flex items-center space-x-2">
+        <div {...listeners}>
+          <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-8 gap-2 flex-grow items-center">
+          <div className="md:col-span-1">
+            <Label>Set</Label>
+            <p className="font-medium p-2">{set.set_number}</p>
+          </div>
+          <div className="md:col-span-2">
+            <Label>Type</Label>
+            <Select value={set.set_type} onValueChange={(value) => onSetChange(exerciseIndex, setIndex, 'set_type', value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Set Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Working Set">Working Set</SelectItem>
+                <SelectItem value="Warm-up">Warm-up</SelectItem>
+                <SelectItem value="Drop Set">Drop Set</SelectItem>
+                <SelectItem value="Failure">Failure</SelectItem>
+                <SelectItem value="AMRAP">AMRAP</SelectItem>
+                <SelectItem value="Back-off">Back-off</SelectItem>
+                <SelectItem value="Rest-Pause">Rest-Pause</SelectItem>
+                <SelectItem value="Cluster">Cluster</SelectItem>
+                <SelectItem value="Technique">Technique</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-1">
+            <Label htmlFor={`reps-${exerciseIndex}-${set.id}`} className="flex items-center">
+              <Repeat className="h-4 w-4 mr-1" style={{ color: '#3b82f6' }} /> Reps
+            </Label>
+            <Input id={`reps-${exerciseIndex}-${set.id}`} type="number" value={set.reps ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'reps', Number(e.target.value))} />
+          </div>
+          <div className="md:col-span-1">
+            <Label htmlFor={`weight-${exerciseIndex}-${set.id}`} className="flex items-center">
+              <Weight className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} /> Weight
+            </Label>
+            <Input id={`weight-${exerciseIndex}-${set.id}`} type="number" value={set.weight ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'weight', Number(e.target.value))} />
+          </div>
+          <div className="md:col-span-1">
+            <Label htmlFor={`duration-${exerciseIndex}-${set.id}`} className="flex items-center">
+                            <Timer className="h-4 w-4 mr-1" style={{ color: '#f97316' }} /> Duration (min)
+                          </Label>            <Input id={`duration-${exerciseIndex}-${set.id}`} type="number" value={set.duration ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'duration', Number(e.target.value))} />
+          </div>
+          <div className="md:col-span-1">
+            <Label htmlFor={`rest-${exerciseIndex}-${set.id}`} className="flex items-center">
+              <Timer className="h-4 w-4 mr-1" style={{ color: '#8b5cf6' }} /> Rest (s)
+            </Label>
+            <Input id={`rest-${exerciseIndex}-${set.id}`} type="number" value={set.rest_time ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'rest_time', Number(e.target.value))} />
+          </div>
+          <div className="flex items-center space-x-1">
+            <Button variant="ghost" size="icon" onClick={() => onDuplicateSet(exerciseIndex, setIndex)}>
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onRemoveSet(exerciseIndex, setIndex)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+      <div className="pl-8">
+        <Label htmlFor={`notes-${exerciseIndex}-${set.id}`}>Notes</Label>
+        <Textarea id={`notes-${exerciseIndex}-${set.id}`} value={set.notes ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'notes', e.target.value)} />
+      </div>
+    </div>
+  );
+});
+
 const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
   isOpen,
   onClose,
@@ -27,59 +116,150 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
   initialPreset,
 }) => {
   const { loggingLevel } = usePreferences();
-  const { toast } = useToast(); // Initialize toast
-  const [name, setName] = useState(initialPreset?.name || "");
-  const [description, setDescription] = useState(initialPreset?.description || "");
-  const [isPublic, setIsPublic] = useState(initialPreset?.is_public || false);
-  const [exercises, setExercises] = useState<WorkoutPresetExercise[]>(
-    initialPreset?.exercises?.map(ex => ({ ...ex, exercise: undefined })) || []
-  );
-  const [isAddExerciseDialogOpen, setIsAddExerciseDialogOpen] = useState(false); // State for AddExerciseDialog
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  const [exercises, setExercises] = useState<WorkoutPresetExercise[]>([]);
+  const [isAddExerciseDialogOpen, setIsAddExerciseDialogOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setName(initialPreset?.name || "");
       setDescription(initialPreset?.description || "");
       setIsPublic(initialPreset?.is_public || false);
-      setExercises(initialPreset?.exercises?.map(ex => ({ ...ex, exercise: undefined })) || []);
+      setExercises(initialPreset?.exercises || []);
     }
   }, [isOpen, initialPreset]);
 
-  const handleAddExercise = (exercise: Exercise, sourceMode: 'internal' | 'external' | 'custom') => {
-    debug(loggingLevel, `WorkoutPresetForm: Adding exercise from ${sourceMode}:`, exercise);
-    setExercises((prev) => {
-      const newExercise: WorkoutPresetExercise = {
-        exercise_id: exercise.id,
-        exercise_name: exercise.name, // Store name for display
-        sets: 1,
-        reps: 10,
-        weight: 0,
-        duration: 0, // Initialize duration
-        notes: "", // Initialize notes
-        image_url: exercise.images && exercise.images.length > 0 ? exercise.images[0] : "", // Use first image if available
-        exercise: exercise, // Store full exercise object for details
-      };
-      return [...prev, newExercise];
-    });
-    setIsAddExerciseDialogOpen(false); // Close the dialog after adding
+  const handleAddExercise = (exercise: Exercise) => {
+    const newExercise: WorkoutPresetExercise = {
+      exercise_id: exercise.id,
+      exercise_name: exercise.name,
+      image_url: exercise.images && exercise.images.length > 0 ? exercise.images[0] : "",
+      exercise: exercise,
+      sets: [{ id: Date.now().toString(), set_number: 1, set_type: 'Working Set', reps: 10, weight: 0 }],
+    };
+    setExercises((prev) => [...prev, newExercise]);
+    setIsAddExerciseDialogOpen(false);
   };
 
   const handleRemoveExercise = (index: number) => {
-    debug(loggingLevel, "WorkoutPresetForm: Removing exercise at index:", index);
     setExercises((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleExerciseChange = (
-    index: number,
-    field: keyof WorkoutPresetExercise,
-    value: any,
-  ) => {
-    debug(loggingLevel, `WorkoutPresetForm: Changing exercise field ${String(field)} for index ${index} to ${value}`);
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i === index ? { ...ex, [field]: value } : ex,
-      ),
+  const handleSetChange = useCallback((exerciseIndex: number, setIndex: number, field: keyof WorkoutPresetSet, value: any) => {
+    setExercises(prev =>
+      prev.map((exercise, eIndex) => {
+        if (eIndex !== exerciseIndex) {
+          return exercise;
+        }
+        return {
+          ...exercise,
+          sets: exercise.sets.map((set, sIndex) => {
+            if (sIndex !== setIndex) {
+              return set;
+            }
+            return { ...set, [field]: value };
+          }),
+        };
+      })
     );
+  }, []);
+
+  const handleAddSet = useCallback((exerciseIndex: number) => {
+    setExercises(prev =>
+      prev.map((exercise, eIndex) => {
+        if (eIndex !== exerciseIndex) {
+          return exercise;
+        }
+        const lastSet = exercise.sets[exercise.sets.length - 1];
+        const newSet: WorkoutPresetSet = {
+          ...lastSet,
+          id: Date.now().toString(),
+          set_number: exercise.sets.length + 1,
+        };
+        return {
+          ...exercise,
+          sets: [...exercise.sets, newSet],
+        };
+      })
+    );
+  }, []);
+
+  const handleDuplicateSet = useCallback((exerciseIndex: number, setIndex: number) => {
+    setExercises(prev =>
+      prev.map((exercise, eIndex) => {
+        if (eIndex !== exerciseIndex) {
+          return exercise;
+        }
+        const sets = exercise.sets;
+        const setToDuplicate = sets[setIndex];
+        const newSets = [
+          ...sets.slice(0, setIndex + 1),
+          { ...setToDuplicate, id: Date.now().toString() },
+          ...sets.slice(setIndex + 1)
+        ].map((s, i) => ({ ...s, set_number: i + 1 }));
+        return { ...exercise, sets: newSets };
+      })
+    );
+  }, []);
+
+  const handleRemoveSet = useCallback((exerciseIndex: number, setIndex: number) => {
+    setExercises(prev => {
+      const newState = prev.map((exercise, eIndex) => {
+        if (eIndex === exerciseIndex) {
+          const newSets = exercise.sets
+            .filter((_, sIndex) => sIndex !== setIndex)
+            .map((s, i) => ({ ...s, set_number: i + 1 }));
+          return { ...exercise, sets: newSets };
+        }
+        return exercise;
+      });
+      return newState.filter(exercise => exercise.sets.length > 0);
+    });
+  }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+  
+    setExercises((exercises) => {
+      const newExercises = [...exercises];
+      const activeExerciseIndex = newExercises.findIndex((ex) =>
+        ex.sets.some((s) => s.id === active.id)
+      );
+      const overExerciseIndex = newExercises.findIndex((ex) =>
+        ex.sets.some((s) => s.id === over.id)
+      );
+  
+      if (activeExerciseIndex === -1 || overExerciseIndex === -1 || activeExerciseIndex !== overExerciseIndex) {
+        return newExercises; // Only handle reordering within the same exercise
+      }
+  
+      const exercise = newExercises[activeExerciseIndex];
+      const oldIndex = exercise.sets.findIndex((s) => s.id === active.id);
+      const newIndex = exercise.sets.findIndex((s) => s.id === over.id);
+  
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedSets = arrayMove(exercise.sets, oldIndex, newIndex);
+        newExercises[activeExerciseIndex] = {
+          ...exercise,
+          sets: reorderedSets.map((set, index) => ({ ...set, set_number: index + 1 })),
+        };
+      }
+  
+      return newExercises;
+    });
   };
 
   const handleSubmit = () => {
@@ -97,7 +277,7 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initialPreset ? "Edit Workout Preset" : "Create New Workout Preset"}</DialogTitle>
           <DialogDescription>
@@ -140,80 +320,42 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
             <AddExerciseDialog
               open={isAddExerciseDialogOpen}
               onOpenChange={setIsAddExerciseDialogOpen}
-              onExerciseAdded={handleAddExercise} // Pass the handler to receive the selected/created exercise
-              mode="preset" // Pass the mode prop
+              onExerciseAdded={handleAddExercise}
+              mode="preset"
             />
 
-            <div className="space-y-2">
-              {exercises.map((ex, index) => (
-                <div key={index} className="flex items-center space-x-2 border p-2 rounded-md">
-                  <div className="flex-grow grid grid-cols-4 gap-2">
-                    <Label className="col-span-4 font-medium">{ex.exercise_name}</Label>
-                    <div>
-                      <Label htmlFor={`sets-${index}`} className="flex items-center gap-1">
-                        <ListOrdered className="h-4 w-4 text-blue-500" /> Sets
-                      </Label>
-                      <Input
-                        id={`sets-${index}`}
-                        type="number"
-                        value={ex.sets ?? ''}
-                        onChange={(e) => handleExerciseChange(index, "sets", Number(e.target.value))}
-                        min="0"
-                      />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <div className="space-y-2">
+                {exercises.map((ex, exerciseIndex) => (
+                  <div key={ex.exercise_id || `ex-${exerciseIndex}`} className="border p-4 rounded-md space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold">{ex.exercise_name}</h4>
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveExercise(exerciseIndex)}>
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div>
-                      <Label htmlFor={`reps-${index}`} className="flex items-center gap-1">
-                        <Repeat className="h-4 w-4 text-green-500" /> Reps
-                      </Label>
-                      <Input
-                        id={`reps-${index}`}
-                        type="number"
-                        value={ex.reps ?? ''}
-                        onChange={(e) => handleExerciseChange(index, "reps", Number(e.target.value))}
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`weight-${index}`} className="flex items-center gap-1">
-                        <Weight className="h-4 w-4 text-yellow-500" /> Weight
-                      </Label>
-                      <Input
-                        id={`weight-${index}`}
-                        type="number"
-                        value={ex.weight ?? ''}
-                        onChange={(e) => handleExerciseChange(index, "weight", Number(e.target.value))}
-                        min="0"
-                        step="0.1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`duration-${index}`} className="flex items-center gap-1">
-                        <Timer className="h-4 w-4 text-red-500" /> Duration (min)
-                      </Label>
-                      <Input
-                        id={`duration-${index}`}
-                        type="number"
-                        value={ex.duration ?? ''}
-                        onChange={(e) => handleExerciseChange(index, "duration", Number(e.target.value))}
-                        min="0"
-                      />
-                    </div>
-                    <div className="col-span-4">
-                      <Label htmlFor={`notes-${index}`}>Notes</Label>
-                      <Textarea
-                        id={`notes-${index}`}
-                        value={ex.notes ?? ''}
-                        onChange={(e) => handleExerciseChange(index, "notes", e.target.value)}
-                        placeholder="Add notes for this exercise"
-                      />
-                    </div>
+                    <SortableContext items={ex.sets.map(s => s.id!)}>
+                      <div className="space-y-2">
+                        {ex.sets.map((set, setIndex) => (
+                          <SortableSetItem
+                            key={set.id}
+                            set={set}
+                            exerciseIndex={exerciseIndex}
+                            setIndex={setIndex}
+                            onSetChange={handleSetChange}
+                            onDuplicateSet={handleDuplicateSet}
+                            onRemoveSet={handleRemoveSet}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                    <Button type="button" variant="outline" onClick={() => handleAddSet(exerciseIndex)}>
+                      <Plus className="h-4 w-4 mr-2" /> Add Set
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleRemoveExercise(index)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </DndContext>
           </div>
         </div>
         <DialogFooter>

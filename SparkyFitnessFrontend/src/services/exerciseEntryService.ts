@@ -4,48 +4,46 @@ import { Exercise } from './exerciseSearchService'; // Import the comprehensive 
 import { parseJsonArray } from './exerciseService'; // Import parseJsonArray
 import { ExerciseProgressData } from './reportsService'; // Import ExerciseProgressData
 
+import { WorkoutPresetSet } from '@/types/workout';
+
 export interface ExerciseEntry {
   id: string;
   exercise_id: string;
-  duration_minutes?: number; // Make optional
+  duration_minutes?: number;
   calories_burned: number;
   entry_date: string;
   notes?: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
-  image_url?: string; // Add image_url
-  exercises: Exercise; // Use the comprehensive Exercise interface
+  sets: WorkoutPresetSet[];
+  image_url?: string;
+  exercises: Exercise;
 }
- 
+
 export const fetchExerciseEntries = async (selectedDate: string): Promise<ExerciseEntry[]> => {
   const response = await getDailyExerciseEntries(selectedDate);
   
-  const parsedEntries = response.map((entry: ExerciseEntry) => ({
+  const parsedEntries = response.map((entry: any) => ({
     ...entry,
-    exercises: {
+    exercises: entry.exercises ? {
       ...entry.exercises,
       equipment: parseJsonArray(entry.exercises.equipment),
       primary_muscles: parseJsonArray(entry.exercises.primary_muscles),
       secondary_muscles: parseJsonArray(entry.exercises.secondary_muscles),
       instructions: parseJsonArray(entry.exercises.instructions),
       images: parseJsonArray(entry.exercises.images),
-    }
+    } : entry.exercises
   }));
  
   return parsedEntries;
 };
- 
+
 export const createExerciseEntry = async (payload: {
   exercise_id: string;
-  duration_minutes?: number; // Make optional
-  calories_burned?: number; // Make optional as it can be calculated by backend
   entry_date: string;
   notes?: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
-  image_url?: string; // Add image_url
+  sets: WorkoutPresetSet[];
+  image_url?: string;
+  calories_burned?: number;
+  imageFile?: File | null;
 }): Promise<ExerciseEntry> => {
   return apiCall('/exercise-entries', {
     method: 'POST',
