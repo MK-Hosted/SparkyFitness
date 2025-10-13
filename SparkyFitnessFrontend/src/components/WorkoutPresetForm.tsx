@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { WorkoutPreset, WorkoutPresetExercise, WorkoutPresetSet } from "@/types/workout";
 import { Exercise } from "@/services/exerciseService";
 import AddExerciseDialog from "./AddExerciseDialog";
-import { Plus, X, Repeat, Weight, Timer, ListOrdered, GripVertical, Copy } from "lucide-react";
+import { Plus, X, Repeat, Weight, Timer, ListOrdered, GripVertical, Copy, Dumbbell, Hourglass } from "lucide-react";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useToast } from "@/hooks/use-toast";
 import { debug } from "@/utils/logging";
@@ -76,13 +76,13 @@ const SortableSetItem = React.memo(({ set, exerciseIndex, setIndex, onSetChange,
           </div>
           <div className="md:col-span-1">
             <Label htmlFor={`weight-${exerciseIndex}-${set.id}`} className="flex items-center">
-              <Weight className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} /> Weight
+              <Dumbbell className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} /> Weight
             </Label>
             <Input id={`weight-${exerciseIndex}-${set.id}`} type="number" value={set.weight ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'weight', Number(e.target.value))} />
           </div>
           <div className="md:col-span-1">
             <Label htmlFor={`duration-${exerciseIndex}-${set.id}`} className="flex items-center">
-                            <Timer className="h-4 w-4 mr-1" style={{ color: '#f97316' }} /> Duration (min)
+                            <Hourglass className="h-4 w-4 mr-1" style={{ color: '#f97316' }} /> Duration (min)
                           </Label>            <Input id={`duration-${exerciseIndex}-${set.id}`} type="number" value={set.duration ?? ''} onChange={(e) => onSetChange(exerciseIndex, setIndex, 'duration', Number(e.target.value))} />
           </div>
           <div className="md:col-span-1">

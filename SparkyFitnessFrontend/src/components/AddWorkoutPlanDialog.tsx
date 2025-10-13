@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { WorkoutPlanTemplate, WorkoutPlanAssignment, WorkoutPreset, WorkoutPresetSet } from "@/types/workout";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Repeat, Weight, Timer, ListOrdered, CalendarDays, GripVertical, Copy } from "lucide-react";
+import { Plus, X, Repeat, Weight, Timer, ListOrdered, CalendarDays, GripVertical, Copy, Dumbbell, Hourglass } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, arrayMove, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -95,7 +95,7 @@ const SortableSetItem = React.memo(({ set, assignmentIndex, setIndex, handleSetC
           </div>
           <div className="md:col-span-1">
             <Label htmlFor={`weight-${assignmentIndex}-${setIndex}`} className="flex items-center">
-              <Weight className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} /> Weight
+              <Dumbbell className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} /> Weight
             </Label>
             <Input id={`weight-${assignmentIndex}-${setIndex}`} type="number" value={set.weight ?? ''} onChange={(e) => handleSetChangeInPlan(assignmentIndex, setIndex, 'weight', Number(e.target.value))} />
           </div>
