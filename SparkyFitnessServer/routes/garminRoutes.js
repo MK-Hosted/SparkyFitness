@@ -74,7 +74,7 @@ router.post('/sync/daily_summary', authenticateToken, async (req, res, next) => 
                 if (summaryData && summaryData.data) {
                     const healthDataArray = [
                         { type: 'step', value: summaryData.data.totalSteps, date: date, timestamp: new Date(date).toISOString() },
-                        { type: 'Active Calories', value: summaryData.data.totalKilocalories, date: date, timestamp: new Date(date).toISOString() },
+                        { type: 'Active Calories', value: summaryData.data.activeKilocalories, date: date, timestamp: new Date(date).toISOString() },
                         { type: 'Floors Climbed', value: summaryData.data.floorsClimbed, date: date, timestamp: new Date(date).toISOString() },
                         { type: 'Distance (km)', value: summaryData.data.totalDistanceMeters ? (summaryData.data.totalDistanceMeters / 1000) : null, date: date, timestamp: new Date(date).toISOString() }
                     ].filter(entry => entry.value !== null && entry.value !== undefined);
