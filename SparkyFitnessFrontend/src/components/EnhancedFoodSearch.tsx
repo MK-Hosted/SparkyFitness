@@ -66,6 +66,7 @@ interface EnhancedFoodSearchProps {
   onFoodSelect: (item: Food | Meal, type: 'food' | 'meal') => void;
   hideDatabaseTab?: boolean;
   hideMealTab?: boolean;
+  mealType?: string;
 }
 
 type FoodDataForBackend = Omit<CSVData, "id">;
@@ -74,6 +75,7 @@ const EnhancedFoodSearch = ({
   onFoodSelect,
   hideDatabaseTab = false,
   hideMealTab = false,
+  mealType = undefined,
 }: EnhancedFoodSearchProps) => {
   const { user } = useAuth();
   const { activeUserId } = useActiveUser();
@@ -159,7 +161,11 @@ const EnhancedFoodSearch = ({
       try {
         if (!term.trim()) {
           // If search term is empty, fetch recent and top foods
-          const data = await apiCall(`/foods?limit=${itemDisplayLimit}`);
+          let query = `/foods?limit=${itemDisplayLimit}`;
+          if (!!mealType) {
+            query += `&mealType=${mealType}`;
+          }
+          const data = await apiCall(query);
           setRecentFoods(data.recentFoods || []);
           setTopFoods(data.topFoods || []);
         } else {
