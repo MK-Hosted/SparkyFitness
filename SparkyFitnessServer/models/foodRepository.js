@@ -701,7 +701,8 @@ async function getFoodEntriesByDate(userId, selectedDate) {
        FROM food_entries fe
        JOIN foods f ON fe.food_id = f.id
        JOIN food_variants fv ON fe.variant_id = fv.id
-       WHERE fe.user_id = $1 AND fe.entry_date = $2`,
+       WHERE fe.user_id = $1 AND fe.entry_date = $2
+       ORDER BY fe.created_at`,
       [userId, selectedDate]
     );
     return result.rows;
