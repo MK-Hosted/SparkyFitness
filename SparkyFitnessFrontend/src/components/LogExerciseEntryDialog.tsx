@@ -28,6 +28,53 @@ interface LogExerciseEntryDialogProps {
   initialImageUrl?: string;
 }
 
+const SortableSetItem = React.memo(({ set, index, handleSetChange, handleDuplicateSet, handleRemoveSet }: { set: WorkoutPresetSet, index: number, handleSetChange: Function, handleDuplicateSet: Function, handleRemoveSet: Function }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: `set-${index}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center space-x-2" {...attributes}>
+      <div {...listeners}>
+        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-8 gap-2 flex-grow">
+        <div className="md:col-span-1"><Label>Set</Label><p className="font-medium p-2">{set.set_number}</p></div>
+        <div className="md:col-span-2"><Label>Type</Label>
+          <Select value={set.set_type} onValueChange={(value) => handleSetChange(index, 'set_type', value)}>
+            <SelectTrigger><SelectValue/></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Working Set">Working Set</SelectItem>
+              <SelectItem value="Warm-up">Warm-up</SelectItem>
+              <SelectItem value="Drop Set">Drop Set</SelectItem>
+              <SelectItem value="Failure">Failure</SelectItem>
+              <SelectItem value="AMRAP">AMRAP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-1"><Label className="flex items-center"><Repeat className="h-4 w-4 mr-1" style={{ color: '#3b82f6' }} />Reps</Label><Input type="number" value={set.reps ?? ''} onChange={(e) => handleSetChange(index, 'reps', Number(e.target.value))} /></div>
+        <div className="md:col-span-1"><Label className="flex items-center"><Weight className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} />Weight</Label><Input type="number" value={set.weight ?? ''} onChange={(e) => handleSetChange(index, 'weight', Number(e.target.value))} /></div>
+        <div className="md:col-span-1"><Label className="flex items-center"><Timer className="h-4 w-4 mr-1" style={{ color: '#f97316' }} />Duration</Label><Input type="number" value={set.duration ?? ''} onChange={(e) => handleSetChange(index, 'duration', Number(e.target.value))} /></div>
+        <div className="md:col-span-1"><Label className="flex items-center"><Timer className="h-4 w-4 mr-1" style={{ color: '#8b5cf6' }} />Rest (s)</Label><Input type="number" value={set.rest_time ?? ''} onChange={(e) => handleSetChange(index, 'rest_time', Number(e.target.value))} /></div>
+        <div className="col-span-1 md:col-span-8"><Label>Notes</Label><Textarea value={set.notes ?? ''} onChange={(e) => handleSetChange(index, 'notes', e.target.value)} /></div>
+      </div>
+      <div className="flex flex-col space-y-1">
+        <Button variant="ghost" size="icon" onClick={() => handleDuplicateSet(index)}><Copy className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => handleRemoveSet(index)}><X className="h-4 w-4" /></Button>
+      </div>
+    </div>
+  );
+});
+
 const LogExerciseEntryDialog: React.FC<LogExerciseEntryDialogProps> = ({
   isOpen,
   onClose,
@@ -164,56 +211,9 @@ const LogExerciseEntryDialog: React.FC<LogExerciseEntryDialogProps> = ({
     }
   };
 
-  const SortableSetItem = React.memo(({ set, index }: { set: WorkoutPresetSet, index: number }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-    } = useSortable({ id: `set-${index}` });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-
-    return (
-      <div ref={setNodeRef} style={style} className="flex items-center space-x-2" {...attributes}>
-        <div {...listeners}>
-          <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-2 flex-grow">
-          <div className="md:col-span-1"><Label>Set</Label><p className="font-medium p-2">{set.set_number}</p></div>
-          <div className="md:col-span-2"><Label>Type</Label>
-            <Select value={set.set_type} onValueChange={(value) => handleSetChange(index, 'set_type', value)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Working Set">Working Set</SelectItem>
-                <SelectItem value="Warm-up">Warm-up</SelectItem>
-                <SelectItem value="Drop Set">Drop Set</SelectItem>
-                <SelectItem value="Failure">Failure</SelectItem>
-                <SelectItem value="AMRAP">AMRAP</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-1"><Label className="flex items-center"><Repeat className="h-4 w-4 mr-1" style={{ color: '#3b82f6' }} />Reps</Label><Input type="number" value={set.reps ?? ''} onChange={(e) => handleSetChange(index, 'reps', Number(e.target.value))} /></div>
-          <div className="md:col-span-1"><Label className="flex items-center"><Weight className="h-4 w-4 mr-1" style={{ color: '#ef4444' }} />Weight</Label><Input type="number" value={set.weight ?? ''} onChange={(e) => handleSetChange(index, 'weight', Number(e.target.value))} /></div>
-          <div className="md:col-span-1"><Label className="flex items-center"><Timer className="h-4 w-4 mr-1" style={{ color: '#f97316' }} />Duration</Label><Input type="number" value={set.duration ?? ''} onChange={(e) => handleSetChange(index, 'duration', Number(e.target.value))} /></div>
-          <div className="md:col-span-1"><Label className="flex items-center"><Timer className="h-4 w-4 mr-1" style={{ color: '#8b5cf6' }} />Rest (s)</Label><Input type="number" value={set.rest_time ?? ''} onChange={(e) => handleSetChange(index, 'rest_time', Number(e.target.value))} /></div>
-          <div className="col-span-1 md:col-span-6"><Label>Notes</Label><Textarea value={set.notes ?? ''} onChange={(e) => handleSetChange(index, 'notes', e.target.value)} /></div>
-        </div>
-        <div className="flex flex-col space-y-1">
-          <Button variant="ghost" size="icon" onClick={() => handleDuplicateSet(index)}><Copy className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => handleRemoveSet(index)}><X className="h-4 w-4" /></Button>
-        </div>
-      </div>
-    );
-  });
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log Exercise: {exercise?.name}</DialogTitle>
           <DialogDescription>
@@ -225,7 +225,7 @@ const LogExerciseEntryDialog: React.FC<LogExerciseEntryDialogProps> = ({
             <SortableContext items={sets.map((_, index) => `set-${index}`)}>
               <div className="space-y-2">
                 {sets.map((set, index) => (
-                  <SortableSetItem key={`set-${index}`} set={set} index={index} />
+                  <SortableSetItem key={`set-${index}`} set={set} index={index} handleSetChange={handleSetChange} handleDuplicateSet={handleDuplicateSet} handleRemoveSet={handleRemoveSet} />
                 ))}
               </div>
             </SortableContext>

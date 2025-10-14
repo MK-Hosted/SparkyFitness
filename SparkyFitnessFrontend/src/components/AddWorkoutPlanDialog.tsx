@@ -331,7 +331,7 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
             template_id: '',
             workout_preset_id: preset.id,
             exercise_id: undefined,
-            sets: [],
+            sets: [], // Presets are expanded on the backend
           },
         ]);
       } else {
@@ -456,6 +456,9 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
               Set as active plan
             </Label>
           </div>
+          <p className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mt-2" role="alert">
+            <span className="font-bold">Note:</span> Saving an active plan updates future exercise entries. Deleting a plan removes future entries, but past entries remain in your log.
+          </p>
 
           <div className="space-y-4">
             <h4 className="mb-2 text-lg font-medium">Assignments</h4>

@@ -948,7 +948,9 @@ async function createExerciseEntriesFromTemplate(templateId, userId) {
           };
 
           if (assignment.exercise_id) {
-            await processExercise(assignment.exercise_id, assignment.sets, assignment.notes);
+            const setsResult = await client.query('SELECT * FROM workout_plan_assignment_sets WHERE assignment_id = $1', [assignment.id]);
+            const sets = setsResult.rows;
+            await processExercise(assignment.exercise_id, sets, null);
           } else if (assignment.workout_preset_id) {
             log('info', `createExerciseEntriesFromTemplate - Found workout_preset_id ${assignment.workout_preset_id} for date ${entryDate}.`);
             const preset = await workoutPresetRepository.getWorkoutPresetById(assignment.workout_preset_id);
@@ -979,6 +981,7 @@ async function deleteExerciseEntriesByTemplateId(templateId, userId) {
     const result = await client.query(
       `DELETE FROM exercise_entries
        WHERE user_id = $1
+         AND entry_date >= CURRENT_DATE -- Only delete entries for today or future dates
          AND workout_plan_assignment_id IN (
              SELECT id FROM workout_plan_template_assignments
              WHERE template_id = $2

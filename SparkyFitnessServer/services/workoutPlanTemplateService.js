@@ -104,8 +104,8 @@ async function deleteWorkoutPlanTemplate(userId, templateId) {
         throw new Error('Forbidden: You do not have permission to delete this workout plan template.');
     }
     try {
-        // Also delete associated exercise entries
-        log('info', `deleteWorkoutPlanTemplate service - Deleting associated exercise entries for template ${templateId}`);
+        // Delete future associated exercise entries, and decouple past ones via ON DELETE SET NULL
+        log('info', `deleteWorkoutPlanTemplate service - Deleting future associated exercise entries for template ${templateId}`);
         await exerciseRepository.deleteExerciseEntriesByTemplateId(templateId, userId);
 
         const deleted = await workoutPlanTemplateRepository.deleteWorkoutPlanTemplate(templateId, userId);

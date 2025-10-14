@@ -191,26 +191,59 @@ async function updateWorkoutPlanTemplate(templateId, userId, updateData) {
         );
         const updatedTemplate = templateResult.rows[0];
 
-        await client.query('DELETE FROM workout_plan_template_assignments WHERE template_id = $1', [templateId]);
+        // Instead of deleting and recreating, we will update the assignments
+        if (updateData.assignments) {
+            // First, get the existing assignments
+            const existingAssignmentsResult = await client.query('SELECT id FROM workout_plan_template_assignments WHERE template_id = $1', [templateId]);
+            const existingAssignmentIds = existingAssignmentsResult.rows.map(r => r.id);
 
-        if (updateData.assignments && updateData.assignments.length > 0) {
+            // Then, get the new assignment ids
+            const newAssignmentIds = updateData.assignments.map(a => a.id).filter(id => id);
+
+            // Delete any assignments that are no longer in the plan
+            const assignmentsToDelete = existingAssignmentIds.filter(id => !newAssignmentIds.includes(id));
+            if (assignmentsToDelete.length > 0) {
+                await client.query(`DELETE FROM workout_plan_template_assignments WHERE id = ANY($1::int[])`, [assignmentsToDelete]);
+            }
+
+            // Now, update or insert the assignments
             for (const a of updateData.assignments) {
-                const assignmentResult = await client.query(
-                    `INSERT INTO workout_plan_template_assignments (template_id, day_of_week, workout_preset_id, exercise_id)
-                     VALUES ($1, $2, $3, $4) RETURNING id`,
-                    [templateId, a.day_of_week, a.workout_preset_id, a.exercise_id]
-                );
-
-                if (a.exercise_id && a.sets && a.sets.length > 0) {
-                    const newAssignmentId = assignmentResult.rows[0].id;
-                    const setsValues = a.sets.map(set => [
-                        newAssignmentId, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
-                    ]);
-                    const setsQuery = format(
-                        `INSERT INTO workout_plan_assignment_sets (assignment_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
-                        setsValues
+                if (a.id) {
+                    // This is an existing assignment, so we update it
+                    await client.query(
+                        `UPDATE workout_plan_template_assignments SET day_of_week = $1, workout_preset_id = $2, exercise_id = $3 WHERE id = $4`,
+                        [a.day_of_week, a.workout_preset_id, a.exercise_id, a.id]
                     );
-                    await client.query(setsQuery);
+                    // And update the sets
+                    await client.query('DELETE FROM workout_plan_assignment_sets WHERE assignment_id = $1', [a.id]);
+                    if (a.exercise_id && a.sets && a.sets.length > 0) {
+                        const setsValues = a.sets.map(set => [
+                            a.id, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
+                        ]);
+                        const setsQuery = format(
+                            `INSERT INTO workout_plan_assignment_sets (assignment_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
+                            setsValues
+                        );
+                        await client.query(setsQuery);
+                    }
+                } else {
+                    // This is a new assignment, so we insert it
+                    const assignmentResult = await client.query(
+                        `INSERT INTO workout_plan_template_assignments (template_id, day_of_week, workout_preset_id, exercise_id)
+                         VALUES ($1, $2, $3, $4) RETURNING id`,
+                        [templateId, a.day_of_week, a.workout_preset_id, a.exercise_id]
+                    );
+                    const newAssignmentId = assignmentResult.rows[0].id;
+                    if (a.exercise_id && a.sets && a.sets.length > 0) {
+                        const setsValues = a.sets.map(set => [
+                            newAssignmentId, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
+                        ]);
+                        const setsQuery = format(
+                            `INSERT INTO workout_plan_assignment_sets (assignment_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
+                            setsValues
+                        );
+                        await client.query(setsQuery);
+                    }
                 }
             }
         }

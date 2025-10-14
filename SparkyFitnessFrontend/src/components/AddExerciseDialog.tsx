@@ -94,7 +94,7 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkou
       // Assuming the newly created exercise is returned by createExercise
       // For now, we'll just pass a placeholder or refetch if necessary.
       // A more robust solution would be to return the created exercise from createExercise.
-      onExerciseAdded({ id: 'temp-id', name: newExerciseName, category: newExerciseCategory, calories_per_hour: manualCaloriesPerHour !== undefined ? manualCaloriesPerHour : newExerciseCalories }, 'custom');
+      onExerciseAdded({ id: 'temp-id', name: newExerciseName, category: newExerciseCategory, calories_per_hour: manualCaloriesPerHour !== undefined ? manualCaloriesPerHour : newExerciseCalories, sets: [{ set_number: 1, set_type: 'Working Set', reps: 10, weight: 0 }] }, 'custom');
       onOpenChange(false);
       setNewExerciseName("");
       setNewExerciseCategory("general");
