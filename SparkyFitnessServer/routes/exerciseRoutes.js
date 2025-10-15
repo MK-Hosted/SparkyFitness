@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeAccess } = require('../middleware/authMiddleware');
 const exerciseService = require('../services/exerciseService');
+const reportRepository = require('../models/reportRepository');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -131,7 +132,7 @@ router.get('/search-external', authenticateToken, authorizeAccess('exercise_list
   }
 });
 
-router.get('/equipment-types', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+router.get('/equipment', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
   try {
     const equipmentTypes = await exerciseService.getAvailableEquipment();
     res.status(200).json(equipmentTypes);
@@ -144,6 +145,16 @@ router.get('/muscle-groups', authenticateToken, authorizeAccess('exercise_list')
   try {
     const muscleGroups = await exerciseService.getAvailableMuscleGroups();
     res.status(200).json(muscleGroups);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/names', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const { muscle, equipment } = req.query;
+    const exerciseNames = await reportRepository.getExerciseNames(req.userId, muscle, equipment);
+    res.status(200).json(exerciseNames);
   } catch (error) {
     next(error);
   }

@@ -120,19 +120,15 @@ async function getMiniNutritionTrends(userId, startDate, endDate) {
   }
 }
 
-async function getExerciseEntries(userId, startDate, endDate) {
+async function getExerciseEntries(userId, startDate, endDate, equipment, muscle, exercise) {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `SELECT
+    let query = `SELECT
          ee.id,
          TO_CHAR(ee.entry_date, 'YYYY-MM-DD') AS entry_date,
          ee.duration_minutes,
          ee.calories_burned,
          ee.notes,
-         ee.sets,
-         ee.reps,
-         ee.weight,
          e.id AS exercise_id,
          e.name AS exercise_name,
          e.category AS exercise_category,
@@ -148,14 +144,61 @@ async function getExerciseEntries(userId, startDate, endDate) {
          e.is_custom AS exercise_is_custom,
          e.level AS exercise_level,
          e.force AS exercise_force,
-         e.mechanic AS exercise_mechanic
+         e.mechanic AS exercise_mechanic,
+         COALESCE(
+           (SELECT json_agg(set_data ORDER BY set_data.set_number)
+            FROM (
+              SELECT ees.id, ees.set_number, ees.set_type, ees.reps, ees.weight, ees.duration, ees.rest_time, ees.notes
+              FROM exercise_entry_sets ees
+              WHERE ees.exercise_entry_id = ee.id
+            ) AS set_data
+           ), '[]'::json
+         ) AS sets
        FROM exercise_entries ee
        JOIN exercises e ON ee.exercise_id = e.id
-       WHERE ee.user_id = $1 AND ee.entry_date BETWEEN $2 AND $3
-       ORDER BY ee.entry_date DESC, ee.created_at DESC`,
-      [userId, startDate, endDate]
-    );
+       WHERE ee.user_id = $1 AND ee.entry_date BETWEEN $2 AND $3`;
+
+    const params = [userId, startDate, endDate];
+    let paramIndex = 4;
+
+    if (equipment) {
+      query += ` AND e.equipment::jsonb @> '["${equipment}"]'`;
+    }
+    if (muscle) {
+      query += ` AND e.primary_muscles::jsonb @> '["${muscle}"]'`;
+    }
+    if (exercise) {
+      query += ` AND e.name = $${paramIndex}`;
+      params.push(exercise);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY ee.entry_date DESC, ee.created_at DESC`;
+
+    const result = await client.query(query, params);
     return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+async function getExerciseNames(userId, muscle, equipment) {
+  const client = await getPool().connect();
+  try {
+    let query = `SELECT DISTINCT id, name FROM exercises WHERE user_id = $1`;
+    const params = [userId];
+    let paramIndex = 2;
+
+    if (muscle) {
+      query += ` AND primary_muscles::jsonb @> '["${muscle}"]'`;
+    }
+    if (equipment) {
+      query += ` AND equipment::jsonb @> '["${equipment}"]'`;
+    }
+    query += ` ORDER BY name`;
+
+    const result = await client.query(query, params);
+    return result.rows; // Return the full objects { id, name }
   } finally {
     client.release();
   }
@@ -168,4 +211,5 @@ module.exports = {
   getCustomMeasurementsData,
   getMiniNutritionTrends,
   getExerciseEntries,
+  getExerciseNames,
 };

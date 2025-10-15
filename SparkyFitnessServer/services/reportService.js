@@ -187,8 +187,292 @@ async function getNutritionTrendsWithGoals(authenticatedUserId, targetUserId, st
   }
 }
 
+// Helper function to calculate 1RM using the Epley formula
+function calculate1RM(weight, reps) {
+  if (reps === 0) return 0;
+  return weight * (1 + (reps / 30));
+}
+
+// Helper function to categorize rep ranges
+function getRepRangeCategory(reps) {
+  if (reps >= 1 && reps <= 5) return '1-5 Reps';
+  if (reps >= 6 && reps <= 8) return '6-8 Reps';
+  if (reps >= 9 && reps <= 12) return '9-12 Reps';
+  if (reps > 12) return '12+ Reps';
+  return 'N/A';
+}
+
+// Helper function to calculate workout consistency
+function calculateWorkoutConsistency(exerciseEntries, startDate, endDate) {
+  if (!exerciseEntries || exerciseEntries.length === 0) {
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      weeklyFrequency: 0,
+      monthlyFrequency: 0,
+    };
+  }
+
+  const workoutDates = [...new Set(exerciseEntries.map(e => new Date(e.entry_date).toISOString().split('T')[0]))].sort();
+  
+  let currentStreak = 0;
+  let longestStreak = 0;
+  
+  if (workoutDates.length > 0) {
+    // Calculate streaks
+    let streak = 1;
+    for (let i = 1; i < workoutDates.length; i++) {
+      const currentDate = new Date(workoutDates[i]);
+      const prevDate = new Date(workoutDates[i - 1]);
+      const diffTime = Math.abs(currentDate - prevDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        streak++;
+      } else {
+        longestStreak = Math.max(longestStreak, streak);
+        streak = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, streak);
+
+    // Check if the most recent workout was yesterday or today to determine current streak
+    const lastWorkoutDate = new Date(workoutDates[workoutDates.length - 1]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const lastWorkoutTime = lastWorkoutDate.getTime();
+    if (lastWorkoutTime === today.getTime() || lastWorkoutTime === yesterday.getTime()) {
+      currentStreak = streak;
+    } else {
+      currentStreak = 0;
+    }
+  }
+
+  // Calculate frequencies
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end - start);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  const totalWorkouts = workoutDates.length;
+  const weeklyFrequency = (totalWorkouts / diffDays) * 7;
+  const monthlyFrequency = (totalWorkouts / diffDays) * 30;
+
+  return {
+    currentStreak,
+    longestStreak,
+    weeklyFrequency: isNaN(weeklyFrequency) ? 0 : weeklyFrequency,
+    monthlyFrequency: isNaN(monthlyFrequency) ? 0 : monthlyFrequency,
+  };
+}
+
+// Helper function to calculate muscle group recovery
+function calculateMuscleGroupRecovery(exerciseEntries) {
+  const recoveryData = {};
+  exerciseEntries.forEach(entry => {
+    const muscles = entry.exercises ? JSON.parse(entry.exercises.primary_muscles || '[]') : [];
+    muscles.forEach(muscle => {
+      const entryDate = new Date(entry.entry_date);
+      if (!recoveryData[muscle] || entryDate > new Date(recoveryData[muscle])) {
+        recoveryData[muscle] = entryDate.toISOString().split('T')[0];
+      }
+    });
+  });
+  return recoveryData;
+}
+
+// Helper function to calculate exercise variety
+function calculateExerciseVariety(exerciseEntries) {
+  const varietyData = {};
+  const muscleExerciseMap = {};
+
+  exerciseEntries.forEach(entry => {
+    if (entry.exercises && entry.exercises.primary_muscles) {
+      const primaryMuscles = JSON.parse(entry.exercises.primary_muscles || '[]');
+      primaryMuscles.forEach(muscle => {
+        if (!muscleExerciseMap[muscle]) {
+          muscleExerciseMap[muscle] = new Set();
+        }
+        muscleExerciseMap[muscle].add(entry.exercise_name);
+      });
+    }
+  });
+
+  for (const muscle in muscleExerciseMap) {
+    varietyData[muscle] = muscleExerciseMap[muscle].size;
+  }
+
+  return varietyData;
+}
+
+// Helper function to calculate PR progression
+function calculatePrProgression(exerciseEntries) {
+  const progression = {};
+
+  // Sort entries by date ascending to process in chronological order
+  const sortedEntries = [...exerciseEntries].sort((a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime());
+
+  sortedEntries.forEach(entry => {
+    if (entry.sets && entry.sets.length > 0) {
+      entry.sets.forEach(set => {
+        const weight = parseFloat(set.weight) || 0;
+        const reps = parseInt(set.reps) || 0;
+        const oneRM = calculate1RM(weight, reps);
+
+        if (!progression[entry.exercise_name]) {
+          progression[entry.exercise_name] = [];
+        }
+
+        const exerciseProgression = progression[entry.exercise_name];
+        const lastPr = exerciseProgression.length > 0 ? exerciseProgression[exerciseProgression.length - 1] : null;
+
+        if (!lastPr || oneRM > lastPr.oneRM || weight > lastPr.maxWeight || reps > lastPr.maxReps) {
+          progression[entry.exercise_name].push({
+            date: new Date(entry.entry_date).toISOString().split('T')[0],
+            oneRM: oneRM,
+            maxWeight: weight,
+            maxReps: reps,
+          });
+        }
+      });
+    }
+  });
+
+  return progression;
+}
+// Helper function to analyze set performance (first vs. middle vs. last sets)
+function calculateSetPerformance(exerciseEntries) {
+  const setPerformance = {};
+
+  exerciseEntries.forEach(entry => {
+    if (entry.sets && entry.sets.length >= 3) {
+      const exerciseName = entry.exercise_name;
+      if (!setPerformance[exerciseName]) {
+        setPerformance[exerciseName] = {
+          firstSet: { reps: [], weight: [] },
+          middleSet: { reps: [], weight: [] },
+          lastSet: { reps: [], weight: [] },
+        };
+      }
+
+      const firstSet = entry.sets[0];
+      const lastSet = entry.sets[entry.sets.length - 1];
+      const middleIndex = Math.floor(entry.sets.length / 2);
+      const middleSet = entry.sets[middleIndex];
+
+      setPerformance[exerciseName].firstSet.reps.push(firstSet.reps);
+      setPerformance[exerciseName].firstSet.weight.push(firstSet.weight);
+      setPerformance[exerciseName].middleSet.reps.push(middleSet.reps);
+      setPerformance[exerciseName].middleSet.weight.push(middleSet.weight);
+      setPerformance[exerciseName].lastSet.reps.push(lastSet.reps);
+      setPerformance[exerciseName].lastSet.weight.push(lastSet.weight);
+    }
+  });
+
+  // Averaging the results for a cleaner data structure
+  for (const exercise in setPerformance) {
+    const data = setPerformance[exercise];
+    data.firstSet.avgReps = data.firstSet.reps.reduce((a, b) => a + b, 0) / data.firstSet.reps.length;
+    data.firstSet.avgWeight = data.firstSet.weight.reduce((a, b) => a + b, 0) / data.firstSet.weight.length;
+    data.middleSet.avgReps = data.middleSet.reps.reduce((a, b) => a + b, 0) / data.middleSet.reps.length;
+    data.middleSet.avgWeight = data.middleSet.weight.reduce((a, b) => a + b, 0) / data.middleSet.weight.length;
+    data.lastSet.avgReps = data.lastSet.reps.reduce((a, b) => a + b, 0) / data.lastSet.reps.length;
+    data.lastSet.avgWeight = data.lastSet.weight.reduce((a, b) => a + b, 0) / data.lastSet.weight.length;
+  }
+
+  return setPerformance;
+}
+
+async function getExerciseDashboardData(authenticatedUserId, targetUserId, startDate, endDate, equipment, muscle, exercise) {
+  try {
+    const exerciseEntries = await reportRepository.getExerciseEntries(targetUserId, startDate, endDate, equipment, muscle, exercise);
+
+    let totalVolume = 0;
+    let totalReps = 0;
+    let totalWorkouts = new Set(); // To count unique workout days
+    const prData = {}; // Stores max 1RM for each exercise
+    const bestSetRepRange = {}; // Stores max weight for each exercise and rep range
+    const muscleGroupVolume = {}; // Stores total volume per muscle group
+
+    exerciseEntries.forEach(entry => {
+      totalWorkouts.add(new Date(entry.entry_date).toISOString().split('T')[0]); // Add unique dates
+
+      if (entry.sets && entry.sets.length > 0) {
+        entry.sets.forEach(set => {
+          const weight = parseFloat(set.weight) || 0;
+          const reps = parseInt(set.reps) || 0;
+          const duration = parseFloat(set.duration) || 0;
+
+          // Calculate total volume and reps
+          totalVolume += (weight * reps);
+          totalReps += reps;
+
+          // Calculate 1RM and track PRs
+          const oneRM = calculate1RM(weight, reps);
+          if (!prData[entry.exercise_name] || oneRM > prData[entry.exercise_name].oneRM) {
+            prData[entry.exercise_name] = { oneRM, date: new Date(entry.entry_date).toISOString().split('T')[0], weight, reps };
+          }
+
+          // Best set per rep range
+          const repRange = getRepRangeCategory(reps);
+          if (repRange !== 'N/A') {
+            if (!bestSetRepRange[entry.exercise_name]) {
+              bestSetRepRange[entry.exercise_name] = {};
+            }
+            if (!bestSetRepRange[entry.exercise_name][repRange] || weight > bestSetRepRange[entry.exercise_name][repRange].weight) {
+              bestSetRepRange[entry.exercise_name][repRange] = { weight, reps, date: new Date(entry.entry_date).toISOString().split('T')[0] };
+            }
+          }
+
+          // Muscle group volume
+          if (entry.exercises && entry.exercises.primary_muscles) {
+            // It's already parsed in getReportsData, so no need to parse again
+            const primaryMuscles = entry.exercises.primary_muscles;
+            if (Array.isArray(primaryMuscles)) {
+              primaryMuscles.forEach(muscle => {
+                muscleGroupVolume[muscle] = (muscleGroupVolume[muscle] || 0) + (weight * reps);
+              });
+            }
+          }
+        });
+      }
+    });
+
+    const consistencyData = calculateWorkoutConsistency(exerciseEntries, startDate, endDate);
+    const recoveryData = calculateMuscleGroupRecovery(exerciseEntries);
+    const prProgressionData = calculatePrProgression(exerciseEntries);
+    const exerciseVarietyData = calculateExerciseVariety(exerciseEntries);
+    const setPerformanceData = calculateSetPerformance(exerciseEntries);
+
+    return {
+      keyStats: {
+        totalWorkouts: totalWorkouts.size,
+        totalVolume: totalVolume,
+        totalReps: totalReps,
+      },
+      prData,
+      bestSetRepRange,
+      muscleGroupVolume,
+      consistencyData, // Add consistency data to the response
+      recoveryData, // Add recovery data to the response
+      prProgressionData, // Add PR progression data to the response
+      exerciseVarietyData, // Add exercise variety data
+      setPerformanceData, // Add set performance data
+      exerciseEntries, // Return raw entries for tabular display
+    };
+
+  } catch (error) {
+    log('error', `Error fetching exercise dashboard data for user ${targetUserId} by ${authenticatedUserId}:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   getReportsData,
   getMiniNutritionTrends,
   getNutritionTrendsWithGoals,
+  getExerciseDashboardData,
 };

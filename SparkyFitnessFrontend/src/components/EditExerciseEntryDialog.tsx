@@ -40,6 +40,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ExerciseHistoryDisplay from "./ExerciseHistoryDisplay";
 
 
 interface EditExerciseEntryDialogProps {
@@ -460,6 +461,7 @@ const EditExerciseEntryDialog = ({
           <Button type="button" variant="outline" onClick={handleAddSet}>
             <Plus className="h-4 w-4 mr-2" /> Add Set
           </Button>
+          <ExerciseHistoryDisplay exerciseId={entry.exercise_id} />
 
           <div>
             <Label htmlFor="notes">Notes</Label>

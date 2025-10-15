@@ -64,10 +64,11 @@ export const deleteExerciseEntry = async (entryId: string): Promise<void> => {
   });
 };
 
-export const getExerciseProgressData = async (exerciseId: string, startDate: string, endDate: string): Promise<ExerciseProgressData[]> => {
+export const getExerciseProgressData = async (exerciseId: string, startDate: string, endDate: string, aggregationLevel: string = 'daily'): Promise<ExerciseProgressData[]> => {
   const params = new URLSearchParams({
     startDate,
     endDate,
+    aggregationLevel,
   });
   const response = await apiCall(`/exercise-entries/progress/${exerciseId}?${params.toString()}`, {
     method: 'GET',

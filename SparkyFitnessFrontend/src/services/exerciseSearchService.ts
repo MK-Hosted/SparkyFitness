@@ -97,3 +97,34 @@ export const getTopExercises = async (userId: string, limit: number = 5): Promis
   });
   return Array.isArray(result) ? result : [];
 };
+
+export const getAvailableEquipment = async (): Promise<string[]> => {
+  const response = await apiCall('/exercises/equipment', {
+    method: 'GET',
+  });
+  return Array.isArray(response) ? response : [];
+};
+
+export const getAvailableExercises = async (muscle?: string | null, equipment?: string | null): Promise<{ id: string, name: string }[]> => {
+  const params = new URLSearchParams();
+  if (muscle) {
+    params.append('muscle', muscle);
+  }
+  if (equipment) {
+    params.append('equipment', equipment);
+  }
+  // Assuming the endpoint can return objects with id and name.
+  // If the endpoint `/exercises/names` only returns names, a new endpoint might be needed.
+  // For now, let's assume we can change it to return what we need.
+  const response = await apiCall(`/exercises/names?${params.toString()}`, {
+    method: 'GET',
+  });
+  return Array.isArray(response) ? response : [];
+};
+
+export const getAvailableMuscleGroups = async (): Promise<string[]> => {
+  const response = await apiCall('/exercises/muscle-groups', {
+    method: 'GET',
+  });
+  return Array.isArray(response) ? response : [];
+};

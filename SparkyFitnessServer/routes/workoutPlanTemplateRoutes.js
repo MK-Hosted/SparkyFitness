@@ -6,7 +6,8 @@ const workoutPlanTemplateService = require('../services/workoutPlanTemplateServi
 // Create a new workout plan template
 router.post('/', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
   try {
-    const newPlan = await workoutPlanTemplateService.createWorkoutPlanTemplate(req.userId, req.body);
+    const { currentClientDate, ...planData } = req.body;
+    const newPlan = await workoutPlanTemplateService.createWorkoutPlanTemplate(req.userId, planData, currentClientDate);
     res.status(201).json(newPlan);
   } catch (error) {
     next(error);
@@ -42,7 +43,8 @@ router.get('/:id', authenticateToken, authorizeAccess('exercise_list'), async (r
 // Update an existing workout plan template
 router.put('/:id', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
   try {
-    const updatedPlan = await workoutPlanTemplateService.updateWorkoutPlanTemplate(req.userId, req.params.id, req.body);
+    const { currentClientDate, ...updateData } = req.body;
+    const updatedPlan = await workoutPlanTemplateService.updateWorkoutPlanTemplate(req.userId, req.params.id, updateData, currentClientDate);
     res.status(200).json(updatedPlan);
   } catch (error) {
     if (error.message.startsWith('Forbidden')) {

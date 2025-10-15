@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AddExerciseDialog from "@/components/AddExerciseDialog";
+import ExerciseHistoryDisplay from "./ExerciseHistoryDisplay";
 
 interface AddWorkoutPlanDialogProps {
   isOpen: boolean;
@@ -477,9 +478,27 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
                           <div key={originalIndex} className="border p-4 rounded-md space-y-4">
                             {assignment.workout_preset_id ? (
                               <div className="flex items-center justify-between">
-                                <span className="font-medium">
-                                  Preset: {workoutPresets.find(p => p.id === assignment.workout_preset_id)?.name || "N/A"}
-                                </span>
+                                <div>
+                                  <h4 className="font-medium">
+                                    Preset: {workoutPresets.find(p => p.id === assignment.workout_preset_id)?.name || "N/A"}
+                                  </h4>
+                                  {(() => {
+                                    const preset = workoutPresets.find(p => p.id === assignment.workout_preset_id);
+                                    if (preset && preset.exercises && preset.exercises.length > 0) {
+                                      return (
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          {preset.exercises.map((ex, idx) => (
+                                            <p key={idx} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                              <span className="font-medium">{ex.exercise_name}</span>
+                                              {ex.sets && <span className="flex items-center gap-1"><ListOrdered className="h-3 w-3" /> {ex.sets.length} sets</span>}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveAssignment(originalIndex)}>
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -510,6 +529,7 @@ const AddWorkoutPlanDialog: React.FC<AddWorkoutPlanDialogProps> = ({ isOpen, onC
                                 <Button type="button" variant="outline" onClick={() => handleAddSetInPlan(originalIndex)}>
                                   <Plus className="h-4 w-4 mr-2" /> Add Set
                                 </Button>
+                                <ExerciseHistoryDisplay exerciseId={assignment.exercise_id!} />
                               </>
                             )}
                           </div>

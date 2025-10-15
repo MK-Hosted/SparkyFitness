@@ -524,6 +524,13 @@ const ExerciseCard = ({
                     {entry.notes && (
                       <div className="text-xs text-gray-400">{entry.notes}</div>
                     )}
+                    {entry.image_url && (
+                      <img
+                        src={entry.image_url}
+                        alt={entry.exercises.name}
+                        className="w-16 h-16 object-cover mt-2 rounded"
+                      />
+                    )}
                     {entry.exercises?.images && entry.exercises.images.length > 0 && (
                       <img
                         src={entry.exercises.source ? `/uploads/exercises/${entry.exercises.images[0]}` : entry.exercises.images[0]}

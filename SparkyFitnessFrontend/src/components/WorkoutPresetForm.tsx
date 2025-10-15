@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { WorkoutPreset, WorkoutPresetExercise, WorkoutPresetSet } from "@/types/workout";
 import { Exercise } from "@/services/exerciseService";
 import AddExerciseDialog from "./AddExerciseDialog";
+import ExerciseHistoryDisplay from "./ExerciseHistoryDisplay";
 import { Plus, X, Repeat, Weight, Timer, ListOrdered, GripVertical, Copy, Dumbbell, Hourglass } from "lucide-react";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useToast } from "@/hooks/use-toast";
@@ -352,6 +353,7 @@ const WorkoutPresetForm: React.FC<WorkoutPresetFormProps> = ({
                     <Button type="button" variant="outline" onClick={() => handleAddSet(exerciseIndex)}>
                       <Plus className="h-4 w-4 mr-2" /> Add Set
                     </Button>
+                    <ExerciseHistoryDisplay exerciseId={ex.exercise_id} />
                   </div>
                 ))}
               </div>

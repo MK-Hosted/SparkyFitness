@@ -88,19 +88,33 @@ export interface DailyExerciseEntry {
   duration_minutes: number;
   calories_burned: number;
   notes?: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
   exercises: Exercise; // Use the comprehensive Exercise interface
+  sets: { // Define the structure of sets
+    id: string;
+    set_number: number;
+    set_type: string;
+    reps: number;
+    weight: number;
+    duration?: number;
+    rest_time?: number;
+    notes?: string;
+  }[];
 }
 
 export interface ExerciseProgressData {
   entry_date: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
   calories_burned: number;
   duration_minutes: number;
+  sets: {
+    id: string;
+    set_number: number;
+    set_type: string;
+    reps: number;
+    weight: number;
+    duration?: number;
+    rest_time?: number;
+    notes?: string;
+  }[];
 }
 
 export interface CustomCategory {
@@ -136,6 +150,93 @@ export const loadReportsData = async (
     endDate,
   });
   const response = await apiCall(`/reports?${params.toString()}`, {
+    method: 'GET',
+  });
+  return response;
+}; // Closing brace for loadReportsData
+
+export interface ExerciseDashboardData {
+  keyStats: {
+    totalWorkouts: number;
+    totalVolume: number;
+    totalReps: number;
+  };
+  prData: {
+    [exerciseName: string]: {
+      oneRM: number;
+      date: string;
+      weight: number;
+      reps: number;
+    };
+  };
+  bestSetRepRange: {
+    [exerciseName: string]: {
+      [repRange: string]: {
+        weight: number;
+        reps: number;
+        date: string;
+      };
+    };
+  };
+  muscleGroupVolume: {
+    [muscleGroup: string]: number;
+  };
+  exerciseEntries: DailyExerciseEntry[];
+  consistencyData: {
+    currentStreak: number;
+    longestStreak: number;
+    weeklyFrequency: number;
+    monthlyFrequency: number;
+  };
+  recoveryData: {
+    [muscleGroup: string]: string;
+  };
+  prProgressionData: {
+    [exerciseName: string]: {
+      date: string;
+      oneRM: number;
+      maxWeight: number;
+      maxReps: number;
+    }[];
+  };
+  exerciseVarietyData: {
+    [muscleGroup: string]: number;
+  };
+  setPerformanceData: {
+    [exerciseName: string]: {
+      firstSet: {
+        avgReps: number;
+        avgWeight: number;
+      };
+      middleSet: {
+        avgReps: number;
+        avgWeight: number;
+      };
+      lastSet: {
+        avgReps: number;
+        avgWeight: number;
+      };
+    };
+  };
+}
+
+export const getExerciseDashboardData = async (
+  userId: string,
+  startDate: string,
+  endDate: string,
+  equipment: string | null,
+  muscle: string | null,
+  exercise: string | null
+): Promise<ExerciseDashboardData> => {
+  const params = new URLSearchParams({
+    userId,
+    startDate,
+    endDate,
+  });
+  if (equipment) params.append('equipment', equipment);
+  if (muscle) params.append('muscle', muscle);
+  if (exercise) params.append('exercise', exercise);
+  const response = await apiCall(`/reports/exercise-dashboard?${params.toString()}`, {
     method: 'GET',
   });
   return response;

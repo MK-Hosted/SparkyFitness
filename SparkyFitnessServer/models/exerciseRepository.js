@@ -274,12 +274,25 @@ async function countExercises(targetUserId, searchTerm, categoryFilter, ownershi
 async function getDistinctEquipment() {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `SELECT DISTINCT jsonb_array_elements_text(equipment::jsonb) AS equipment_name
-       FROM exercises
-       WHERE equipment IS NOT NULL AND equipment::jsonb IS NOT NULL AND jsonb_array_length(equipment::jsonb) > 0`
-    );
-    return result.rows.map(row => row.equipment_name);
+    const result = await client.query(`SELECT equipment FROM exercises WHERE equipment IS NOT NULL AND equipment <> '[]' AND equipment <> ''`);
+    const equipmentSet = new Set();
+    result.rows.forEach(row => {
+      try {
+        const equipmentList = JSON.parse(row.equipment);
+        if (Array.isArray(equipmentList)) {
+          equipmentList.forEach(item => equipmentSet.add(item));
+        }
+      } catch (e) {
+        // Fallback for non-JSON string
+        let equipment = row.equipment.replace(/[\[\]'"`]/g, ''); // Clean the string
+        let equipmentList = equipment.split(',').map(item => item.trim()).filter(Boolean);
+        equipmentList.forEach(item => equipmentSet.add(item));
+      }
+    });
+    return Array.from(equipmentSet).sort();
+  } catch (error) {
+    log('error', 'Error fetching distinct equipment:', error);
+    return [];
   } finally {
     client.release();
   }
@@ -288,18 +301,30 @@ async function getDistinctEquipment() {
 async function getDistinctMuscleGroups() {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `SELECT DISTINCT muscle_name FROM (
-         SELECT jsonb_array_elements_text(primary_muscles::jsonb) AS muscle_name
-         FROM exercises
-         WHERE primary_muscles IS NOT NULL AND primary_muscles::jsonb IS NOT NULL AND jsonb_array_length(primary_muscles::jsonb) > 0
-         UNION
-         SELECT jsonb_array_elements_text(secondary_muscles::jsonb) AS muscle_name
-         FROM exercises
-         WHERE secondary_muscles IS NOT NULL AND secondary_muscles::jsonb IS NOT NULL AND jsonb_array_length(secondary_muscles::jsonb) > 0
-       ) AS distinct_muscles`
-    );
-    return result.rows.map(row => row.muscle_name);
+    const result = await client.query(`SELECT primary_muscles, secondary_muscles FROM exercises WHERE (primary_muscles IS NOT NULL AND primary_muscles <> '[]' AND primary_muscles <> '') OR (secondary_muscles IS NOT NULL AND secondary_muscles <> '[]' AND secondary_muscles <> '')`);
+    const muscleGroupSet = new Set();
+
+    result.rows.forEach(row => {
+      ['primary_muscles', 'secondary_muscles'].forEach(field => {
+        if (row[field]) {
+          try {
+            const muscleList = JSON.parse(row[field]);
+            if (Array.isArray(muscleList)) {
+              muscleList.forEach(item => muscleGroupSet.add(item));
+            }
+          } catch (e) {
+            // Fallback for non-JSON string
+            let muscles = row[field].replace(/[\[\]'"`]/g, ''); // Clean the string
+            let muscleList = muscles.split(',').map(item => item.trim()).filter(Boolean);
+            muscleList.forEach(item => muscleGroupSet.add(item));
+          }
+        }
+      });
+    });
+    return Array.from(muscleGroupSet).sort();
+  } catch (error) {
+    log('error', 'Error fetching distinct muscle groups:', error);
+    return [];
   } finally {
     client.release();
   }
@@ -866,7 +891,7 @@ module.exports = {
   deleteExerciseEntriesByTemplateId,
 };
 
-async function createExerciseEntriesFromTemplate(templateId, userId) {
+async function createExerciseEntriesFromTemplate(templateId, userId, currentClientDate = null) {
   log('info', `createExerciseEntriesFromTemplate called for templateId: ${templateId}, userId: ${userId}`);
   const client = await getPool().connect();
   try {
@@ -909,6 +934,11 @@ async function createExerciseEntriesFromTemplate(templateId, userId) {
     }
 
     const entriesToInsert = [];
+    
+    // Use the provided client date to ensure timezone consistency
+    const clientDate = currentClientDate ? new Date(currentClientDate) : new Date();
+    clientDate.setHours(0, 0, 0, 0); // Normalize to the beginning of the day in the client's timezone
+
     const startDate = new Date(template.start_date);
     // If end_date is not provided, default to one year from start_date
     const endDate = template.end_date ? new Date(template.end_date) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
@@ -981,7 +1011,7 @@ async function deleteExerciseEntriesByTemplateId(templateId, userId) {
     const result = await client.query(
       `DELETE FROM exercise_entries
        WHERE user_id = $1
-         AND entry_date >= CURRENT_DATE -- Only delete entries for today or future dates
+         AND entry_date >= CURRENT_DATE::date -- Only delete entries for today or future dates
          AND workout_plan_assignment_id IN (
              SELECT id FROM workout_plan_template_assignments
              WHERE template_id = $2
