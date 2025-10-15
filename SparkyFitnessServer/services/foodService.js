@@ -236,7 +236,8 @@ async function searchFoods(
   exactMatch,
   broadMatch,
   checkCustom,
-  limit = 10
+  limit = 10,
+  mealType = undefined
 ) {
   try {
     if (targetUserId && targetUserId !== authenticatedUserId) {
@@ -247,11 +248,13 @@ async function searchFoods(
       // If no search term, return recent and top foods
       const recentFoods = await foodRepository.getRecentFoods(
         authenticatedUserId,
-        limit
+        limit,
+        mealType
       );
       const topFoods = await foodRepository.getTopFoods(
         authenticatedUserId,
-        limit
+        limit,
+        mealType
       );
       return { recentFoods, topFoods };
     } else {

@@ -47,7 +47,8 @@ export const searchFoods = async (
   exactMatch: boolean,
   broadMatch: boolean,
   checkCustom: boolean,
-  limit?: number // Make limit optional
+  limit?: number, // Make limit optional
+  mealType?: string
 ): Promise<FoodSearchResult> => {
   const params = new URLSearchParams();
   if (name) {
@@ -59,6 +60,9 @@ export const searchFoods = async (
   }
   if (limit !== undefined) {
     params.append('limit', limit.toString());
+  }
+  if (mealType !== undefined) {
+    params.append('mealType', mealType);
   }
 
   const response = await apiCall(`/foods?${params.toString()}`, {

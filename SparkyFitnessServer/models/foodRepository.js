@@ -701,7 +701,8 @@ async function getFoodEntriesByDate(userId, selectedDate) {
        FROM food_entries fe
        JOIN foods f ON fe.food_id = f.id
        JOIN food_variants fv ON fe.variant_id = fv.id
-       WHERE fe.user_id = $1 AND fe.entry_date = $2`,
+       WHERE fe.user_id = $1 AND fe.entry_date = $2
+       ORDER BY fe.created_at`,
       [userId, selectedDate]
     );
     return result.rows;
@@ -1130,8 +1131,17 @@ async function getFoodDataProviderById(providerId) {
   }
 }
 
-async function getRecentFoods(userId, limit) {
+async function getRecentFoods(userId, limit, mealType) {
   const client = await getPool().connect();
+
+  const whereClauses = ["fe.user_id = $1"];
+  const queryParams = [userId, limit];
+
+  if (!!mealType) {
+      whereClauses.push("fe.meal_type = $3");
+      queryParams.push(mealType);
+  }
+
   try {
     const result = await client.query(
       `SELECT
@@ -1163,11 +1173,11 @@ async function getRecentFoods(userId, limit) {
       FROM food_entries fe
       JOIN foods f ON fe.food_id = f.id
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
-      WHERE fe.user_id = $1
+      WHERE ${whereClauses.join(" AND ")}
       GROUP BY f.id, f.name, f.brand, f.is_custom, f.user_id, f.shared_with_public, f.provider_external_id, f.provider_type, fv.id, fv.serving_size, fv.serving_unit, fv.calories, fv.protein, fv.carbs, fv.fat, fv.saturated_fat, fv.polyunsaturated_fat, fv.monounsaturated_fat, fv.trans_fat, fv.cholesterol, fv.sodium, fv.potassium, fv.dietary_fiber, fv.sugars, fv.vitamin_a, fv.vitamin_c, fv.calcium, fv.iron, fv.is_default
       ORDER BY MAX(fe.entry_date) DESC, MAX(fe.created_at) DESC
       LIMIT $2`,
-      [userId, limit]
+      queryParams
     );
     return result.rows;
   } finally {
@@ -1175,8 +1185,17 @@ async function getRecentFoods(userId, limit) {
   }
 }
 
-async function getTopFoods(userId, limit) {
+async function getTopFoods(userId, limit, mealType) {
   const client = await getPool().connect();
+
+  const whereClauses = ["fe.user_id = $1"];
+  const queryParams = [userId, limit];
+
+  if (!!mealType) {
+      whereClauses.push("fe.meal_type = $3");
+      queryParams.push(mealType);
+  }
+
   try {
     const result = await client.query(
       `SELECT
@@ -1209,11 +1228,11 @@ async function getTopFoods(userId, limit) {
       FROM food_entries fe
       JOIN foods f ON fe.food_id = f.id
       LEFT JOIN food_variants fv ON f.id = fv.food_id AND fv.is_default = TRUE
-      WHERE fe.user_id = $1
+      WHERE ${whereClauses.join(" AND ")}
       GROUP BY f.id, f.name, f.brand, f.is_custom, f.user_id, f.shared_with_public, f.provider_external_id, f.provider_type, fv.id, fv.serving_size, fv.serving_unit, fv.calories, fv.protein, fv.carbs, fv.fat, fv.saturated_fat, fv.polyunsaturated_fat, fv.monounsaturated_fat, fv.trans_fat, fv.cholesterol, fv.sodium, fv.potassium, fv.dietary_fiber, fv.sugars, fv.vitamin_a, fv.vitamin_c, fv.calcium, fv.iron, fv.is_default
       ORDER BY usage_count DESC
       LIMIT $2`,
-      [userId, limit]
+      queryParams
     );
     return result.rows;
   } finally {

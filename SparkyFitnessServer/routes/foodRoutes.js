@@ -315,7 +315,7 @@ router.get(
   authenticateToken,
   authorizeAccess("food_list", (req) => req.userId),
   async (req, res, next) => {
-    const { name, exactMatch, broadMatch, checkCustom, limit } = req.query;
+    const { name, exactMatch, broadMatch, checkCustom, limit, mealType } = req.query;
 
     try {
       const result = await foodService.searchFoods(
@@ -325,7 +325,8 @@ router.get(
         exactMatch === "true",
         broadMatch === "true",
         checkCustom === "true",
-        parseInt(limit, 10)
+        parseInt(limit, 10),
+        mealType
       );
       res.status(200).json(result);
     } catch (error) {

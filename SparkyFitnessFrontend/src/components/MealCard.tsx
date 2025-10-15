@@ -191,6 +191,7 @@ const MealCard = ({
                     </DialogDescription>
                   </DialogHeader>
                   <EnhancedFoodSearch
+                    mealType={meal.type}
                     onFoodSelect={(item, type) => {
                       if (type === 'food') {
                         debug(
