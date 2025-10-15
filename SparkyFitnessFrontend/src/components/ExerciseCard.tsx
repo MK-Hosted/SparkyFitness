@@ -38,10 +38,11 @@ import {
   createExercise,
   Exercise,
 } from "@/services/exerciseService";
+import { WorkoutPresetSet, WorkoutPreset } from "@/types/workout";
 
 // Extend Exercise with optional logging fields for pre-population
 interface ExerciseToLog extends Exercise {
-  sets?: number;
+  sets?: WorkoutPresetSet[];
   reps?: number;
   weight?: number;
   duration?: number; // Duration in minutes (optional) - Changed from duration_minutes
@@ -49,26 +50,24 @@ interface ExerciseToLog extends Exercise {
   image_url?: string;
   exercise_name?: string; // Added to match PresetExercise
 }
-import { PresetExercise } from "@/types/workout"; // Import PresetExercise
 import ExerciseSearch from "./ExerciseSearch"; // New import for ExerciseSearch
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // New import for tabs
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import AddExerciseDialog from "./AddExerciseDialog"; // Import AddExerciseDialog
-import { WorkoutPreset } from "@/types/workout"; // Import WorkoutPreset
 
 import LogExerciseEntryDialog from "./LogExerciseEntryDialog"; // Import LogExerciseEntryDialog
 
 interface ExerciseCardProps {
   selectedDate: string;
   onExerciseChange: () => void;
-  initialExercisesToLog?: PresetExercise[]; // Changed to PresetExercise[]
+  initialExercisesToLog?: ExerciseToLog[];
   onExercisesLogged: () => void; // New prop to signal that exercises have been logged
 }
 
 // Extend ExerciseEntry to include sets, reps, weight
 interface ExpandedExerciseEntry extends ExerciseEntry {
-  sets?: number;
+  exercise_name?: string;
   reps?: number;
   weight?: number;
 }
@@ -155,14 +154,16 @@ const ExerciseCard = ({
     if (initialExercisesToLog && initialExercisesToLog.length > 0) {
       debug(loggingLevel, "ExerciseCard: Received initial exercises to log:", initialExercisesToLog);
       // Map PresetExercise to ExerciseToLog, ensuring all fields are present
-      const mappedExercises: ExerciseToLog[] = initialExercisesToLog.map(presetEx => ({
-        id: presetEx.exercise_id, // Use exercise_id as the main ID for ExerciseToLog
-        name: presetEx.exercise_name || '', // Ensure name is present
-        category: '', // Placeholder, as category is not in PresetExercise
-        calories_per_hour: 0, // Placeholder, as calories_per_hour is not in PresetExercise
-        ...presetEx,
-        duration: presetEx.duration, // Map duration to duration
-      }));
+      const mappedExercises: ExerciseToLog[] = initialExercisesToLog.map(presetEx => {
+        const { exercise_id, exercise_name, ...rest } = presetEx as any; // Use 'as any' to bypass strict type checking for this mapping
+        return {
+          id: exercise_id,
+          name: exercise_name || '',
+          category: '',
+          calories_per_hour: 0,
+          ...rest,
+        };
+      });
       setExercisesToLogQueue(mappedExercises);
       setCurrentExerciseToLog(mappedExercises[0]);
       setIsLogExerciseDialogOpen(true);
@@ -504,7 +505,7 @@ const ExerciseCard = ({
                       {entry.exercises?.name === "Active Calories"
                         ? `${Math.round(entry.calories_burned)} active calories`
                         : `${entry.duration_minutes} minutes • ${Math.round(entry.calories_burned)} calories`}
-                      {entry.sets && ` • Sets: ${entry.sets}`}
+                      {entry.sets && Array.isArray(entry.sets) && ` • Sets: ${entry.sets.length}`}
                       {entry.reps && ` • Reps: ${entry.reps}`}
                       {entry.weight && ` • Weight: ${entry.weight}`}
                       {entry.exercises?.level && ` • Level: ${entry.exercises.level}`}
@@ -522,6 +523,13 @@ const ExerciseCard = ({
                     )}
                     {entry.notes && (
                       <div className="text-xs text-gray-400">{entry.notes}</div>
+                    )}
+                    {entry.image_url && (
+                      <img
+                        src={entry.image_url}
+                        alt={entry.exercises.name}
+                        className="w-16 h-16 object-cover mt-2 rounded"
+                      />
                     )}
                     {entry.exercises?.images && entry.exercises.images.length > 0 && (
                       <img
@@ -594,7 +602,7 @@ const ExerciseCard = ({
         {/* Edit Exercise Entry Dialog */}
         {editingEntry && (
           <EditExerciseEntryDialog
-            entry={editingEntry}
+            entry={editingEntry as ExerciseEntry}
             open={!!editingEntry}
             onOpenChange={(open) => {
               debug(
@@ -630,11 +638,8 @@ const ExerciseCard = ({
             selectedDate={selectedDate}
             onSaveSuccess={handleLogSuccess} // Use the new handler
             initialSets={currentExerciseToLog.sets}
-            initialReps={currentExerciseToLog.reps}
-            initialWeight={currentExerciseToLog.weight}
-            initialDuration={currentExerciseToLog.duration} // Use duration from PresetExercise
-            initialNotes={currentExerciseToLog.notes}
-            initialImageUrl={currentExerciseToLog.image_url}
+            // initialReps, initialWeight, etc. are not valid props for LogExerciseEntryDialog
+            // The dialog should handle these internally based on the 'exercise' prop.
           />
         )}
 

@@ -9,6 +9,7 @@ interface FoodSearchDialogProps {
   title?: string;
   description?: string;
   hideDatabaseTab?: boolean;
+  hideMealTab?: boolean;
 }
 
 const FoodSearchDialog = ({
@@ -17,7 +18,8 @@ const FoodSearchDialog = ({
   onFoodSelect,
   title = "Search and Add Food",
   description = "Search for foods to add to your database.",
-  hideDatabaseTab = false
+  hideDatabaseTab = false,
+  hideMealTab = false
 }: FoodSearchDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -28,7 +30,7 @@ const FoodSearchDialog = ({
             {description}
           </DialogDescription>
         </DialogHeader>
-        <EnhancedFoodSearch onFoodSelect={onFoodSelect} hideDatabaseTab={hideDatabaseTab} />
+        <EnhancedFoodSearch onFoodSelect={onFoodSelect} hideDatabaseTab={hideDatabaseTab} hideMealTab={hideMealTab} />
       </DialogContent>
     </Dialog>
   );

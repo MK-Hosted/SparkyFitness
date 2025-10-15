@@ -59,4 +59,22 @@ router.get('/nutrition-trends-with-goals', authenticateToken, authorizeAccess('r
   }
 });
 
+router.get('/exercise-dashboard', authenticateToken, authorizeAccess('reports', (req) => req.query.userId), async (req, res, next) => {
+  const { userId: targetUserId, startDate, endDate, equipment, muscle, exercise } = req.query;
+
+  if (!targetUserId || !startDate || !endDate) {
+    return res.status(400).json({ error: 'Target User ID, start date, and end date are required.' });
+  }
+
+  try {
+    const dashboardData = await reportService.getExerciseDashboardData(req.userId, targetUserId, startDate, endDate, equipment, muscle, exercise);
+    res.status(200).json(dashboardData);
+  } catch (error) {
+    if (error.message.startsWith('Forbidden')) {
+      return res.status(403).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 module.exports = router;

@@ -50,13 +50,13 @@ const ExerciseHistoryDisplay: React.FC<ExerciseHistoryDisplayProps> = ({ exercis
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          {history.map((entry, index) => (
+          {history
+            .filter(entry => new Date(entry.entry_date) <= new Date())
+            .map((entry, index) => (
             <div key={entry.id || index} className="border-b pb-2 last:border-b-0">
               <p className="text-sm font-medium">{new Date(entry.entry_date).toLocaleDateString()}</p>
               <p className="text-xs text-muted-foreground">
-                {entry.sets && `Sets: ${entry.sets}`}
-                {entry.reps && ` • Reps: ${entry.reps}`}
-                {entry.weight && ` • Weight: ${entry.weight}`}
+                {entry.sets && `Sets: ${entry.sets.map(set => `${set.reps}x${set.weight}kg`).join(', ')}`}
                 {entry.duration_minutes && ` • Duration: ${entry.duration_minutes} min`}
                 {entry.calories_burned && ` • Calories: ${Math.round(entry.calories_burned)}`}
               </p>

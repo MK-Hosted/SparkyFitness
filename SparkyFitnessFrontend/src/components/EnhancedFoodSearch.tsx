@@ -10,11 +10,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Search, Plus, Loader2, Edit, Camera } from "lucide-react";
+import { Search, Plus, Loader2, Edit, Camera, BookText } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import EnhancedCustomFoodForm from "./EnhancedCustomFoodForm";
 import BarcodeScanner from "./BarcodeScanner";
-import ImportFromCSV from "./ImportFromCSV";
+import ImportFromCSV from "./FoodImportFromCSV";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debug, error } from "@/utils/logging"; // Import logging functions
@@ -63,8 +63,9 @@ interface OpenFoodFactsProduct {
 }
 
 interface EnhancedFoodSearchProps {
-  onFoodSelect: (food: Food) => void;
+  onFoodSelect: (item: Food | Meal, type: 'food' | 'meal') => void;
   hideDatabaseTab?: boolean;
+  hideMealTab?: boolean;
 }
 
 type FoodDataForBackend = Omit<CSVData, "id">;
@@ -72,6 +73,7 @@ type FoodDataForBackend = Omit<CSVData, "id">;
 const EnhancedFoodSearch = ({
   onFoodSelect,
   hideDatabaseTab = false,
+  hideMealTab = false,
 }: EnhancedFoodSearchProps) => {
   const { user } = useAuth();
   const { activeUserId } = useActiveUser();
@@ -97,8 +99,14 @@ const EnhancedFoodSearch = ({
     []
   ); // To store FatSecret search results
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"database" | "online" | "barcode">(
-    hideDatabaseTab ? "online" : "database"
+  const getInitialActiveTab = () => {
+    if (!hideDatabaseTab) return "database";
+    if (!hideMealTab) return "meal";
+    return "online";
+  };
+
+  const [activeTab, setActiveTab] = useState<"database" | "meal" | "online" | "barcode">(
+    getInitialActiveTab()
   );
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<
@@ -176,15 +184,17 @@ const EnhancedFoodSearch = ({
 
   // Debounce effect for database search
   useEffect(() => {
-    if (activeTab === "database") {
-      const handler = setTimeout(() => {
+    const handler = setTimeout(() => {
+      if (activeTab === "database") {
         searchDatabase(searchTerm);
-      }, 500); // 500ms debounce delay
+      } else if (activeTab === "meal") {
+        handleMealSearch(searchTerm);
+      }
+    }, 500); // 500ms debounce delay
 
-      return () => {
-        clearTimeout(handler);
-      };
-    }
+    return () => {
+      clearTimeout(handler);
+    };
   }, [searchTerm, activeTab, searchDatabase]);
 
   const searchOpenFoodFacts = async () => {
@@ -298,7 +308,7 @@ const EnhancedFoodSearch = ({
   const handleSaveEditedFood = async (foodData: Food) => {
     // foodData is now the fully saved food from EnhancedCustomFoodForm
     try {
-      onFoodSelect(foodData);
+      onFoodSelect(foodData, 'food');
 
       // Close dialog and clear state
       setShowEditDialog(false);
@@ -363,6 +373,24 @@ const EnhancedFoodSearch = ({
     }
   };
 
+  const handleMealSearch = useCallback(async (term: string) => {
+    if (!activeUserId) return;
+    setLoading(true);
+    try {
+      const results = await getMeals(activeUserId, true, term);
+      setMeals(results);
+    } catch (err) {
+      error(loggingLevel, "Error searching meals:", err);
+      toast({
+        title: "Error",
+        description: "Failed to search for meals.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [activeUserId, loggingLevel]);
+
   const handleSearch = async () => {
     setLoading(true);
     setFoods([]); // Clear previous results
@@ -372,29 +400,23 @@ const EnhancedFoodSearch = ({
     setFatSecretResults([]);
 
     if (!searchTerm.trim()) {
+      if (activeTab === "database") {
+        await searchDatabase(""); // Fetch recent/top foods
+      }
       setLoading(false);
       return;
     }
 
     if (activeTab === "database") {
-      await searchDatabase(searchTerm); // Call with current searchTerm
-      // Also search for meals in the database
-      try {
-        const fetchedMeals = await getMeals(activeUserId!, true); // Fetch public meals
-        setMeals(
-          fetchedMeals.filter((meal) =>
-            meal.name.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        );
-      } catch (err: any) {
-        error(loggingLevel, "Error searching meals:", err);
-      }
+      await searchDatabase(searchTerm);
+    } else if (activeTab === "meal") {
+      await handleMealSearch(searchTerm);
     } else if (activeTab === "online") {
-      setHasOnlineSearchBeenPerformed(true); // Set to true when an online search is initiated
+      setHasOnlineSearchBeenPerformed(true);
       if (!selectedFoodDataProvider) {
         toast({
           title: "Error",
-          description: "Please select a food data provider from the dropdown.",
+          description: "Please select a food data provider.",
           variant: "destructive",
         });
         setLoading(false);
@@ -419,18 +441,14 @@ const EnhancedFoodSearch = ({
         );
         setFatSecretResults(results);
       } else if (provider?.provider_type === "mealie") {
-        debug(
-          loggingLevel,
-          `EnhancedFoodSearch: Calling searchMealieFoods with provider.id: ${provider.id}`
-        );
         const results = await searchMealieFoods(
           searchTerm,
-          provider.base_url, // Use base_url for Mealie URL
-          provider.app_key, // Mealie API Key
+          provider.base_url,
+          provider.app_key,
           activeUserId!,
           provider.id
         );
-        setFoods(results); // Assuming Mealie results are mapped to Food[]
+        setFoods(results);
       } else {
         toast({
           title: "Error",
@@ -633,6 +651,15 @@ const EnhancedFoodSearch = ({
             Database
           </Button>
         )}
+        {!hideMealTab && (
+          <Button
+            variant={activeTab === "meal" ? "default" : "outline"}
+            onClick={() => setActiveTab("meal")}
+          >
+            <BookText className="w-4 h-4 mr-2" />
+            Meals
+          </Button>
+        )}
         <Button
           variant={activeTab === "online" ? "default" : "outline"}
           onClick={() => setActiveTab("online")}
@@ -733,7 +760,7 @@ const EnhancedFoodSearch = ({
                   <Card
                     key={food.id}
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                    onClick={() => onFoodSelect(food)}
+                    onClick={() => onFoodSelect(food, 'food')}
                   >
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
@@ -808,7 +835,7 @@ const EnhancedFoodSearch = ({
                   <Card
                     key={food.id}
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                    onClick={() => onFoodSelect(food)}
+                    onClick={() => onFoodSelect(food, 'food')}
                   >
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
@@ -888,9 +915,10 @@ const EnhancedFoodSearch = ({
         {!loading &&
           activeTab === "database" &&
           searchTerm.trim() !== "" &&
-          foods.length === 0 && (
+          foods.length === 0 &&
+          meals.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No foods found in your database for "{searchTerm}".
+              No items found in your database for "{searchTerm}".
             </div>
           )}
 
@@ -989,31 +1017,25 @@ const EnhancedFoodSearch = ({
             </Card>
           ))}
 
-        {activeTab === "database" &&
-          searchTerm.trim() !== "" &&
+        {activeTab === "meal" &&
           meals.map((meal) => (
             <Card
               key={meal.id}
               className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-              onClick={() => onFoodSelect(meal as any)}
+              onClick={() => onFoodSelect(meal, 'meal')}
             >
-              {" "}
-              {/* Cast to any for now, will refine */}
               <CardContent className="p-4">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
                       <h3 className="font-medium">{meal.name}</h3>
-                      {meal.is_public && (
-                        <Badge variant="outline" className="text-xs">
-                          Public Meal
-                        </Badge>
-                      )}
+                      <Badge variant="outline" className="text-xs">
+                        Meal
+                      </Badge>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      {meal.description || "No description available."}
+                    <p className="text-sm text-gray-500">
+                      {meal.description || "No description"}
                     </p>
-                    {/* You might want to display total nutrition for the meal here */}
                   </div>
                 </div>
               </CardContent>
@@ -1026,7 +1048,7 @@ const EnhancedFoodSearch = ({
             <Card
               key={food.id}
               className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-              onClick={() => onFoodSelect(food)}
+              onClick={() => onFoodSelect(food, 'food')}
             >
               <CardContent className="p-4">
                 <div className="flex justify-between items-start">
@@ -1280,7 +1302,7 @@ const EnhancedFoodSearch = ({
                             if (!details) return null;
 
                             if (nutrient === "glycemic_index") {
-                              const giValue = item.glycemic_index || "None"; // Assuming item has glycemic_index
+                              const giValue = "None"; // FatSecret does not provide GI
                               return (
                                 <span key={nutrient}>
                                   <strong>{giValue}</strong> {details.label}

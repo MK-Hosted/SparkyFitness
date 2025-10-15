@@ -274,12 +274,25 @@ async function countExercises(targetUserId, searchTerm, categoryFilter, ownershi
 async function getDistinctEquipment() {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `SELECT DISTINCT jsonb_array_elements_text(equipment::jsonb) AS equipment_name
-       FROM exercises
-       WHERE equipment IS NOT NULL AND equipment::jsonb IS NOT NULL AND jsonb_array_length(equipment::jsonb) > 0`
-    );
-    return result.rows.map(row => row.equipment_name);
+    const result = await client.query(`SELECT equipment FROM exercises WHERE equipment IS NOT NULL AND equipment <> '[]' AND equipment <> ''`);
+    const equipmentSet = new Set();
+    result.rows.forEach(row => {
+      try {
+        const equipmentList = JSON.parse(row.equipment);
+        if (Array.isArray(equipmentList)) {
+          equipmentList.forEach(item => equipmentSet.add(item));
+        }
+      } catch (e) {
+        // Fallback for non-JSON string
+        let equipment = row.equipment.replace(/[\[\]'"`]/g, ''); // Clean the string
+        let equipmentList = equipment.split(',').map(item => item.trim()).filter(Boolean);
+        equipmentList.forEach(item => equipmentSet.add(item));
+      }
+    });
+    return Array.from(equipmentSet).sort();
+  } catch (error) {
+    log('error', 'Error fetching distinct equipment:', error);
+    return [];
   } finally {
     client.release();
   }
@@ -288,18 +301,30 @@ async function getDistinctEquipment() {
 async function getDistinctMuscleGroups() {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `SELECT DISTINCT muscle_name FROM (
-         SELECT jsonb_array_elements_text(primary_muscles::jsonb) AS muscle_name
-         FROM exercises
-         WHERE primary_muscles IS NOT NULL AND primary_muscles::jsonb IS NOT NULL AND jsonb_array_length(primary_muscles::jsonb) > 0
-         UNION
-         SELECT jsonb_array_elements_text(secondary_muscles::jsonb) AS muscle_name
-         FROM exercises
-         WHERE secondary_muscles IS NOT NULL AND secondary_muscles::jsonb IS NOT NULL AND jsonb_array_length(secondary_muscles::jsonb) > 0
-       ) AS distinct_muscles`
-    );
-    return result.rows.map(row => row.muscle_name);
+    const result = await client.query(`SELECT primary_muscles, secondary_muscles FROM exercises WHERE (primary_muscles IS NOT NULL AND primary_muscles <> '[]' AND primary_muscles <> '') OR (secondary_muscles IS NOT NULL AND secondary_muscles <> '[]' AND secondary_muscles <> '')`);
+    const muscleGroupSet = new Set();
+
+    result.rows.forEach(row => {
+      ['primary_muscles', 'secondary_muscles'].forEach(field => {
+        if (row[field]) {
+          try {
+            const muscleList = JSON.parse(row[field]);
+            if (Array.isArray(muscleList)) {
+              muscleList.forEach(item => muscleGroupSet.add(item));
+            }
+          } catch (e) {
+            // Fallback for non-JSON string
+            let muscles = row[field].replace(/[\[\]'"`]/g, ''); // Clean the string
+            let muscleList = muscles.split(',').map(item => item.trim()).filter(Boolean);
+            muscleList.forEach(item => muscleGroupSet.add(item));
+          }
+        }
+      });
+    });
+    return Array.from(muscleGroupSet).sort();
+  } catch (error) {
+    log('error', 'Error fetching distinct muscle groups:', error);
+    return [];
   } finally {
     client.release();
   }
@@ -413,9 +438,11 @@ async function createExercise(exerciseData) {
 async function createExerciseEntry(userId, entryData) {
   const client = await getPool().connect();
   try {
-    const result = await client.query(
-      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, workout_plan_assignment_id, image_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), now()) RETURNING *`,
+    await client.query('BEGIN');
+
+    const entryResult = await client.query(
+      `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, workout_plan_assignment_id, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         userId,
         entryData.exercise_id,
@@ -423,14 +450,29 @@ async function createExerciseEntry(userId, entryData) {
         entryData.calories_burned,
         entryData.entry_date,
         entryData.notes,
-        entryData.sets || null,
-        entryData.reps || null,
-        entryData.weight || null,
         entryData.workout_plan_assignment_id || null,
         entryData.image_url || null,
       ]
     );
-    return result.rows[0];
+    const newEntryId = entryResult.rows[0].id;
+
+    if (entryData.sets && entryData.sets.length > 0) {
+      const setsValues = entryData.sets.map(set => [
+        newEntryId, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
+      ]);
+      const setsQuery = format(
+        `INSERT INTO exercise_entry_sets (exercise_entry_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
+        setsValues
+      );
+      await client.query(setsQuery);
+    }
+
+    await client.query('COMMIT');
+    return getExerciseEntryById(newEntryId); // Refetch to get full data
+  } catch (error) {
+    await client.query('ROLLBACK');
+    log('error', `Error creating exercise entry:`, error);
+    throw error;
   } finally {
     client.release();
   }
@@ -440,7 +482,19 @@ async function getExerciseEntryById(id) {
   const client = await getPool().connect();
   try {
     const result = await client.query(
-      'SELECT * FROM exercise_entries WHERE id = $1',
+      `SELECT ee.*, e.name as exercise_name,
+              COALESCE(
+                (SELECT json_agg(set_data ORDER BY set_data.set_number)
+                 FROM (
+                   SELECT ees.id, ees.set_number, ees.set_type, ees.reps, ees.weight, ees.duration, ees.rest_time, ees.notes
+                   FROM exercise_entry_sets ees
+                   WHERE ees.exercise_entry_id = ee.id
+                 ) AS set_data
+                ), '[]'::json
+              ) AS sets
+       FROM exercise_entries ee
+       JOIN exercises e ON ee.exercise_id = e.id
+       WHERE ee.id = $1`,
       [id]
     );
     return result.rows[0];
@@ -465,6 +519,8 @@ async function getExerciseEntryOwnerId(id) {
 async function updateExerciseEntry(id, userId, updateData) {
   const client = await getPool().connect();
   try {
+    await client.query('BEGIN');
+
     const result = await client.query(
       `UPDATE exercise_entries SET
         exercise_id = COALESCE($1, exercise_id),
@@ -472,30 +528,43 @@ async function updateExerciseEntry(id, userId, updateData) {
         calories_burned = COALESCE($3, calories_burned),
         entry_date = COALESCE($4, entry_date),
         notes = COALESCE($5, notes),
-        sets = COALESCE($6, sets),
-        reps = COALESCE($7, reps),
-        weight = COALESCE($8, weight),
-        workout_plan_assignment_id = COALESCE($9, workout_plan_assignment_id),
-        image_url = COALESCE($10, image_url),
+        workout_plan_assignment_id = COALESCE($6, workout_plan_assignment_id),
+        image_url = COALESCE($7, image_url),
         updated_at = now()
-      WHERE id = $11 AND user_id = $12
-      RETURNING *`,
+      WHERE id = $8 AND user_id = $9
+      RETURNING id`,
       [
         updateData.exercise_id,
         updateData.duration_minutes || null,
         updateData.calories_burned,
         updateData.entry_date,
         updateData.notes,
-        updateData.sets || null,
-        updateData.reps || null,
-        updateData.weight || null,
         updateData.workout_plan_assignment_id || null,
         updateData.image_url || null,
         id,
         userId,
       ]
     );
-    return result.rows[0];
+
+    if (result.rows.length > 0 && updateData.sets !== undefined) {
+      // Delete old sets
+      await client.query('DELETE FROM exercise_entry_sets WHERE exercise_entry_id = $1', [id]);
+
+      // Insert new sets
+      if (updateData.sets.length > 0) {
+        const setsValues = updateData.sets.map(set => [
+          id, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
+        ]);
+        const setsQuery = format(
+          `INSERT INTO exercise_entry_sets (exercise_entry_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
+          setsValues
+        );
+        await client.query(setsQuery);
+      }
+    }
+
+    await client.query('COMMIT');
+    return getExerciseEntryById(id); // Refetch to get full data
   } finally {
     client.release();
   }
@@ -579,31 +648,21 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
   try {
     const result = await client.query(
       `SELECT
-         ee.id,
-         ee.exercise_id,
-         ee.duration_minutes,
-         ee.calories_burned,
-         ee.entry_date,
-         ee.notes,
-         ee.sets,
-         ee.reps,
-         ee.weight,
-         ee.workout_plan_assignment_id,
-         ee.image_url,
-         e.name AS exercise_name,
-         e.category AS exercise_category,
-         e.calories_per_hour AS exercise_calories_per_hour,
-         e.user_id AS exercise_user_id,
-         e.source AS exercise_source,
-         e.source_id AS exercise_source_id,
-         e.force AS exercise_force,
-         e.level AS exercise_level,
-         e.mechanic AS exercise_mechanic,
-         e.equipment AS exercise_equipment,
-         e.primary_muscles AS exercise_primary_muscles,
-         e.secondary_muscles AS exercise_secondary_muscles,
-         e.instructions AS exercise_instructions,
-         e.images AS exercise_images
+         ee.id, ee.exercise_id, ee.duration_minutes, ee.calories_burned, ee.entry_date, ee.notes,
+         ee.workout_plan_assignment_id, ee.image_url, e.name AS exercise_name, e.category AS exercise_category,
+         e.calories_per_hour AS exercise_calories_per_hour, e.user_id AS exercise_user_id, e.source AS exercise_source,
+         e.source_id AS exercise_source_id, e.force AS exercise_force, e.level AS exercise_level,
+         e.mechanic AS exercise_mechanic, e.equipment AS exercise_equipment, e.primary_muscles AS exercise_primary_muscles,
+         e.secondary_muscles AS exercise_secondary_muscles, e.instructions AS exercise_instructions, e.images AS exercise_images,
+         COALESCE(
+           (SELECT json_agg(set_data ORDER BY set_data.set_number)
+            FROM (
+              SELECT ees.id, ees.set_number, ees.set_type, ees.reps, ees.weight, ees.duration, ees.rest_time, ees.notes
+              FROM exercise_entry_sets ees
+              WHERE ees.exercise_entry_id = ee.id
+            ) AS set_data
+           ), '[]'::json
+         ) AS sets
        FROM exercise_entries ee
        JOIN exercises e ON ee.exercise_id = e.id
        WHERE ee.user_id = $1 AND ee.entry_date = $2`,
@@ -611,43 +670,31 @@ async function getExerciseEntriesByDate(userId, selectedDate) {
     );
 
     return result.rows.map(row => {
-      if (row.exercise_images) {
-        try {
-          row.exercise_images = JSON.parse(row.exercise_images);
-        } catch (e) {
-          log('error', `Error parsing images for exercise entry ${row.id}:`, e);
-          row.exercise_images = [];
-        }
-      }
+      const {
+        exercise_name, exercise_category, exercise_calories_per_hour, exercise_user_id,
+        exercise_source, exercise_source_id, exercise_force, exercise_level, exercise_mechanic,
+        exercise_equipment, exercise_primary_muscles, exercise_secondary_muscles,
+        exercise_instructions, exercise_images, ...entryData
+      } = row;
+
       return {
-        id: row.id,
-        exercise_id: row.exercise_id,
-        duration_minutes: row.duration_minutes,
-        calories_burned: row.calories_burned,
-        entry_date: row.entry_date,
-        notes: row.notes,
-        sets: row.sets,
-        reps: row.reps,
-        weight: row.weight,
-        workout_plan_assignment_id: row.workout_plan_assignment_id,
-        image_url: row.image_url,
+        ...entryData,
         exercises: {
-          id: row.exercise_id,
-          name: row.exercise_name,
-          category: row.exercise_category,
-          calories_per_hour: row.exercise_calories_per_hour,
-          user_id: row.exercise_user_id,
-          source: row.exercise_source,
-          source_id: row.exercise_source_id,
-          force: row.exercise_force,
-          level: row.exercise_level,
-          mechanic: row.exercise_mechanic,
-          equipment: row.exercise_equipment,
-          primary_muscles: row.exercise_primary_muscles,
-          secondary_muscles: row.exercise_secondary_muscles,
-          instructions: row.exercise_instructions,
-          images: row.exercise_images,
-        },
+          name: exercise_name,
+          category: exercise_category,
+          calories_per_hour: exercise_calories_per_hour,
+          user_id: exercise_user_id,
+          source: exercise_source,
+          source_id: exercise_source_id,
+          force: exercise_force,
+          level: exercise_level,
+          mechanic: exercise_mechanic,
+          equipment: exercise_equipment,
+          primary_muscles: exercise_primary_muscles,
+          secondary_muscles: exercise_secondary_muscles,
+          instructions: exercise_instructions,
+          images: exercise_images,
+        }
       };
     });
   } finally {
@@ -757,11 +804,17 @@ async function getExerciseProgressData(userId, exerciseId, startDate, endDate) {
     const result = await client.query(
       `SELECT
          ee.entry_date,
-         ee.sets,
-         ee.reps,
-         ee.weight,
          ee.calories_burned,
-         ee.duration_minutes
+         ee.duration_minutes,
+         COALESCE(
+           (SELECT json_agg(set_data ORDER BY set_data.set_number)
+            FROM (
+              SELECT ees.id, ees.set_number, ees.set_type, ees.reps, ees.weight, ees.duration, ees.rest_time, ees.notes
+              FROM exercise_entry_sets ees
+              WHERE ees.exercise_entry_id = ee.id
+            ) AS set_data
+           ), '[]'::json
+         ) AS sets
        FROM exercise_entries ee
        WHERE ee.user_id = $1
          AND ee.exercise_id = $2
@@ -781,13 +834,19 @@ async function getExerciseHistory(userId, exerciseId, limit = 5) {
     const result = await client.query(
       `SELECT
          ee.entry_date,
-         ee.sets,
-         ee.reps,
-         ee.weight,
          ee.duration_minutes,
          ee.calories_burned,
          ee.notes,
-         ee.image_url
+         ee.image_url,
+         COALESCE(
+           (SELECT json_agg(set_data ORDER BY set_data.set_number)
+            FROM (
+              SELECT ees.id, ees.set_number, ees.set_type, ees.reps, ees.weight, ees.duration, ees.rest_time, ees.notes
+              FROM exercise_entry_sets ees
+              WHERE ees.exercise_entry_id = ee.id
+            ) AS set_data
+           ), '[]'::json
+         ) AS sets
        FROM exercise_entries ee
        WHERE ee.user_id = $1
          AND ee.exercise_id = $2
@@ -832,7 +891,7 @@ module.exports = {
   deleteExerciseEntriesByTemplateId,
 };
 
-async function createExerciseEntriesFromTemplate(templateId, userId) {
+async function createExerciseEntriesFromTemplate(templateId, userId, currentClientDate = null) {
   log('info', `createExerciseEntriesFromTemplate called for templateId: ${templateId}, userId: ${userId}`);
   const client = await getPool().connect();
   try {
@@ -853,12 +912,7 @@ async function createExerciseEntriesFromTemplate(templateId, userId) {
                           'id', wpta.id,
                           'day_of_week', wpta.day_of_week,
                           'workout_preset_id', wpta.workout_preset_id,
-                          'exercise_id', wpta.exercise_id,
-                          'sets', wpta.sets,
-                          'reps', wpta.reps,
-                          'weight', wpta.weight,
-                          'duration', wpta.duration,
-                          'notes', wpta.notes
+                          'exercise_id', wpta.exercise_id
                       )
                   )
                   FROM workout_plan_template_assignments wpta
@@ -880,6 +934,11 @@ async function createExerciseEntriesFromTemplate(templateId, userId) {
     }
 
     const entriesToInsert = [];
+    
+    // Use the provided client date to ensure timezone consistency
+    const clientDate = currentClientDate ? new Date(currentClientDate) : new Date();
+    clientDate.setHours(0, 0, 0, 0); // Normalize to the beginning of the day in the client's timezone
+
     const startDate = new Date(template.start_date);
     // If end_date is not provided, default to one year from start_date
     const endDate = template.end_date ? new Date(template.end_date) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
@@ -892,59 +951,52 @@ async function createExerciseEntriesFromTemplate(templateId, userId) {
 
       for (const assignment of template.assignments) {
         if (assignment.day_of_week === currentDayOfWeek) {
-          if (assignment.exercise_id) {
+          const processExercise = async (exerciseId, sets, notes) => {
+            const exerciseDetails = await getExerciseById(exerciseId);
+            const durationMinutes = sets?.reduce((acc, set) => acc + (set.duration || 0), 0) || 30;
+            const caloriesPerHour = exerciseDetails.calories_per_hour || 0;
+            const caloriesBurned = (caloriesPerHour / 60) * durationMinutes;
+
             log('info', `createExerciseEntriesFromTemplate - Assignment day_of_week (${assignment.day_of_week}) matches currentDayOfWeek (${currentDayOfWeek}) for date ${entryDate}. Adding to entriesToInsert.`);
-            entriesToInsert.push([
-              userId,
-              assignment.exercise_id,
-              assignment.duration,
-              0, // calories_burned - will be calculated or left null
-              entryDate, // Use the iterated date
-              assignment.notes,
-              assignment.sets,
-              assignment.reps,
-              assignment.weight,
-              assignment.id, // workout_plan_assignment_id
-              null, // image_url
-            ]);
+            const entryResult = await client.query(
+              `INSERT INTO exercise_entries (user_id, exercise_id, entry_date, notes, workout_plan_assignment_id, duration_minutes, calories_burned)
+               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+              [userId, exerciseId, entryDate, notes, assignment.id, durationMinutes, caloriesBurned]
+            );
+            const newEntryId = entryResult.rows[0].id;
+
+            if (sets && sets.length > 0) {
+              const setsValues = sets.map(set => [
+                newEntryId, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
+              ]);
+              const setsQuery = format(
+                `INSERT INTO exercise_entry_sets (exercise_entry_id, set_number, set_type, reps, weight, duration, rest_time, notes) VALUES %L`,
+                setsValues
+              );
+              await client.query(setsQuery);
+            }
+          };
+
+          if (assignment.exercise_id) {
+            const setsResult = await client.query('SELECT * FROM workout_plan_assignment_sets WHERE assignment_id = $1', [assignment.id]);
+            const sets = setsResult.rows;
+            await processExercise(assignment.exercise_id, sets, null);
           } else if (assignment.workout_preset_id) {
             log('info', `createExerciseEntriesFromTemplate - Found workout_preset_id ${assignment.workout_preset_id} for date ${entryDate}.`);
             const preset = await workoutPresetRepository.getWorkoutPresetById(assignment.workout_preset_id);
             if (preset && preset.exercises) {
               for (const exercise of preset.exercises) {
                 log('info', `Adding exercise ${exercise.exercise_id} from preset ${preset.id} to entriesToInsert.`);
-                entriesToInsert.push([
-                  userId,
-                  exercise.exercise_id,
-                  exercise.duration,
-                  0, // calories_burned
-                  entryDate,
-                  exercise.notes,
-                  exercise.sets,
-                  exercise.reps,
-                  exercise.weight,
-                  assignment.id, // workout_plan_assignment_id
-                  null, // image_url
-                ]);
+                await processExercise(exercise.exercise_id, exercise.sets, exercise.notes);
               }
             }
           }
         }
       }
+      log('info', `Finished processing assignments for date ${entryDate}.`);
     }
-    log('info', `createExerciseEntriesFromTemplate - Total entries to insert: ${entriesToInsert.length}`);
-
-    if (entriesToInsert.length > 0) {
-      const insertQuery = format(
-        `INSERT INTO exercise_entries (user_id, exercise_id, duration_minutes, calories_burned, entry_date, notes, sets, reps, weight, workout_plan_assignment_id, image_url)
-         VALUES %L RETURNING *`,
-        entriesToInsert
-      );
-      await client.query(insertQuery);
-      log('info', `Created ${entriesToInsert.length} exercise entries from workout plan template ${templateId} for user ${userId}.`);
-    } else {
-      log('info', `No exercise entries to create from workout plan template ${templateId} for user ${userId}.`);
-    }
+    // The logic has been moved inside the loop to handle sets for each entry individually.
+    // The entriesToInsert array is no longer needed.
   } catch (error) {
     log('error', `Error creating exercise entries from template ${templateId} for user ${userId}: ${error.message}`, error);
     throw error;
@@ -959,6 +1011,7 @@ async function deleteExerciseEntriesByTemplateId(templateId, userId) {
     const result = await client.query(
       `DELETE FROM exercise_entries
        WHERE user_id = $1
+         AND entry_date >= CURRENT_DATE::date -- Only delete entries for today or future dates
          AND workout_plan_assignment_id IN (
              SELECT id FROM workout_plan_template_assignments
              WHERE template_id = $2

@@ -13,6 +13,7 @@ const calorieCalculationService = require('./CalorieCalculationService'); // Imp
 const fs = require('fs'); // Import file system module
 const path = require('path'); // Import path module
 const { isValidUuid, resolveExerciseIdToUuid } = require('../utils/uuidUtils'); // Import uuidUtils
+const papa = require('papaparse');
 
 async function getExercisesWithPagination(authenticatedUserId, targetUserId, searchTerm, categoryFilter, ownershipFilter, equipmentFilter, muscleGroupFilter, currentPage, itemsPerPage) {
   try {
@@ -573,6 +574,128 @@ async function getExerciseHistory(authenticatedUserId, exerciseId, limit) {
   }
 }
 
+async function importExercisesFromCSV(authenticatedUserId, filePath) {
+  let createdCount = 0;
+  let updatedCount = 0;
+  let failedCount = 0;
+  const failedRows = [];
+
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const { data, errors } = papa.parse(fileContent, {
+      header: true,
+      skipEmptyLines: true,
+    });
+
+    if (errors.length > 0) {
+      log('error', 'CSV parsing errors:', errors);
+      throw new Error('CSV parsing failed. Please check file format.');
+    }
+
+    for (const row of data) {
+      try {
+        const exerciseName = row.name ? row.name.trim() : null;
+        if (!exerciseName) {
+          failedCount++;
+          failedRows.push({ row, reason: 'Exercise name is required.' });
+          continue;
+        }
+
+        const primaryMuscles = row.primary_muscles ? row.primary_muscles.split(',').map(m => m.trim()) : [];
+        if (primaryMuscles.length === 0) {
+          failedCount++;
+          failedRows.push({ row, reason: 'Primary muscles are required.' });
+          continue;
+        }
+
+        const sourceId = exerciseName.toLowerCase().replace(/\s/g, '_');
+        const exerciseData = {
+          name: exerciseName,
+          description: row.description || null,
+          instructions: row.instructions ? row.instructions.split(',').map(i => i.trim()) : [],
+          category: row.category || null,
+          force: row.force || null,
+          level: row.level || null,
+          mechanic: row.mechanic || null,
+          equipment: row.equipment ? row.equipment.split(',').map(e => e.trim()) : [],
+          primary_muscles: primaryMuscles,
+          secondary_muscles: row.secondary_muscles ? row.secondary_muscles.split(',').map(m => m.trim()) : [],
+          calories_per_hour: row.calories_per_hour ? parseFloat(row.calories_per_hour) : null,
+          user_id: authenticatedUserId,
+          is_custom: true,
+          shared_with_public: row.shared_with_public === 'true',
+          source: 'CSV',
+          source_id: sourceId,
+        };
+
+        // Handle images: download and store local paths
+        if (row.images) {
+          const imageUrls = row.images.split(',').map(url => url.trim());
+          const localImagePaths = [];
+          const exerciseFolderName = exerciseName.replace(/[^a-zA-Z0-9]/g, '_');
+          for (const imageUrl of imageUrls) {
+            try {
+              const localPath = await downloadImage(imageUrl, exerciseFolderName);
+              localImagePaths.push(localPath);
+            } catch (imgError) {
+              log('error', `Failed to download image ${imageUrl} for exercise ${exerciseName}:`, imgError);
+              // Continue without this image, but log the error
+            }
+          }
+          exerciseData.images = localImagePaths;
+        } else {
+          exerciseData.images = [];
+        }
+
+        const existingExercise = await exerciseRepository.searchExercises(exerciseName, authenticatedUserId, [], []);
+        if (existingExercise && existingExercise.length > 0) {
+          // Assuming the first match is the one to update
+          await exerciseRepository.updateExercise(existingExercise[0].id, authenticatedUserId, exerciseData);
+          updatedCount++;
+        } else {
+          await exerciseRepository.createExercise(exerciseData);
+          createdCount++;
+        }
+      } catch (rowError) {
+        failedCount++;
+        failedRows.push({ row, reason: rowError.message });
+        log('error', `Error processing CSV row for user ${authenticatedUserId}:`, rowError);
+      }
+    }
+  } catch (error) {
+    log('error', `Error importing exercises from CSV for user ${authenticatedUserId}:`, error);
+    throw error;
+  } finally {
+    // Clean up the uploaded file
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+  return {
+    message: 'CSV import complete.',
+    created: createdCount,
+    updated: updatedCount,
+    failed: failedCount,
+    failedRows: failedRows,
+  };
+}
+ 
+async function getExerciseDeletionImpact(exerciseId) {
+    const client = await getPool().connect();
+    try {
+        const result = await client.query(
+            'SELECT COUNT(*) FROM exercise_entries WHERE exercise_id = $1',
+            [exerciseId]
+        );
+        return {
+            exerciseEntriesCount: parseInt(result.rows[0].count, 10),
+        };
+    } finally {
+        client.release();
+    }
+}
+
 module.exports = {
   getExerciseById,
   getOrCreateActiveCaloriesExercise,
@@ -596,22 +719,115 @@ module.exports = {
   addNutritionixExerciseToUserExercises,
   getExerciseDeletionImpact,
   getExerciseProgressData,
-  getExerciseHistory, // New export
+  getExerciseHistory,
   getRecentExercises,
   getTopExercises,
+  importExercisesFromCSV,
+  importExercisesFromJson, // Export the new function
 };
- 
-async function getExerciseDeletionImpact(exerciseId) {
-    const client = await getPool().connect();
+
+async function importExercisesFromJson(authenticatedUserId, exercisesArray) {
+  let createdCount = 0;
+  let updatedCount = 0;
+  let failedCount = 0;
+  const failedRows = [];
+  const duplicates = [];
+
+  for (const exerciseData of exercisesArray) {
     try {
-        const result = await client.query(
-            'SELECT COUNT(*) FROM exercise_entries WHERE exercise_id = $1',
-            [exerciseId]
+      const exerciseName = exerciseData.name ? exerciseData.name.trim() : null;
+      if (!exerciseName) {
+        failedCount++;
+        failedRows.push({ row: exerciseData, reason: 'Exercise name is required.' });
+        continue;
+      }
+
+      const primaryMuscles = exerciseData.primary_muscles ? exerciseData.primary_muscles.split(',').map(m => m.trim()) : [];
+      if (primaryMuscles.length === 0) {
+        failedCount++;
+        failedRows.push({ row: exerciseData, reason: 'Primary muscles are required.' });
+        continue;
+      }
+
+      const sourceId = exerciseName.toLowerCase().replace(/\s/g, '_');
+      const newExerciseData = {
+        name: exerciseName,
+        description: exerciseData.description || null,
+        instructions: exerciseData.instructions ? exerciseData.instructions.split(',').map(i => i.trim()) : [],
+        category: exerciseData.category || null,
+        force: exerciseData.force || null,
+        level: exerciseData.level || null,
+        mechanic: exerciseData.mechanic || null,
+        equipment: exerciseData.equipment ? exerciseData.equipment.split(',').map(e => e.trim()) : [],
+        primary_muscles: primaryMuscles,
+        secondary_muscles: exerciseData.secondary_muscles ? exerciseData.secondary_muscles.split(',').map(m => m.trim()) : [],
+        calories_per_hour: exerciseData.calories_per_hour ? parseFloat(exerciseData.calories_per_hour) : null,
+        user_id: authenticatedUserId,
+        is_custom: exerciseData.is_custom === true,
+        shared_with_public: exerciseData.shared_with_public === true,
+        source: 'CSV_Import', // Indicate that it came from a CSV import via the UI
+        source_id: sourceId,
+      };
+
+      // Handle images: download and store local paths
+      if (exerciseData.images) {
+        const imageUrls = exerciseData.images.split(',').map(url => url.trim());
+        const localImagePaths = [];
+        const exerciseFolderName = exerciseName.replace(/[^a-zA-Z0-9]/g, '_');
+        for (const imageUrl of imageUrls) {
+          try {
+            const localPath = await downloadImage(imageUrl, exerciseFolderName);
+            localImagePaths.push(localPath);
+          } catch (imgError) {
+            log('error', `Failed to download image ${imageUrl} for exercise ${exerciseName}:`, imgError);
+            // Continue without this image, but log the error
+          }
+        }
+        newExerciseData.images = localImagePaths;
+      } else {
+        newExerciseData.images = [];
+      }
+
+      const existingExercise = await exerciseRepository.searchExercises(exerciseName, authenticatedUserId, [], []);
+      if (existingExercise && existingExercise.length > 0) {
+        // Check for exact duplicate before updating
+        const isDuplicate = existingExercise.some(
+          (ex) => ex.name.toLowerCase() === exerciseName.toLowerCase()
         );
-        return {
-            exerciseEntriesCount: parseInt(result.rows[0].count, 10),
-        };
-    } finally {
-        client.release();
+
+        if (isDuplicate) {
+          duplicates.push({ name: exerciseName, reason: 'Exercise with this name already exists.' });
+          failedCount++;
+          failedRows.push({ row: exerciseData, reason: 'Duplicate exercise name.' });
+          continue;
+        }
+
+        // Assuming the first match is the one to update
+        await exerciseRepository.updateExercise(existingExercise[0].id, authenticatedUserId, newExerciseData);
+        updatedCount++;
+      } else {
+        await exerciseRepository.createExercise(newExerciseData);
+        createdCount++;
+      }
+    } catch (rowError) {
+      failedCount++;
+      failedRows.push({ row: exerciseData, reason: rowError.message });
+      log('error', `Error processing exercise data for user ${authenticatedUserId}:`, rowError);
     }
+  }
+
+  if (duplicates.length > 0) {
+    const error = new Error('Duplicate exercises found.');
+    error.status = 409; // Conflict
+    error.data = { duplicates };
+    throw error;
+  }
+
+  return {
+    message: 'Exercise import complete.',
+    created: createdCount,
+    updated: updatedCount,
+    failed: failedCount,
+    failedRows: failedRows,
+  };
 }

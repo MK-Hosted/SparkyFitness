@@ -1,4 +1,5 @@
 import { apiCall } from './api';
+import { WorkoutPresetSet } from '@/types/workout';
 
 export interface ExerciseEntry {
   id: string;
@@ -7,7 +8,7 @@ export interface ExerciseEntry {
   calories_burned: number;
   entry_date: string;
   notes?: string;
-  sets?: number;
+  sets?: WorkoutPresetSet[];
   reps?: number;
   weight?: number;
   image_url?: string;
@@ -31,7 +32,7 @@ export const updateExerciseEntry = async (
     duration_minutes?: number;
     calories_burned: number;
     notes?: string;
-    sets?: number;
+    sets?: WorkoutPresetSet[];
     reps?: number;
     weight?: number;
     image_url?: string;

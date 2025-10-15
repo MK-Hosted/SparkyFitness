@@ -30,8 +30,10 @@ import {
   removeFoodEntry,
   copyFoodEntries, // Import the new copy function
   copyFoodEntriesFromYesterday, // Import the new copy from yesterday function
+  addMealToDiary,
 } from "@/services/foodDiaryService";
-import { Food, FoodVariant, GlycemicIndex } from "@/types/food"; // Import GlycemicIndex
+import { Food, FoodVariant, GlycemicIndex } from "@/types/food";
+import { Meal as MealType } from "@/types/meal";
 import { FoodEntry } from "@/types/food";
 import { ExpandedGoals } from "@/types/goals";
 import { Exercise } from "@/services/exerciseSearchService"; // Import Exercise interface
@@ -40,15 +42,7 @@ import { PresetExercise, WorkoutPreset } from "@/types/workout"; // Import Prese
 import AddExerciseDialog from "./AddExerciseDialog"; // Import AddExerciseDialog
 import AddWorkoutPresetDialog from "./AddWorkoutPresetDialog"; // Import AddWorkoutPresetDialog
 
-import { Meal as MealType } from "@/types/meal"; // Import MealType from types/meal.d.ts
 
-interface Meal {
-  name: string;
-  type: string;
-  entries: FoodEntry[];
-  targetCalories?: number;
-  selectedDate?: string; // Add selectedDate as it's passed to MealCard
-}
 
 interface MealTotals {
   calories: number;
@@ -246,7 +240,7 @@ const FoodDiary = ({
   );
 
   const getMealData = useCallback(
-    (mealType: string): Meal => {
+    (mealType: string): { name: string; type: string; entries: FoodEntry[]; targetCalories: number } => {
       debug(loggingLevel, "Getting meal data for meal type:", mealType);
       const mealNames = {
         breakfast: "Breakfast",
@@ -435,11 +429,31 @@ const FoodDiary = ({
   }, [debug, loggingLevel, date, handleDateSelect]);
 
   const handleFoodSelect = useCallback(
-    (food: Food, mealType: string) => {
-      debug(loggingLevel, "Handling food select:", { food, mealType });
-      setSelectedFood(food);
-      setSelectedMealType(mealType);
-      setIsUnitSelectorOpen(true);
+    async (item: Food | MealType, mealType: string) => {
+      if ('is_custom' in item) { // It's a Food
+        debug(loggingLevel, "Handling food select:", { food: item, mealType });
+        setSelectedFood(item as Food);
+        setSelectedMealType(mealType);
+        setIsUnitSelectorOpen(true);
+      } else { // It's a Meal
+        debug(loggingLevel, "Handling meal select:", { meal: item, mealType });
+        const meal = item as MealType;
+        try {
+          await addMealToDiary(meal.id, mealType, selectedDate);
+          toast({
+            title: "Success",
+            description: `Meal "${meal.name}" added to diary.`,
+          });
+          handleDataChange();
+        } catch (err) {
+          error(loggingLevel, "Error adding meal to diary:", err);
+          toast({
+            title: "Error",
+            description: "Failed to add meal to diary.",
+            variant: "destructive",
+          });
+        }
+      }
     },
     [
       debug,

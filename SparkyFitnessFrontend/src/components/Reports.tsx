@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'; // Added Legend
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, ScatterChart, Scatter } from 'recharts'; // Added ScatterChart, Scatter
 import { BarChart3, TrendingUp, Activity, Dumbbell } from "lucide-react"; // Added Dumbbell
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useActiveUser } from "@/contexts/ActiveUserContext";
@@ -12,6 +12,7 @@ import ReportsControls from "./reports/ReportsControls";
 import NutritionChartsGrid from "./reports/NutritionChartsGrid";
 import MeasurementChartsGrid from "./reports/MeasurementChartsGrid";
 import ReportsTables from "./reports/ReportsTables";
+import ExerciseReportsDashboard from "./reports/ExerciseReportsDashboard"; // Import ExerciseReportsDashboard
 import { log, debug, info, warn, error, UserLoggingLevel } from "@/utils/logging";
 import { format, parseISO, addDays } from 'date-fns'; // Import format, parseISO, addDays from date-fns
 import { calculateFoodEntryNutrition } from '@/utils/nutritionCalculations'; // Import the new utility function
@@ -32,8 +33,10 @@ import {
   CustomMeasurementData,
   DailyExerciseEntry, // Import DailyExerciseEntry
   ExerciseProgressData, // Import ExerciseProgressData
+  ExerciseDashboardData, // Import new type for dashboard data
 } from '@/services/reportsService';
 import { getExerciseProgressData } from '@/services/exerciseEntryService'; // Import getExerciseProgressData
+import { getExerciseDashboardData } from '@/services/reportsService'; // Import new dashboard data function
 
 const Reports = () => {
   const { user } = useAuth();
@@ -43,6 +46,7 @@ const Reports = () => {
   const [measurementData, setMeasurementData] = useState<ReportsMeasurementData[]>([]);
   const [tabularData, setTabularData] = useState<DailyFoodEntry[]>([]);
   const [exerciseEntries, setExerciseEntries] = useState<DailyExerciseEntry[]>([]); // New state for exercise entries
+  const [exerciseDashboardData, setExerciseDashboardData] = useState<ExerciseDashboardData | null>(null); // New state for exercise dashboard data
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [customMeasurementsData, setCustomMeasurementsData] = useState<Record<string, CustomMeasurementData[]>>({});
   const [loading, setLoading] = useState(true);
@@ -50,8 +54,14 @@ const Reports = () => {
   const [endDate, setEndDate] = useState<string | null>(null);
   const [showWeightInKg, setShowWeightInKg] = useState(defaultWeightUnit === 'kg');
   const [showMeasurementsInCm, setShowMeasurementsInCm] = useState(defaultMeasurementUnit === 'cm');
-  const [selectedExerciseForChart, setSelectedExerciseForChart] = useState<string | null>(null); // New state for exercise chart selection
-  const [exerciseProgressData, setExerciseProgressData] = useState<ExerciseProgressData[]>([]); // New state for exercise progress data
+  const [drilldownDate, setDrilldownDate] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("charts");
+
+
+  const handleDrilldown = (date: string) => {
+    setDrilldownDate(date);
+    // You might want to switch to the table tab here
+  };
 
   // Effect to re-initialize startDate and endDate when timezone preference changes
   useEffect(() => {
@@ -104,23 +114,31 @@ const Reports = () => {
       };
     }, [user, activeUserId, startDate, endDate, loggingLevel, formatDateInUserTimezone, parseDateInUserTimezone, showWeightInKg, showMeasurementsInCm, defaultWeightUnit, defaultMeasurementUnit]); // Added showWeightInKg, showMeasurementsInCm, defaultWeightUnit, defaultMeasurementUnit to dependencies
 
+
   const loadReports = async () => {
     info(loggingLevel, 'Reports: Loading reports...');
     try {
       setLoading(true);
       
-      const {
-        nutritionData: fetchedNutritionData,
-        tabularData: fetchedTabularData,
-        exerciseEntries: fetchedExerciseEntries, // Fetch exercise entries
-        measurementData: fetchedMeasurementData,
-        customCategories: fetchedCustomCategories,
-        customMeasurementsData: fetchedCustomMeasurementsData,
-      } = await loadReportsData(activeUserId, startDate, endDate);
+      const [
+        {
+          nutritionData: fetchedNutritionData,
+          tabularData: fetchedTabularData,
+          exerciseEntries: fetchedExerciseEntries,
+          measurementData: fetchedMeasurementData,
+          customCategories: fetchedCustomCategories,
+          customMeasurementsData: fetchedCustomMeasurementsData,
+        },
+        fetchedExerciseDashboardData,
+      ] = await Promise.all([
+        loadReportsData(activeUserId, startDate, endDate),
+        getExerciseDashboardData(activeUserId, startDate, endDate, null, null, null),
+      ]);
 
       setNutritionData(fetchedNutritionData);
       setTabularData(fetchedTabularData);
-      setExerciseEntries(fetchedExerciseEntries); // Set exercise entries
+      setExerciseEntries(fetchedExerciseEntries);
+      setExerciseDashboardData(fetchedExerciseDashboardData);
       
       // Apply unit conversions to fetchedMeasurementData
       const measurementDataFormatted = fetchedMeasurementData.map(m => ({
@@ -148,27 +166,6 @@ const Reports = () => {
       debug(loggingLevel, 'Reports: Loading state set to false.');
     }
   };
-
-  const fetchExerciseChartData = useCallback(async () => {
-    if (!selectedExerciseForChart || !startDate || !endDate) return;
-
-    try {
-      const data = await getExerciseProgressData(selectedExerciseForChart, startDate, endDate);
-      setExerciseProgressData(data);
-      info(loggingLevel, `Reports: Fetched exercise progress data for ${selectedExerciseForChart}:`, data);
-    } catch (err) {
-      error(loggingLevel, `Reports: Error fetching exercise progress data for ${selectedExerciseForChart}:`, err);
-      toast({
-        title: "Error",
-        description: "Failed to load exercise progress data.",
-        variant: "destructive",
-      });
-    }
-  }, [selectedExerciseForChart, startDate, endDate, loggingLevel, toast]);
-
-  useEffect(() => {
-    fetchExerciseChartData();
-  }, [fetchExerciseChartData]);
 
   const exportFoodDiary = async () => {
     info(loggingLevel, 'Reports: Attempting to export food diary.');
@@ -353,9 +350,9 @@ const Reports = () => {
         entry.exercises.name,
         entry.duration_minutes.toString(),
         Math.round(entry.calories_burned).toString(),
-        entry.sets?.toString() || '',
-        entry.reps?.toString() || '',
-        entry.weight?.toString() || '',
+        entry.sets.map(set => set.set_number).join('; ') || '', // Display set numbers
+        entry.sets.map(set => set.reps).join('; ') || '', // Display reps for each set
+        entry.sets.map(set => set.weight).join('; ') || '', // Display weight for each set
         entry.notes || '',
         entry.exercises.category,
         entry.exercises.equipment?.join(', ') || '',
@@ -637,7 +634,7 @@ const Reports = () => {
       {loading ? (
         <div>Loading reports...</div>
       ) : (
-        <Tabs defaultValue="charts" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3"> {/* Changed to 3 columns */}
             <TabsTrigger value="charts" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
@@ -723,87 +720,22 @@ const Reports = () => {
           </TabsContent>
 
           <TabsContent value="exercise-charts" className="space-y-6"> {/* New tab content */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Dumbbell className="w-5 h-5 mr-2" /> Exercise Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={selectedExerciseForChart || ''}
-                  onValueChange={(value) => setSelectedExerciseForChart(value)}
-                >
-                  <SelectTrigger className="w-full mb-4">
-                    <SelectValue placeholder="Select an exercise" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(exerciseEntries || [])
-                      .filter((entry, index, self) =>
-                        index === self.findIndex((e) => e.exercises.id === entry.exercises.id)
-                      ) // Get unique exercises
-                      .map((entry) => (
-                        <SelectItem key={entry.exercises.id} value={entry.exercises.id}>
-                          {entry.exercises.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-
-                {selectedExerciseForChart && exerciseProgressData.length > 0 ? (
-                  <div className="space-y-4">
-                    <ZoomableChart title="Volume Trend">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={exerciseProgressData.map(d => ({
-                          ...d,
-                          date: formatDateInUserTimezone(d.entry_date, 'MMM dd, yyyy'),
-                          volume: (d.sets || 0) * (d.reps || 0) * (d.weight || 0)
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis label={{ value: 'Volume', angle: -90, position: 'insideLeft', offset: 10 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))' }} />
-                          <Legend />
-                          <Line type="monotone" dataKey="volume" stroke="#8884d8" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </ZoomableChart>
-
-                    <ZoomableChart title="Max Weight Trend">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={exerciseProgressData.map(d => ({
-                          ...d,
-                          date: formatDateInUserTimezone(d.entry_date, 'MMM dd, yyyy'),
-                          maxWeight: d.weight || 0
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis label={{ value: 'Max Weight', angle: -90, position: 'insideLeft', offset: 10 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))' }} />
-                          <Legend />
-                          <Line type="monotone" dataKey="maxWeight" stroke="#82ca9d" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </ZoomableChart>
-
-                    {/* Add 1RM chart here if desired */}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground">
-                    {selectedExerciseForChart ? "No progress data available for this exercise in the selected date range." : "Select an exercise to view progress charts."}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <ExerciseReportsDashboard
+              exerciseDashboardData={exerciseDashboardData}
+              startDate={startDate}
+              endDate={endDate}
+              onDrilldown={handleDrilldown}
+            />
           </TabsContent>
 
           <TabsContent value="table" className="space-y-6">
             <ReportsTables
               tabularData={tabularData}
-              exerciseEntries={exerciseEntries} // Pass exerciseEntries
+              exerciseEntries={drilldownDate ? exerciseEntries.filter(e => e.entry_date === drilldownDate) : exerciseEntries} // Pass exerciseEntries
               measurementData={measurementData}
               customCategories={customCategories}
               customMeasurementsData={customMeasurementsData}
+              prData={exerciseDashboardData?.prData}
               showWeightInKg={showWeightInKg}
               showMeasurementsInCm={showMeasurementsInCm}
               onExportFoodDiary={exportFoodDiary}

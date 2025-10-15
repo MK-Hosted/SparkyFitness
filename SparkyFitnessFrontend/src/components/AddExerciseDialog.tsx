@@ -14,11 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ExerciseSearch from "./ExerciseSearch";
 import WorkoutPresetSelector from "./WorkoutPresetSelector"; // Import WorkoutPresetSelector
+import ExerciseImportCSV, { ExerciseCSVData } from "./ExerciseImportCSV"; // Renamed import and import ExerciseCSVData
 import { createExercise, Exercise } from "@/services/exerciseService";
 import { WorkoutPreset } from "@/types/workout"; // Import WorkoutPreset type
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { PlusCircle, XCircle } from "lucide-react";
+import { apiCall } from "@/services/api"; // Import apiCall
 
 interface AddExerciseDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ interface AddExerciseDialogProps {
 
 const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkoutPresetSelected }: AddExerciseDialogProps) => {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState(mode === 'database-manager' ? 'online' : 'my-exercises');
   const [newExerciseName, setNewExerciseName] = useState("");
   const [newExerciseCategory, setNewExerciseCategory] = useState("general");
   const [newExerciseCalories, setNewExerciseCalories] = useState(300); // Default calculated calories
@@ -91,7 +94,7 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkou
       // Assuming the newly created exercise is returned by createExercise
       // For now, we'll just pass a placeholder or refetch if necessary.
       // A more robust solution would be to return the created exercise from createExercise.
-      onExerciseAdded({ id: 'temp-id', name: newExerciseName, category: newExerciseCategory, calories_per_hour: manualCaloriesPerHour !== undefined ? manualCaloriesPerHour : newExerciseCalories }, 'custom');
+      onExerciseAdded({ id: 'temp-id', name: newExerciseName, category: newExerciseCategory, calories_per_hour: manualCaloriesPerHour !== undefined ? manualCaloriesPerHour : newExerciseCalories, sets: [{ set_number: 1, set_type: 'Working Set', reps: 10, weight: 0 }] }, 'custom');
       onOpenChange(false);
       setNewExerciseName("");
       setNewExerciseCategory("general");
@@ -166,21 +169,59 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkou
     setDraggedImageIndex(null);
   };
 
+  const handleImportFromCSV = async (exerciseDataArray: Omit<ExerciseCSVData, "id">[]) => {
+    try {
+      const res = await apiCall(`/exercises/import-json`, {
+        method: "POST",
+        body: JSON.stringify({ exercises: exerciseDataArray }),
+      });
+
+      toast({
+        title: "Success",
+        description: "Exercise data imported successfully",
+      });
+      onOpenChange(false);
+    } catch (error) {
+      if (error?.status === 409 && error.data?.duplicates) {
+        const duplicateList = error.data.duplicates
+          .map(
+            (d: { name: string }) => `"${d.name}"`
+          )
+          .join(", ");
+
+        toast({
+          title: "Import Failed: Duplicate Items Found",
+          description: `The following items already exist: ${duplicateList}. Please remove them from your file and try again.`,
+          variant: "destructive",
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: "An Error Occurred",
+          description:
+            error.message || "Failed to import exercise data. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[625px] overflow-y-auto max-h-[90vh]">
+      <DialogContent className={activeTab === 'import-csv' ? "sm:max-w-[95vw] sm:max-h-[95vh] w-[95vw] h-[95vh] overflow-y-auto" : "sm:max-w-[625px] overflow-y-auto max-h-[90vh]"}>
         <DialogHeader>
           <DialogTitle>Add Exercise</DialogTitle>
           <DialogDescription>
             Add a new exercise to your database, either by creating a custom one or importing from an external source.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue={mode === 'database-manager' ? 'online' : 'my-exercises'}>
-          <TabsList className={`grid w-full grid-cols-${mode === 'database-manager' ? 2 : (mode === 'diary' || mode === 'workout-plan') ? 4 : 3}`}>
+        <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
+          <TabsList className={`grid w-full grid-cols-${mode === 'database-manager' ? 3 : (mode === 'diary' || mode === 'workout-plan') ? 5 : 4}`}>
             {mode !== 'database-manager' && <TabsTrigger value="my-exercises">My Exercises</TabsTrigger>}
             {(mode === 'diary' || mode === 'workout-plan') && <TabsTrigger value="workout-preset">Workout Preset</TabsTrigger>}
             <TabsTrigger value="online">Online</TabsTrigger>
             <TabsTrigger value="custom">Add Custom</TabsTrigger>
+            <TabsTrigger value="import-csv">Import CSV</TabsTrigger>
           </TabsList>
           {mode !== 'database-manager' && (
             <TabsContent value="my-exercises">
@@ -274,34 +315,45 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkou
                 <Label htmlFor="force" className="text-right">
                   Force
                 </Label>
-                <Input
-                  id="force"
-                  value={newExerciseForce}
-                  onChange={(e) => setNewExerciseForce(e.target.value)}
-                  className="col-span-3"
-                />
+                <Select onValueChange={setNewExerciseForce} defaultValue={newExerciseForce}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select force" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pull">Pull</SelectItem>
+                    <SelectItem value="push">Push</SelectItem>
+                    <SelectItem value="static">Static</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="level" className="text-right">
                   Level
                 </Label>
-                <Input
-                  id="level"
-                  value={newExerciseLevel}
-                  onChange={(e) => setNewExerciseLevel(e.target.value)}
-                  className="col-span-3"
-                />
+                <Select onValueChange={setNewExerciseLevel} defaultValue={newExerciseLevel}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="expert">Expert</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="mechanic" className="text-right">
                   Mechanic
                 </Label>
-                <Input
-                  id="mechanic"
-                  value={newExerciseMechanic}
-                  onChange={(e) => setNewExerciseMechanic(e.target.value)}
-                  className="col-span-3"
-                />
+                <Select onValueChange={setNewExerciseMechanic} defaultValue={newExerciseMechanic}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select mechanic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="isolation">Isolation</SelectItem>
+                    <SelectItem value="compound">Compound</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="equipment" className="text-right mt-1">
@@ -386,6 +438,13 @@ const AddExerciseDialog = ({ open, onOpenChange, onExerciseAdded, mode, onWorkou
                 </div>
               </div>
             <Button onClick={handleAddCustomExercise}>Add Exercise</Button>
+          </TabsContent>
+          <TabsContent value="import-csv">
+            <div className="pt-4">
+              <ExerciseImportCSV
+                onSave={handleImportFromCSV} // Use the new onSave prop
+              />
+            </div>
           </TabsContent>
           {(mode === 'diary' || mode === 'workout-plan') && (
             <TabsContent value="workout-preset">

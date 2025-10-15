@@ -346,9 +346,9 @@ const ExerciseDatabaseManager: React.FC<ExerciseDatabaseManagerProps> = ({ onPre
                       setEditExerciseCategory(exercise.category);
                       setEditExerciseCalories(exercise.calories_per_hour);
                       setEditExerciseDescription(exercise.description || "");
-                      setEditExerciseLevel(exercise.level || "");
-                      setEditExerciseForce(exercise.force || "");
-                      setEditExerciseMechanic(exercise.mechanic || "");
+                      setEditExerciseLevel(exercise.level?.toLowerCase() || "");
+                      setEditExerciseForce(exercise.force?.toLowerCase() || "");
+                      setEditExerciseMechanic(exercise.mechanic?.toLowerCase() || "");
                       setEditExerciseEquipment(Array.isArray(exercise.equipment) ? exercise.equipment : []);
                       setEditExercisePrimaryMuscles(Array.isArray(exercise.primary_muscles) ? exercise.primary_muscles : []);
                       setEditExerciseSecondaryMuscles(Array.isArray(exercise.secondary_muscles) ? exercise.secondary_muscles : []);

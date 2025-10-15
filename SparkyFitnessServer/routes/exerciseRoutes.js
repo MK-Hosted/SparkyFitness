@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeAccess } = require('../middleware/authMiddleware');
 const exerciseService = require('../services/exerciseService');
+const reportRepository = require('../models/reportRepository');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -131,7 +132,7 @@ router.get('/search-external', authenticateToken, authorizeAccess('exercise_list
   }
 });
 
-router.get('/equipment-types', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+router.get('/equipment', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
   try {
     const equipmentTypes = await exerciseService.getAvailableEquipment();
     res.status(200).json(equipmentTypes);
@@ -144,6 +145,16 @@ router.get('/muscle-groups', authenticateToken, authorizeAccess('exercise_list')
   try {
     const muscleGroups = await exerciseService.getAvailableMuscleGroups();
     res.status(200).json(muscleGroups);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/names', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const { muscle, equipment } = req.query;
+    const exerciseNames = await reportRepository.getExerciseNames(req.userId, muscle, equipment);
+    res.status(200).json(exerciseNames);
   } catch (error) {
     next(error);
   }
@@ -212,6 +223,32 @@ router.post('/', authenticateToken, authorizeAccess('exercise_list'), upload.arr
     });
     res.status(201).json(newExercise);
   } catch (error) {
+    next(error);
+  }
+});
+// Endpoint to import exercises from CSV (file upload)
+router.post('/import', authenticateToken, authorizeAccess('exercise_list'), upload.single('file'), async (req, res, next) => {
+  try {
+    const result = await exerciseService.importExercisesFromCSV(req.userId, req.file.path);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Endpoint to import exercises from JSON (from frontend table)
+router.post('/import-json', authenticateToken, authorizeAccess('exercise_list'), async (req, res, next) => {
+  try {
+    const { exercises } = req.body;
+    if (!exercises || !Array.isArray(exercises)) {
+      return res.status(400).json({ error: 'Invalid data format. Expected an array of exercises.' });
+    }
+    const result = await exerciseService.importExercisesFromJson(req.userId, exercises);
+    res.status(201).json(result);
+  } catch (error) {
+    if (error.status === 409) {
+      return res.status(409).json({ error: error.message, duplicates: error.data.duplicates });
+    }
     next(error);
   }
 });

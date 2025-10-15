@@ -80,6 +80,13 @@ export const addFoodEntry = async (payload: {
   });
 };
 
+export const addMealToDiary = async (mealId: string, mealType: string, entryDate: string): Promise<void> => {
+  return apiCall('/foods/food-entries/add-meal', {
+    method: 'POST',
+    body: { mealId, mealType, entryDate },
+  });
+};
+
 export const removeFoodEntry = async (entryId: string): Promise<void> => {
   return apiCall(`/foods/food-entries/${entryId}`, {
     method: 'DELETE',

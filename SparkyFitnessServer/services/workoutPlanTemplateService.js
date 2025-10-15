@@ -3,7 +3,7 @@ const workoutPresetRepository = require('../models/workoutPresetRepository');
 const exerciseRepository = require('../models/exerciseRepository');
 const { log } = require('../config/logging');
 
-async function createWorkoutPlanTemplate(userId, planData) {
+async function createWorkoutPlanTemplate(userId, planData, currentClientDate = null) {
     log('info', `createWorkoutPlanTemplate service - received planData:`, planData);
     // Validate assignments
     if (planData.assignments) {
@@ -27,7 +27,7 @@ async function createWorkoutPlanTemplate(userId, planData) {
         log('info', 'createWorkoutPlanTemplate service - newPlan created:', newPlan);
         if (newPlan.is_active) {
             log('info', `createWorkoutPlanTemplate service - New plan is active, creating exercise entries from template ${newPlan.id}`);
-            await exerciseRepository.createExerciseEntriesFromTemplate(newPlan.id, userId);
+            await exerciseRepository.createExerciseEntriesFromTemplate(newPlan.id, userId, currentClientDate);
         } else {
             log('info', `createWorkoutPlanTemplate service - New plan is not active, skipping exercise entry creation.`);
         }
@@ -54,7 +54,7 @@ async function getWorkoutPlanTemplateById(userId, templateId) {
     return template;
 }
 
-async function updateWorkoutPlanTemplate(userId, templateId, updateData) {
+async function updateWorkoutPlanTemplate(userId, templateId, updateData, currentClientDate = null) {
     log('info', `updateWorkoutPlanTemplate service - received updateData for template ${templateId}:`, updateData);
     const ownerId = await workoutPlanTemplateRepository.getWorkoutPlanTemplateOwnerId(templateId);
     if (ownerId !== userId) {
@@ -86,7 +86,7 @@ async function updateWorkoutPlanTemplate(userId, templateId, updateData) {
         log('info', 'updateWorkoutPlanTemplate service - updatedPlan:', updatedPlan);
         if (updatedPlan.is_active) {
             log('info', `updateWorkoutPlanTemplate service - Updated plan is active, creating exercise entries from template ${updatedPlan.id}`);
-            await exerciseRepository.createExerciseEntriesFromTemplate(updatedPlan.id, userId);
+            await exerciseRepository.createExerciseEntriesFromTemplate(updatedPlan.id, userId, currentClientDate);
         } else {
             log('info', `updateWorkoutPlanTemplate service - Updated plan is not active, skipping exercise entry creation.`);
         }
@@ -104,8 +104,8 @@ async function deleteWorkoutPlanTemplate(userId, templateId) {
         throw new Error('Forbidden: You do not have permission to delete this workout plan template.');
     }
     try {
-        // Also delete associated exercise entries
-        log('info', `deleteWorkoutPlanTemplate service - Deleting associated exercise entries for template ${templateId}`);
+        // Delete future associated exercise entries, and decouple past ones via ON DELETE SET NULL
+        log('info', `deleteWorkoutPlanTemplate service - Deleting future associated exercise entries for template ${templateId}`);
         await exerciseRepository.deleteExerciseEntriesByTemplateId(templateId, userId);
 
         const deleted = await workoutPlanTemplateRepository.deleteWorkoutPlanTemplate(templateId, userId);

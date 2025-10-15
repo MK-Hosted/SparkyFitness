@@ -24,22 +24,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import EnhancedFoodSearch from "./EnhancedFoodSearch";
 import EnhancedCustomFoodForm from "./EnhancedCustomFoodForm";
-import MealSelectionDialog from "./MealSelectionDialog"; // Import MealSelectionDialog
 import { usePreferences } from "@/contexts/PreferencesContext"; // Import usePreferences
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debug, info, warn, error } from "@/utils/logging"; // Import logging utility
 
 import type { Food, FoodVariant, FoodEntry, GlycemicIndex } from "@/types/food";
-
-// import { Meal as MealType } from '@/types/meal'; // No longer needed as we define Meal directly
-
-interface Meal {
-  name: string; // Add name property
-  type: string;
-  entries: FoodEntry[];
-  targetCalories?: number;
-  selectedDate: string; // Add selectedDate to Meal interface
-}
+import { Meal } from '@/types/meal';
 
 interface MealTotals {
   calories: number;
@@ -60,9 +50,15 @@ interface MealTotals {
 }
 
 interface MealCardProps {
-  meal: Meal;
+  meal: {
+    name: string;
+    type: string;
+    entries: FoodEntry[];
+    targetCalories?: number;
+    selectedDate: string;
+  };
   totals: MealTotals;
-  onFoodSelect: (food: Food, mealType: string) => void;
+  onFoodSelect: (item: Food | Meal, mealType: string) => void;
   onEditEntry: (entry: FoodEntry) => void;
   onEditFood: (food: Food) => void;
   onRemoveEntry: (entryId: string) => void;
@@ -195,22 +191,26 @@ const MealCard = ({
                     </DialogDescription>
                   </DialogHeader>
                   <EnhancedFoodSearch
-                    onFoodSelect={(food) => {
-                      debug(
-                        loggingLevel,
-                        "MealCard: Food selected in search:",
-                        food,
-                      );
-                      onFoodSelect(food, meal.type);
+                    onFoodSelect={(item, type) => {
+                      if (type === 'food') {
+                        debug(
+                          loggingLevel,
+                          "MealCard: Food selected in search:",
+                          item,
+                        );
+                        onFoodSelect(item as Food, meal.type);
+                      } else {
+                        debug(
+                          loggingLevel,
+                          "MealCard: Meal selected in search:",
+                          item,
+                        );
+                        onFoodSelect(item as any, meal.type);
+                      }
                     }}
                   />
                 </DialogContent>
               </Dialog>
-              <MealSelectionDialog
-                mealType={meal.type}
-                selectedDate={meal.selectedDate}
-                onMealAdded={onMealAdded}
-              />
               {/* Existing clock icon would go here if it were part of this component */}
               <Button
                 size="default"

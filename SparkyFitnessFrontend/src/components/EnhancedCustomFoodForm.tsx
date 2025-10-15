@@ -82,7 +82,8 @@ const EnhancedCustomFoodForm = ({
   const platform = isMobile ? "mobile" : "desktop";
   const [loading, setLoading] = useState(false);
   const [variants, setVariants] = useState<FoodVariant[]>([]);
-
+  const [variantErrors, setVariantErrors] = useState<string[]>([]); // State to hold errors for each variant
+ 
   const foodDatabasePreferences = nutrientDisplayPreferences.find(
     (p) => p.view_group === "food_database" && p.platform === platform
   );
@@ -108,22 +109,21 @@ const EnhancedCustomFoodForm = ({
         brand: food.brand || "",
         is_quick_food: food.is_quick_food || false,
       });
-      // If food has variants from the API, use them. Otherwise, load existing variants from the backend.
       if (food.variants && food.variants.length > 0) {
-        setVariants(food.variants.map((v) => ({ ...v, is_locked: false, glycemic_index: sanitizeGlycemicIndexFrontend(v.glycemic_index) }))); // Initialize is_locked to false for existing food variants
+        setVariants(food.variants.map((v) => ({ ...v, is_locked: false, glycemic_index: sanitizeGlycemicIndexFrontend(v.glycemic_index) })));
+        setVariantErrors(new Array(food.variants.length).fill(null)); // Initialize errors for existing variants
       } else {
-        loadExistingVariants(); // Load variants for existing food from DB
+        loadExistingVariants();
       }
     } else if (initialVariants && initialVariants.length > 0) {
-      // If initialVariants are provided (e.g., from online search), use them
       setFormData({
-        name: "", // Will be set by the parent component if food is passed
-        brand: "", // Will be set by the parent component if food is passed
+        name: "",
+        brand: "",
         is_quick_food: false,
       });
       setVariants(initialVariants);
+      setVariantErrors(new Array(initialVariants.length).fill(null)); // Initialize errors for initial variants
     } else {
-      // For completely new foods with no initial variants, initialize with a single default variant
       setFormData({
         name: "",
         brand: "",
@@ -150,13 +150,14 @@ const EnhancedCustomFoodForm = ({
           vitamin_c: 0,
           calcium: 0,
           iron: 0,
-          is_default: true, // Mark as default
-          is_locked: false, // New field for locking nutrient details
+          is_default: true,
+          is_locked: false,
           glycemic_index: "None",
         },
       ]);
+      setVariantErrors([null]); // Initialize error for the single default variant
     }
-  }, [food, initialVariants]); // Add initialVariants to dependency array
+  }, [food, initialVariants]);
 
   const loadExistingVariants = async () => {
     if (!food?.id || !isUUID(food.id)) return; // Ensure food.id is a valid UUID
@@ -258,8 +259,8 @@ const EnhancedCustomFoodForm = ({
   };
 
   const addVariant = () => {
-    setVariants([
-      ...variants,
+    setVariants((prevVariants) => [
+      ...prevVariants,
       {
         serving_size: 1,
         serving_unit: "g",
@@ -285,8 +286,9 @@ const EnhancedCustomFoodForm = ({
         glycemic_index: "None",
       },
     ]);
+    setVariantErrors((prevErrors) => [...prevErrors, null]); // Add a null error for the new variant
   };
-
+ 
   const duplicateVariant = (index: number) => {
     const variantToDuplicate = variants[index];
     const newVariant: FoodVariant = {
@@ -296,9 +298,10 @@ const EnhancedCustomFoodForm = ({
       is_locked: false, // New variant is not locked
       glycemic_index: variantToDuplicate.glycemic_index, // Duplicate GI as well
     };
-    setVariants([...variants, newVariant]);
+    setVariants((prevVariants) => [...prevVariants, newVariant]);
+    setVariantErrors((prevErrors) => [...prevErrors, null]); // Add a null error for the duplicated variant
   };
-
+ 
   const removeVariant = (index: number) => {
     // Prevent removing the primary unit (index 0)
     if (index === 0) {
@@ -310,7 +313,8 @@ const EnhancedCustomFoodForm = ({
       });
       return;
     }
-    setVariants(variants.filter((_, i) => i !== index));
+    setVariants((prevVariants) => prevVariants.filter((_, i) => i !== index));
+    setVariantErrors((prevErrors) => prevErrors.filter((_, i) => i !== index)); // Remove the error for the deleted variant
   };
 
   const updateVariant = (
@@ -321,6 +325,19 @@ const EnhancedCustomFoodForm = ({
     const updatedVariants = [...variants];
     const currentVariant = updatedVariants[index];
     const newVariant = { ...currentVariant, [field]: value };
+
+    const updatedErrors = [...variantErrors];
+
+    // Validate serving_size
+    if (field === "serving_size") {
+      const numValue = Number(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        updatedErrors[index] = "Serving size must be a positive number.";
+      } else {
+        updatedErrors[index] = ""; // Clear error if valid
+      }
+      setVariantErrors(updatedErrors);
+    }
 
     // If this variant is set to be the default, ensure all others are not
     if (field === "is_default" && value === true) {
@@ -360,7 +377,6 @@ const EnhancedCustomFoodForm = ({
         ];
 
         nutrientFields.forEach((nutrientField) => {
-          // No need for typeof check here, as NumericFoodVariantKeys ensures it's a number type
           newVariant[nutrientField] = Number(
             ((currentVariant[nutrientField] as number) * ratio).toFixed(2)
           );
@@ -376,10 +392,26 @@ const EnhancedCustomFoodForm = ({
     e.preventDefault();
     if (!user) return;
 
+    // Perform validation for all variants before submission
+    const newVariantErrors: string[] = variants.map((variant) => {
+      if (isNaN(variant.serving_size) || variant.serving_size <= 0) {
+        return "Serving size must be a positive number.";
+      }
+      return "";
+    });
+    setVariantErrors(newVariantErrors);
+
+    if (newVariantErrors.some((error) => error !== "")) {
+      toast({
+        title: "Validation Error",
+        description: "Please correct the errors in the unit variants.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      // The first variant in the array is always the primary unit for the food
-      // Ensure exactly one variant is marked as default
       const defaultVariantCount = variants.filter((v) => v.is_default).length;
       if (defaultVariantCount === 0) {
         toast({
@@ -403,7 +435,6 @@ const EnhancedCustomFoodForm = ({
 
       const primaryVariant = variants.find((v) => v.is_default);
       if (!primaryVariant) {
-        // This case should ideally be caught by the validation above, but as a fallback
         toast({
           title: "Error",
           description: "No default variant found. This should not happen.",
@@ -436,7 +467,6 @@ const EnhancedCustomFoodForm = ({
           brand: "",
           is_quick_food: false,
         });
-        // When creating a new food, reset variants to include only the default unit
         setVariants([
           {
             serving_size: 100,
@@ -459,10 +489,11 @@ const EnhancedCustomFoodForm = ({
             calcium: 0,
             iron: 0,
             is_default: true,
-            is_locked: false, // Reset to unlocked for new food
+            is_locked: false,
             glycemic_index: sanitizeGlycemicIndexFrontend("None"),
           },
         ]);
+        setVariantErrors([null]); // Reset errors for new food
       }
 
       onSave(savedFood);
@@ -549,41 +580,53 @@ const EnhancedCustomFoodForm = ({
                   {/* Unit Variant Controls: Use flex-wrap and stack on small screens */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-wrap mb-4">
                     {/* Serving Size and Unit */}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={variant.serving_size}
-                        onChange={(e) =>
-                          updateVariant(
-                            index,
-                            "serving_size",
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-24" // Fixed width for input
-                      />
-                      <Select
-                        value={variant.serving_unit}
-                        onValueChange={(value) =>
-                          updateVariant(index, "serving_unit", value)
-                        }
-                      >
-                        <SelectTrigger className="w-32">
-                          {" "}
-                          {/* Fixed width for select */}
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COMMON_UNITS.map((unit) => (
-                            <SelectItem key={unit} value={unit}>
-                              {unit}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-end gap-2">
+                      <div className="flex flex-col">
+                        <Label htmlFor={`serving-size-${index}`}>Serving Size</Label>
+                        <Input
+                          id={`serving-size-${index}`}
+                          type="number"
+                          step="0.1"
+                          value={variant.serving_size}
+                          onChange={(e) =>
+                            updateVariant(
+                              index,
+                              "serving_size",
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-24" // Fixed width for input
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <Label htmlFor={`serving-unit-${index}`}>Unit Type</Label>
+                        <Select
+                          value={variant.serving_unit}
+                          onValueChange={(value) =>
+                            updateVariant(index, "serving_unit", value)
+                          }
+                        >
+                          <SelectTrigger id={`serving-unit-${index}`} className="w-32">
+                            {" "}
+                            {/* Fixed width for select */}
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COMMON_UNITS.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {unit}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-
+                    {variantErrors[index] && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {variantErrors[index]}
+                      </p>
+                    )}
+ 
                     {/* Default & Auto-Scale Checkboxes: wrap if needed */}
                     <div className="flex items-center gap-4 flex-wrap">
                       {" "}
@@ -623,7 +666,7 @@ const EnhancedCustomFoodForm = ({
                         </Label>
                       </div>
                     </div>
-
+ 
                     <div className="flex items-center gap-2 ml-auto sm:ml-0">
                       <Button
                         type="button"
@@ -647,7 +690,7 @@ const EnhancedCustomFoodForm = ({
                       )}
                     </div>
                   </div>
-
+ 
                    {/* Nutrition for this specific variant */}
                    <div className="space-y-4">
                      <h4 className="text-md font-medium">
@@ -754,7 +797,7 @@ const EnhancedCustomFoodForm = ({
                         )}
                       </div>
                     </div>
-
+ 
                     {/* Detailed Fat Information: Responsive Grid */}
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-3">
@@ -835,7 +878,7 @@ const EnhancedCustomFoodForm = ({
                         )}
                       </div>
                     </div>
-
+ 
                     {/* Minerals and Other Nutrients: Responsive Grid */}
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-3">
@@ -916,7 +959,7 @@ const EnhancedCustomFoodForm = ({
                         )}
                       </div>
                     </div>
-
+ 
                     {/* Sugars and Vitamins: Responsive Grid */}
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-3">
@@ -997,7 +1040,7 @@ const EnhancedCustomFoodForm = ({
                         )}
                       </div>
                     </div>
-
+ 
                     {/* Last row of nutrients: Responsive Grid */}
                     <div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

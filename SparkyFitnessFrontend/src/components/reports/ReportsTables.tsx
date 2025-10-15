@@ -1,5 +1,7 @@
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download } from "lucide-react";
 import { usePreferences } from "@/contexts/PreferencesContext";
@@ -44,10 +46,8 @@ interface DailyExerciseEntry {
   duration_minutes: number;
   calories_burned: number;
   notes?: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
   exercises: {
+    id: string;
     name: string;
     category: string;
     calories_per_hour: number;
@@ -55,6 +55,16 @@ interface DailyExerciseEntry {
     primary_muscles?: string[];
     secondary_muscles?: string[];
   };
+  sets: { // Define the structure of sets
+    id: string;
+    set_number: number;
+    set_type: string;
+    reps: number;
+    weight: number;
+    duration?: number;
+    rest_time?: number;
+    notes?: string;
+  }[];
 }
 
 interface MeasurementData {
@@ -87,6 +97,7 @@ interface ReportsTablesProps {
   measurementData: MeasurementData[];
   customCategories: CustomCategory[];
   customMeasurementsData: Record<string, CustomMeasurementData[]>;
+  prData: any; // Add prData to props
   showWeightInKg: boolean;
   showMeasurementsInCm: boolean;
   onExportFoodDiary: () => void;
@@ -101,6 +112,7 @@ const ReportsTables = ({
   measurementData,
   customCategories,
   customMeasurementsData,
+  prData, // Destructure prData
   showWeightInKg,
   showMeasurementsInCm,
   onExportFoodDiary,
@@ -113,6 +125,11 @@ const ReportsTables = ({
   const platform = isMobile ? 'mobile' : 'desktop';
   const reportTabularPreferences = nutrientDisplayPreferences.find(p => p.view_group === 'report_tabular' && p.platform === platform);
   const visibleNutrients = reportTabularPreferences ? reportTabularPreferences.visible_nutrients : ['calories', 'protein', 'carbs', 'fat'];
+  const [exerciseNameFilter, setExerciseNameFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState({ startDate: "", endDate: "" });
+  const [setTypeFilter, setSetTypeFilter] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   info(loggingLevel, 'ReportsTables: Rendering component.');
 
@@ -217,6 +234,41 @@ const ReportsTables = ({
     new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime()
   );
 
+  const filteredExerciseEntries = useMemo(() => {
+    let sortableItems = [...sortedExerciseEntries];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems.filter(entry => {
+      const entryDate = parseISO(entry.entry_date);
+      const startDate = dateFilter.startDate ? parseISO(dateFilter.startDate) : null;
+      const endDate = dateFilter.endDate ? parseISO(dateFilter.endDate) : null;
+
+      if (startDate && entryDate < startDate) return false;
+      if (endDate && entryDate > endDate) return false;
+      if (exerciseNameFilter && !entry.exercises.name.toLowerCase().includes(exerciseNameFilter.toLowerCase())) return false;
+      if (setTypeFilter && !entry.sets.some(set => set.set_type.toLowerCase().includes(setTypeFilter.toLowerCase()))) return false;
+
+      return true;
+    });
+  }, [sortedExerciseEntries, exerciseNameFilter, dateFilter, setTypeFilter, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
   // Sort measurement data by date descending
   debug(loggingLevel, 'ReportsTables: Sorting measurement data.');
   const sortedMeasurementData = [...measurementData]
@@ -320,35 +372,101 @@ const ReportsTables = ({
               <Download className="w-4 h-4" />
             </Button>
           </div>
+          <div className="flex items-center space-x-2 mt-4">
+            <Input
+              placeholder="Filter by exercise name..."
+              value={exerciseNameFilter}
+              onChange={(e) => setExerciseNameFilter(e.target.value)}
+              className="max-w-sm"
+            />
+            <Input
+              type="date"
+              value={dateFilter.startDate}
+              onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+            />
+            <Input
+              type="date"
+              value={dateFilter.endDate}
+              onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+            />
+            <Input
+              placeholder="Filter by set type..."
+              value={setTypeFilter}
+              onChange={(e) => setSetTypeFilter(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Exercise</TableHead>
-                  <TableHead>Duration (min)</TableHead>
-                  <TableHead>Calories Burned</TableHead>
-                  <TableHead>Sets</TableHead>
-                  <TableHead>Reps</TableHead>
-                  <TableHead>Weight</TableHead>
+                  <TableHead onClick={() => requestSort('entry_date')}>Date</TableHead>
+                  <TableHead onClick={() => requestSort('exercise_name')}>Exercise</TableHead>
+                  <TableHead onClick={() => requestSort('set_number')}>Set</TableHead>
+                  <TableHead onClick={() => requestSort('set_type')}>Type</TableHead>
+                  <TableHead onClick={() => requestSort('reps')}>Reps</TableHead>
+                  <TableHead onClick={() => requestSort('weight')}>Weight</TableHead>
+                  <TableHead>Tonnage</TableHead>
+                  <TableHead onClick={() => requestSort('duration')}>Duration (min)</TableHead>
+                  <TableHead onClick={() => requestSort('rest_time')}>Rest (s)</TableHead>
                   <TableHead>Notes</TableHead>
+                  <TableHead onClick={() => requestSort('calories_burned')}>Calories Burned</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedExerciseEntries.map((entry, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{formatDateInUserTimezone(parseISO(entry.entry_date), dateFormat)}</TableCell>
-                    <TableCell>{entry.exercises.name}</TableCell>
-                    <TableCell>{entry.duration_minutes}</TableCell>
-                    <TableCell>{Math.round(entry.calories_burned)}</TableCell>
-                    <TableCell>{entry.sets || '-'}</TableCell>
-                    <TableCell>{entry.reps || '-'}</TableCell>
-                    <TableCell>{entry.weight || '-'}</TableCell>
-                    <TableCell>{entry.notes || '-'}</TableCell>
-                  </TableRow>
-                ))}
+                {filteredExerciseEntries.map((entry) => {
+                  const isPr = prData && prData[entry.exercises.id] && prData[entry.exercises.id].date === entry.entry_date;
+                  const isExpanded = expandedRows[entry.id];
+
+                  return (
+                    <React.Fragment key={entry.id}>
+                      <TableRow className={isPr ? "bg-yellow-100 dark:bg-yellow-900" : ""}>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => setExpandedRows(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))}>
+                            {isExpanded ? '▼' : '▶'}
+                          </Button>
+                          {formatDateInUserTimezone(parseISO(entry.entry_date), dateFormat)}
+                        </TableCell>
+                        <TableCell>{entry.exercises.name}</TableCell>
+                        <TableCell>{entry.sets.length}</TableCell>
+                        <TableCell>N/A</TableCell>
+                        <TableCell>
+                          {Math.min(...entry.sets.map(s => s.reps))} - {Math.max(...entry.sets.map(s => s.reps))}
+                        </TableCell>
+                        <TableCell>
+                          {(entry.sets.reduce((acc, s) => acc + Number(s.weight), 0) / entry.sets.length).toFixed(1)}
+                        </TableCell>
+                        <TableCell>
+                          {entry.sets.reduce((acc, s) => acc + (Number(s.weight) * Number(s.reps)), 0)}
+                        </TableCell>
+                        <TableCell>
+                          {entry.sets.reduce((acc, s) => acc + (s.duration || 0), 0)}
+                        </TableCell>
+                        <TableCell>
+                          {entry.sets.reduce((acc, s) => acc + (s.rest_time || 0), 0)}
+                        </TableCell>
+                        <TableCell>{entry.notes || ''}</TableCell>
+                        <TableCell>{Math.round(entry.calories_burned)}</TableCell>
+                      </TableRow>
+                      {isExpanded && entry.sets.map((set, setIndex) => (
+                        <TableRow key={`${entry.id}-set-${set.id || setIndex}`} className="bg-gray-50 dark:bg-gray-800">
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell>{set.set_number}</TableCell>
+                          <TableCell>{set.set_type}</TableCell>
+                          <TableCell>{set.reps}</TableCell>
+                          <TableCell>{set.weight}</TableCell>
+                          <TableCell>{(Number(set.weight) * Number(set.reps))}</TableCell>
+                          <TableCell>{set.duration || '-'}</TableCell>
+                          <TableCell>{set.rest_time || '-'}</TableCell>
+                          <TableCell colSpan={2}>{set.notes || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
