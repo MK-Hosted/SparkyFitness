@@ -120,13 +120,12 @@ const ReportsTables = ({
   onExportCustomMeasurements,
   onExportExerciseEntries, // Destructure new prop
 }: ReportsTablesProps) => {
-  const { loggingLevel, dateFormat, formatDateInUserTimezone, nutrientDisplayPreferences } = usePreferences();
+  const { loggingLevel, dateFormat, formatDateInUserTimezone, nutrientDisplayPreferences, weightUnit, convertWeight } = usePreferences();
   const isMobile = useIsMobile();
   const platform = isMobile ? 'mobile' : 'desktop';
   const reportTabularPreferences = nutrientDisplayPreferences.find(p => p.view_group === 'report_tabular' && p.platform === platform);
   const visibleNutrients = reportTabularPreferences ? reportTabularPreferences.visible_nutrients : ['calories', 'protein', 'carbs', 'fat'];
   const [exerciseNameFilter, setExerciseNameFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState({ startDate: "", endDate: "" });
   const [setTypeFilter, setSetTypeFilter] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -249,17 +248,12 @@ const ReportsTables = ({
     }
     return sortableItems.filter(entry => {
       const entryDate = parseISO(entry.entry_date);
-      const startDate = dateFilter.startDate ? parseISO(dateFilter.startDate) : null;
-      const endDate = dateFilter.endDate ? parseISO(dateFilter.endDate) : null;
-
-      if (startDate && entryDate < startDate) return false;
-      if (endDate && entryDate > endDate) return false;
       if (exerciseNameFilter && !entry.exercises.name.toLowerCase().includes(exerciseNameFilter.toLowerCase())) return false;
       if (setTypeFilter && !entry.sets.some(set => set.set_type.toLowerCase().includes(setTypeFilter.toLowerCase()))) return false;
 
       return true;
     });
-  }, [sortedExerciseEntries, exerciseNameFilter, dateFilter, setTypeFilter, sortConfig]);
+  }, [sortedExerciseEntries, exerciseNameFilter, setTypeFilter, sortConfig]);
 
   const requestSort = (key: string) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -380,16 +374,6 @@ const ReportsTables = ({
               className="max-w-sm"
             />
             <Input
-              type="date"
-              value={dateFilter.startDate}
-              onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
-            />
-            <Input
-              type="date"
-              value={dateFilter.endDate}
-              onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
-            />
-            <Input
               placeholder="Filter by set type..."
               value={setTypeFilter}
               onChange={(e) => setSetTypeFilter(e.target.value)}
@@ -407,7 +391,7 @@ const ReportsTables = ({
                   <TableHead onClick={() => requestSort('set_number')}>Set</TableHead>
                   <TableHead onClick={() => requestSort('set_type')}>Type</TableHead>
                   <TableHead onClick={() => requestSort('reps')}>Reps</TableHead>
-                  <TableHead onClick={() => requestSort('weight')}>Weight</TableHead>
+                  <TableHead onClick={() => requestSort('weight')}>Weight ({weightUnit})</TableHead>
                   <TableHead>Tonnage</TableHead>
                   <TableHead onClick={() => requestSort('duration')}>Duration (min)</TableHead>
                   <TableHead onClick={() => requestSort('rest_time')}>Rest (s)</TableHead>
@@ -431,15 +415,15 @@ const ReportsTables = ({
                         </TableCell>
                         <TableCell>{entry.exercises.name}</TableCell>
                         <TableCell>{entry.sets.length}</TableCell>
-                        <TableCell>N/A</TableCell>
+                        <TableCell></TableCell>
                         <TableCell>
                           {Math.min(...entry.sets.map(s => s.reps))} - {Math.max(...entry.sets.map(s => s.reps))}
                         </TableCell>
                         <TableCell>
-                          {(entry.sets.reduce((acc, s) => acc + Number(s.weight), 0) / entry.sets.length).toFixed(1)}
+                          {Math.round(convertWeight(entry.sets.reduce((acc, s) => acc + Number(s.weight), 0) / entry.sets.length, 'kg', weightUnit))}
                         </TableCell>
                         <TableCell>
-                          {entry.sets.reduce((acc, s) => acc + (Number(s.weight) * Number(s.reps)), 0)}
+                          {Math.round(convertWeight(entry.sets.reduce((acc, s) => acc + (Number(s.weight) * Number(s.reps)), 0), 'kg', weightUnit))}
                         </TableCell>
                         <TableCell>
                           {entry.sets.reduce((acc, s) => acc + (s.duration || 0), 0)}
@@ -457,8 +441,8 @@ const ReportsTables = ({
                           <TableCell>{set.set_number}</TableCell>
                           <TableCell>{set.set_type}</TableCell>
                           <TableCell>{set.reps}</TableCell>
-                          <TableCell>{set.weight}</TableCell>
-                          <TableCell>{(Number(set.weight) * Number(set.reps))}</TableCell>
+                          <TableCell>{Math.round(convertWeight(set.weight, 'kg', weightUnit))}</TableCell>
+                          <TableCell>{Math.round(convertWeight(Number(set.weight) * Number(set.reps), 'kg', weightUnit))}</TableCell>
                           <TableCell>{set.duration || '-'}</TableCell>
                           <TableCell>{set.rest_time || '-'}</TableCell>
                           <TableCell colSpan={2}>{set.notes || '-'}</TableCell>
