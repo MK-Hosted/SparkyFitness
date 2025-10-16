@@ -131,13 +131,23 @@ async function getExerciseEntryById(authenticatedUserId, id) {
 
 async function updateExerciseEntry(authenticatedUserId, id, updateData) {
   try {
-    const entryOwnerId = await exerciseRepository.getExerciseEntryOwnerId(id);
-    if (!entryOwnerId) {
+    const existingEntry = await exerciseRepository.getExerciseEntryById(id);
+    if (!existingEntry) {
       throw new Error('Exercise entry not found.');
     }
     // Ensure the authenticated user is the owner of the exercise entry
-    if (entryOwnerId !== authenticatedUserId) {
+    if (existingEntry.user_id !== authenticatedUserId) {
       throw new Error('Forbidden: You do not have permission to update this exercise entry.');
+    }
+
+    // If a new image is being uploaded or the image is being cleared, delete the old one
+    // If a new image is being uploaded or the image is being cleared, delete the old one
+    if ((updateData.image_url || updateData.image_url === null) && existingEntry.image_url) {
+      const oldImagePath = path.join(__dirname, '..', existingEntry.image_url);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+        log('info', `Deleted old exercise entry image: ${oldImagePath}`);
+      }
     }
  
     // If calories_burned is not provided, calculate it using the calorieCalculationService
@@ -151,7 +161,8 @@ async function updateExerciseEntry(authenticatedUserId, id, updateData) {
         updateData.calories_burned = 0;
       }
     } else if (updateData.calories_burned === undefined) {
-      updateData.calories_burned = 0;
+      // If calories_burned is not in updateData, use existing value or 0
+      updateData.calories_burned = existingEntry.calories_burned || 0;
     }
 
     const updatedEntry = await exerciseRepository.updateExerciseEntry(id, authenticatedUserId, {
@@ -161,7 +172,7 @@ async function updateExerciseEntry(authenticatedUserId, id, updateData) {
       reps: updateData.reps || null,
       weight: updateData.weight || null,
       workout_plan_assignment_id: updateData.workout_plan_assignment_id || null,
-      image_url: updateData.image_url || null,
+      image_url: updateData.image_url === null ? null : (updateData.image_url || existingEntry.image_url),
     });
     if (!updatedEntry) {
       throw new Error('Exercise entry not found or not authorized to update.');
@@ -175,13 +186,22 @@ async function updateExerciseEntry(authenticatedUserId, id, updateData) {
 
 async function deleteExerciseEntry(authenticatedUserId, id) {
   try {
-    const entryOwnerId = await exerciseRepository.getExerciseEntryOwnerId(id);
-    if (!entryOwnerId) {
+    const entry = await exerciseRepository.getExerciseEntryById(id);
+    if (!entry) {
       throw new Error('Exercise entry not found.');
     }
     // Ensure the authenticated user is the owner of the exercise entry
-    if (entryOwnerId !== authenticatedUserId) {
+    if (entry.user_id !== authenticatedUserId) {
       throw new Error('Forbidden: You do not have permission to delete this exercise entry.');
+    }
+
+    // If an image is associated with the entry, delete it from the filesystem
+    if (entry.image_url) {
+      const imagePath = path.join(__dirname, '..', entry.image_url);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+        log('info', `Deleted exercise entry image: ${imagePath}`);
+      }
     }
 
     const success = await exerciseRepository.deleteExerciseEntry(id, authenticatedUserId);

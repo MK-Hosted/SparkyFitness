@@ -529,7 +529,7 @@ async function updateExerciseEntry(id, userId, updateData) {
         entry_date = COALESCE($4, entry_date),
         notes = COALESCE($5, notes),
         workout_plan_assignment_id = COALESCE($6, workout_plan_assignment_id),
-        image_url = COALESCE($7, image_url),
+        image_url = $7,
         updated_at = now()
       WHERE id = $8 AND user_id = $9
       RETURNING id`,
@@ -546,12 +546,13 @@ async function updateExerciseEntry(id, userId, updateData) {
       ]
     );
 
-    if (result.rows.length > 0 && updateData.sets !== undefined) {
-      // Delete old sets
+    // Only modify sets if they are explicitly provided in the update
+    if (updateData.sets !== undefined) {
+      // Delete old sets for the entry
       await client.query('DELETE FROM exercise_entry_sets WHERE exercise_entry_id = $1', [id]);
 
-      // Insert new sets
-      if (updateData.sets.length > 0) {
+      // Insert new sets if provided and not empty
+      if (Array.isArray(updateData.sets) && updateData.sets.length > 0) {
         const setsValues = updateData.sets.map(set => [
           id, set.set_number, set.set_type, set.reps, set.weight, set.duration, set.rest_time, set.notes
         ]);
@@ -940,6 +941,11 @@ async function createExerciseEntriesFromTemplate(templateId, userId, currentClie
     clientDate.setHours(0, 0, 0, 0); // Normalize to the beginning of the day in the client's timezone
 
     const startDate = new Date(template.start_date);
+    const clientTimezoneOffset = currentClientDate ? new Date(currentClientDate).getTimezoneOffset() : new Date().getTimezoneOffset();
+    const serverTimezoneOffset = startDate.getTimezoneOffset();
+    const timezoneDifference = (clientTimezoneOffset - serverTimezoneOffset) * 60 * 1000;
+    
+    startDate.setTime(startDate.getTime() + timezoneDifference);
     // If end_date is not provided, default to one year from start_date
     const endDate = template.end_date ? new Date(template.end_date) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
 
