@@ -50,7 +50,7 @@ async function searchWgerExercises(query, language = 'en', limit = 10, offset = 
     };
     // Use /exercise/ endpoint for search by name/term
     const data = await callWgerApi('/exercise/search', params);
-    return data.suggestions; // wger returns results in a 'results' array
+    return data.suggestions ? data.suggestions.map(suggestion => suggestion.data) : []; // wger returns results in a 'results' array
 }
 
 async function getWgerExerciseDetails(exerciseId) {
