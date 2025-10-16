@@ -361,7 +361,7 @@ async function searchExternalExercises(authenticatedUserId, query, providerId, p
       const wgerSearchResults = await wgerService.searchWgerExercises(query);
 
       const detailedExercisesPromises = wgerSearchResults.map(async (wgerExercise) => {
-        const details = await wgerService.getWgerExerciseDetails(wgerExercise.id);
+        const details = await wgerService.getWgerExerciseDetails(wgerExercise.base_id);
 
         let caloriesPerHour = 0;
         if (details.met && details.met > 0) {
