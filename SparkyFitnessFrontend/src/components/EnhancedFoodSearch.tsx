@@ -533,11 +533,11 @@ const EnhancedFoodSearch = ({
   const convertNutritionixToFood = (item: any, nutrientData: any): Food => {
     const defaultVariant: FoodVariant = {
       id: "default", // Assign a default ID for now
-      serving_size: nutrientData.serving_qty,
-      serving_unit: nutrientData.serving_unit,
+      serving_size: item.serving_size,
+      serving_unit: item.serving_unit,
       calories: nutrientData.calories,
       protein: nutrientData.protein,
-      carbs: nutrientData.carbohydrates,
+      carbs: nutrientData.carbs,
       fat: nutrientData.fat,
       saturated_fat: nutrientData.saturated_fat,
       polyunsaturated_fat: nutrientData.polyunsaturated_fat || 0,
@@ -572,16 +572,16 @@ const EnhancedFoodSearch = ({
   const handleNutritionixEdit = async (item: any) => {
     setLoading(true);
     let nutrientData;
-    if (item.id && item.id.startsWith("nix_")) {
+    if (item.brand) {
       // It's a branded item, use nix_item_id to get full details
       nutrientData = await getNutritionixBrandedNutrients(
-        item.id,
+        item.id, // The 'id' for branded items is the nix_item_id
         selectedFoodDataProvider
       );
     } else {
       // It's a common item, use natural language query
       nutrientData = await getNutritionixNutrients(
-        item.name,
+        item.name, // The 'name' for common items is the food_name
         selectedFoodDataProvider
       );
     }
